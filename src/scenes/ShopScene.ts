@@ -6,6 +6,7 @@ import {
   SHOP_ITEMS,
   nextLifeThreshold,
   MAX_EXTRA_LIVES,
+  SKIN_QITONGWEI_REQUIREMENT,
   type ShopItem
 } from '../systems/progress';
 import { makeButton, showToast } from '../systems/ui';
@@ -64,6 +65,42 @@ export default class ShopScene extends Phaser.Scene {
           this.scene.restart();
         } else {
           showToast(this, GAME_WIDTH / 2, GAME_HEIGHT - 90, `还需翻越 ${threshold! - p.totalDodged} 个障碍`);
+        }
+      });
+      return;
+    }
+
+    // 皮肤行(祁同伟):按累计翻越数解锁
+    if (item.kind === 'skin') {
+      const unlocked = p.totalDodged >= SKIN_QITONGWEI_REQUIREMENT;
+      const using = p.skin === 'qitongwei';
+      let statusText: string;
+      let statusColor: string;
+      if (using) { statusText = '使用中 ✓'; statusColor = '#7dffa8'; }
+      else if (unlocked) { statusText = '已解锁 · 点击使用'; statusColor = '#ffe066'; }
+      else { statusText = `需累计翻越 ${SKIN_QITONGWEI_REQUIREMENT}(当前 ${p.totalDodged})`; statusColor = '#ff9999'; }
+
+      const row = this.add
+        .rectangle(GAME_WIDTH / 2, y, 700, 44, 0x1d3557, 0.55)
+        .setStrokeStyle(1, 0xffffff, 0.4)
+        .setInteractive({ useHandCursor: true });
+      this.add.text(90, y, item.name, { fontFamily: 'monospace', fontSize: '17px', color: '#ffffff' }).setOrigin(0, 0.5);
+      this.add.text(270, y, item.desc, { fontFamily: 'monospace', fontSize: '14px', color: '#cfe3ff' }).setOrigin(0, 0.5);
+      this.add.text(840, y, statusText, { fontFamily: 'monospace', fontSize: '14px', color: statusColor }).setOrigin(1, 0.5);
+
+      row.on('pointerdown', () => {
+        if (using) {
+          p.skin = '';
+          saveProgress(p);
+          showToast(this, GAME_WIDTH / 2, GAME_HEIGHT - 90, '已换回原角色');
+          this.scene.restart();
+        } else if (unlocked) {
+          p.skin = 'qitongwei';
+          saveProgress(p);
+          showToast(this, GAME_WIDTH / 2, GAME_HEIGHT - 90, '已装备祁同伟皮肤!');
+          this.scene.restart();
+        } else {
+          showToast(this, GAME_WIDTH / 2, GAME_HEIGHT - 90, `还需翻越 ${SKIN_QITONGWEI_REQUIREMENT - p.totalDodged} 个障碍`);
         }
       });
       return;

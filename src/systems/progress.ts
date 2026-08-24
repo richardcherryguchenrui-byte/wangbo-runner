@@ -9,6 +9,7 @@ export interface Progress {
   owned: string[];        // 已拥有物品 id
   pendant: PendantId;     // 当前装备的挂件
   extraLives: number;     // 已解锁的额外初始生命(0~3)
+  skin: string;           // 当前使用的主角皮肤:''=原角色,'qitongwei'=祁同伟
 }
 
 const KEY = 'wangboProgress';
@@ -21,8 +22,11 @@ export function nextLifeThreshold(p: Progress): number | null {
   return p.extraLives < MAX_EXTRA_LIVES ? LIFE_UPGRADE_THRESHOLDS[p.extraLives] : null;
 }
 
+// 祁同伟皮肤:需要累计翻越 1000 个障碍解锁
+export const SKIN_QITONGWEI_REQUIREMENT = 1000;
+
 function defaults(): Progress {
-  return { coins: 0, totalDodged: 0, owned: [], pendant: '', extraLives: 0 };
+  return { coins: 0, totalDodged: 0, owned: [], pendant: '', extraLives: 0, skin: '' };
 }
 
 export function loadProgress(): Progress {
@@ -56,12 +60,13 @@ export interface ShopItem {
   name: string;
   desc: string;
   price: number;
-  kind: 'pistol' | 'pendant' | 'life';
+  kind: 'pistol' | 'pendant' | 'life' | 'skin';
   pendant?: PendantId;
 }
 
 export const SHOP_ITEMS: ShopItem[] = [
   { id: 'life', name: '❤️ 初始生命 +1', desc: '每级需更多累计翻越', price: 0, kind: 'life' },
+  { id: 'skin-qitongwei', name: '👤 皮肤·祁同伟', desc: '更换主角皮肤', price: 0, kind: 'skin' },
   { id: 'pistol', name: '🔫 反腐手枪', desc: '每局 3 发子弹,射击摧毁障碍', price: 30, kind: 'pistol' },
   { id: 'pendant-star', name: '挂件·星星', desc: '头顶 ⭐', price: 25, kind: 'pendant', pendant: 'star' },
   { id: 'pendant-briefcase', name: '挂件·公文包', desc: '头顶 💼', price: 35, kind: 'pendant', pendant: 'briefcase' },

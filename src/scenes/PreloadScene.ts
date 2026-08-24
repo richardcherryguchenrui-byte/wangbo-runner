@@ -6,6 +6,8 @@ export default class PreloadScene extends Phaser.Scene {
   preload() {
     // 玩家角色:照片裁剪去背景后的精灵图
     this.load.image('player', 'assets/player-sprite.png');
+    // 祁同伟皮肤
+    this.load.image('player-qi', 'assets/player-qi.png');
     // 障碍物:用户提供的图片,已去背景
     this.load.image('ob-gold', 'assets/ob-gold.png');
     this.load.image('ob-redpacket', 'assets/ob-redpacket.png');

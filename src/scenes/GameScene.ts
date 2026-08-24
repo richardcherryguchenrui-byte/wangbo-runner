@@ -99,8 +99,9 @@ export default class GameScene extends Phaser.Scene {
       );
     }
 
-    // ---- 玩家角色 ----
-    this.player = this.physics.add.sprite(120, GROUND_TOP, 'player');
+    // ---- 玩家角色(祁同伟皮肤替换贴图,碰撞箱公式通用) ----
+    const skinKey = this.progress.skin === 'qitongwei' ? 'player-qi' : 'player';
+    this.player = this.physics.add.sprite(120, GROUND_TOP, skinKey);
     this.player.setY(GROUND_TOP - this.player.height / 2);
     this.player.setDepth(5);
     {
