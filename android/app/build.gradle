@@ -16,7 +16,20 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        // 固定调试签名:保证每次云端打包的 APK 签名一致,可直接覆盖安装更新
+        // (仅个人使用,非正式发布签名)
+        debug {
+            storeFile file('wangbo-debug.p12')
+            storePassword 'wangborunner'
+            keyAlias 'wangbo'
+            keyPassword 'wangborunner'
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
