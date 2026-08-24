@@ -1,10 +1,10 @@
-// 存档成长系统:金币、累计翻越、称号、皮肤、挂件、手枪
+// 存档成长系统:银币、累计翻越、称号、皮肤、挂件、手枪
 // 所有数据保存在 localStorage,跨局持久
 
 export type PendantId = '' | 'star' | 'crown' | 'briefcase';
 
 export interface Progress {
-  coins: number;          // 金币(翻越障碍获得)
+  coins: number;          // 银币(翻越障碍获得)
   totalDodged: number;    // 累计翻越障碍数(决定称号)
   owned: string[];        // 已拥有物品 id
   pendant: PendantId;     // 当前装备的挂件
@@ -52,7 +52,7 @@ export function getTitle(totalDodged: number): string {
 
 // 称号里程碑(用于展示下一级目标)
 export const TITLE_MILESTONES: [number, string][] = [
-  [50, '科长'], [150, '处长'], [300, '局长'], [500, '厅长']
+  [1000, '科长'], [2000, '处长'], [3000, '局长'], [4000, '厅长']
 ];
 
 export interface ShopItem {

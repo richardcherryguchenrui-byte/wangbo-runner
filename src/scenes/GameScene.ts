@@ -75,7 +75,7 @@ export default class GameScene extends Phaser.Scene {
     this.totalLives = 2 + this.progress.extraLives;
     // 关键:Phaser 场景重启复用同一个场景实例,类字段不会自动重置。
     // 必须在这里完整重置局内状态,否则上一局的死亡标记/计时会带进新一局
-    // (表现为:无敌、不计费、秒进结算并重复加金币)。
+    // (表现为:无敌、不计费、秒进结算并重复加银币)。
     this.resetRunState();
     // 上一局死亡时 physics.pause() 冻结了物理世界(场景重启复用它),这里强制恢复
     this.physics.resume();
@@ -464,7 +464,7 @@ export default class GameScene extends Phaser.Scene {
       this.nextGapPx = this.runSpeed * gapTime;
     }
 
-    // 翻越计数:障碍完全越过玩家 + 金币奖励
+    // 翻越计数:障碍完全越过玩家 + 银币奖励
     if (!this.dead) {
       this.obstacleGroup.getChildren().forEach(child => {
         const o = child as Phaser.Physics.Arcade.Image;

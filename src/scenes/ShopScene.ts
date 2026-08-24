@@ -22,7 +22,7 @@ export default class ShopScene extends Phaser.Scene {
   private draw(p: ReturnType<typeof loadProgress>) {
     const outline = { stroke: '#1d3557', strokeThickness: 4 };
     this.add.text(GAME_WIDTH / 2, 30, '🛒 晋升商店', { fontFamily: 'monospace', fontSize: '28px', color: '#ffffff', ...outline }).setOrigin(0.5);
-    this.add.text(GAME_WIDTH / 2, 66, `余额:🪙 ${p.coins}   累计翻越:${p.totalDodged}   翻越障碍赚金币,兑换装备`, { fontFamily: 'monospace', fontSize: '15px', color: '#ffe066', ...outline }).setOrigin(0.5);
+    this.add.text(GAME_WIDTH / 2, 66, `余额:🪙 ${p.coins}   累计翻越:${p.totalDodged}   翻越障碍赚银币,兑换装备`, { fontFamily: 'monospace', fontSize: '15px', color: '#ffe066', ...outline }).setOrigin(0.5);
 
     SHOP_ITEMS.forEach((item, i) => {
       this.drawRow(item, i, p);
@@ -132,7 +132,7 @@ export default class ShopScene extends Phaser.Scene {
           showToast(this, GAME_WIDTH / 2, GAME_HEIGHT - 90, `已购买:${item.name}`);
           this.scene.restart();
         } else {
-          showToast(this, GAME_WIDTH / 2, GAME_HEIGHT - 90, '金币不足!多翻越障碍赚金币吧');
+          showToast(this, GAME_WIDTH / 2, GAME_HEIGHT - 90, '银币不足!多翻越障碍赚银币吧');
         }
       } else if (item.kind === 'pendant') {
         p.pendant = item.pendant!;

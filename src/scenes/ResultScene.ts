@@ -41,7 +41,7 @@ export default class ResultScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(GAME_WIDTH / 2, centerY + 16, `本局翻越:${dodged} 个障碍   金币 +${coins}${win ? '(含晋升奖金5)' : ''}`, {
+      .text(GAME_WIDTH / 2, centerY + 16, `本局翻越:${dodged} 个障碍   银币 +${coins}${win ? '(含晋升奖金5)' : ''}`, {
         fontFamily: 'monospace', fontSize: '18px', color: '#ffe066', ...outline
       })
       .setOrigin(0.5);
