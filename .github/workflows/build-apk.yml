@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-apk:
@@ -43,3 +43,18 @@ jobs:
           name: wangbo-runner-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+
+      # 自动发布到 GitHub Release(每次推送生成新版本)
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.${{ github.run_number }}
+          name: 王博晋升之路跑酷 v1.${{ github.run_number }}
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          body: |
+            安卓安装包(自签名调试版,允许未知来源即可安装)。
+
+            🎮 玩法:点击跳跃,躲开金币堆/红包/财宝/美女,撑 60 秒晋升成功。
+            💾 成长系统:翻越障碍赚金币,商店兑换手枪/挂件/初始生命。
+            ⭐ 30 秒解锁二段跳。
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
