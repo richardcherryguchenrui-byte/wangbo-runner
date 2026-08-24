@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">王博晋升之路跑酷</string>
+    <string name="title_activity_main">王博晋升之路跑酷</string>
+    <string name="package_name">wangbo.runner</string>
+    <string name="custom_url_scheme">wangbo.runner</string>
+</resources>

@@ -1,0 +1,21 @@
+# 依赖与构建产物
+node_modules/
+dist/
+src-tauri/target/
+
+# 系统文件
+.DS_Store
+
+# 安卓构建产物
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+
+# iOS 构建产物
+ios/App/Pods/
+ios/App/App/public/
+ios/DerivedData/
+
+# 日志
+*.log
