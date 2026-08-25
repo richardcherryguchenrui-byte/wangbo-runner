@@ -3,7 +3,7 @@ import { GAME_WIDTH, GAME_HEIGHT, GROUND_TOP, GAME_VERSION } from '../config/con
 import { loadProgress, getTitle, TITLE_MILESTONES } from '../systems/progress';
 import { makeButton } from '../systems/ui';
 import { startBgm } from '../systems/audio';
-import { hasCustomHead } from '../systems/customhead';
+import { hasCustomHead, playerTexKey } from '../systems/customhead';
 
 export default class TitleScene extends Phaser.Scene {
   constructor() { super('Title'); }
@@ -38,7 +38,7 @@ export default class TitleScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // 角色立绘展示
-    this.add.image(GAME_WIDTH / 2, 320, hasCustomHead() ? 'player-custom-idle' : 'player-idle');
+    this.add.image(GAME_WIDTH / 2, 320, hasCustomHead() ? playerTexKey(this, 'idle') : 'player-idle');
 
     makeButton(this, GAME_WIDTH / 2, 430, 300, 64, '▶ 开始游戏', () => this.scene.start('Game'), 26);
     makeButton(this, GAME_WIDTH / 2, 496, 220, 42, '🛒 晋升商店', () => this.scene.start('Shop'), 18);

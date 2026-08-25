@@ -30,7 +30,7 @@ import {
 } from '../systems/progress';
 import { showToast } from '../systems/ui';
 import { startBgm, playSfx } from '../systems/audio';
-import { hasCustomHead } from '../systems/customhead';
+import { hasCustomHead, playerTexKey } from '../systems/customhead';
 
 type HUDText = {
   lives: Phaser.GameObjects.Text;
@@ -111,7 +111,8 @@ export default class GameScene extends Phaser.Scene {
     // ---- 玩家角色:新素材包跑步动画(祁同伟皮肤=旧贴图+颠动) ----
     this.useQiSkin = this.progress.skin === 'qitongwei';
     const useCustom = !this.useQiSkin && hasCustomHead();
-    this.playerTex = (n: string) => (useCustom ? `player-custom-${n}` : `player-${n}`);
+    // playerTexKey 会检查贴图是否真实存在,缺失时回退默认(防止动画/精灵崩溃)
+    this.playerTex = (n: string) => (useCustom ? playerTexKey(this, n) : `player-${n}`);
     this.player = this.physics.add.sprite(120, GROUND_TOP, this.useQiSkin ? 'player-qi' : this.playerTex('run-1'));
     this.player.setY(GROUND_TOP - this.player.height / 2);
     this.player.setDepth(5);

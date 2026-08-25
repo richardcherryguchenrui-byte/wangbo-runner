@@ -38,11 +38,23 @@ export function rebuildCustomTextures(scene: Phaser.Scene) {
     doComposite();
   } else {
     try { scene.textures.addBase64(TEX, data); } catch { return; }
-    // addBase64 是异步加载:监听贴图创建事件,另有兜底轮询
-    try { scene.textures.once('addtexture' + TEX, () => doComposite()); } catch {}
-    scene.time.delayedCall(150, () => doComposite());
-    scene.time.delayedCall(600, () => doComposite());
+    // addBase64 是异步加载:监听贴图创建事件(事件名是 'addtexture-' + key,带连字符!)
+    // 纹理管理器是全局的,Preload 场景关闭后事件依然能触发
+    try { scene.textures.once('addtexture-' + TEX, () => doComposite()); } catch {}
+    // 兜底轮询:每 300ms 检查一次,最多约 6 秒(大照片解码可能很慢)
+    const poll = () => {
+      if (done) return;
+      doComposite();
+      if (!done) scene.time.delayedCall(300, poll);
+    };
+    scene.time.delayedCall(150, poll);
   }
+}
+
+// 取玩家贴图键:自定义贴图缺失时回退到默认贴图(防御崩溃)
+export function playerTexKey(scene: Phaser.Scene, name: string): string {
+  const custom = 'player-custom-' + name;
+  return scene.textures.exists(custom) ? custom : 'player-' + name;
 }
 
 function compositeFrames(scene: Phaser.Scene, headTex: Phaser.Textures.Texture) {
