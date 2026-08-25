@@ -17,7 +17,8 @@
     "cap:open:android": "npx cap open android",
     "tauri:init": "npx @tauri-apps/cli init --ci",
     "tauri:dev": "npx @tauri-apps/cli dev",
-    "tauri:build": "npx @tauri-apps/cli build"
+    "tauri:build": "npx @tauri-apps/cli build",
+    "build:minigame": "node scripts/build-minigame.mjs"
   },
   "dependencies": {
     "phaser": "^3.70.0"

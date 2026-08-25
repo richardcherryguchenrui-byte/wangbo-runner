@@ -1,0 +1,14 @@
+{
+  "description": "王博晋升之路跑酷 - 微信小游戏",
+  "compileType": "game",
+  "appid": "touristappid",
+  "projectname": "wangbo-runner",
+  "setting": {
+    "es6": false,
+    "minified": true,
+    "urlCheck": false,
+    "ignoreUploadUnusedFiles": true
+  },
+  "libVersion": "latest",
+  "condition": {}
+}

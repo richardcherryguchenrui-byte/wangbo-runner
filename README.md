@@ -46,7 +46,8 @@ npm run build      # 构建网页版到 dist/
 
 ## 打包
 
-- **安卓 APK**:推送代码后 GitHub Actions 自动打包,产物在仓库 Actions 页面下载(`wangbo-runner-apk`)
+- **安卓 APK**:推送代码后 GitHub Actions 自动打包,并发布到 GitHub Release(带 APK 下载)
+- **微信小游戏**:`npm run build:minigame` → 用微信开发者工具导入 `dist-minigame/` 目录,上传体验版
 - **桌面版**:`npm run tauri:build`
 
 ## 目录结构

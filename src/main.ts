@@ -7,9 +7,12 @@ import GameScene from './scenes/GameScene';
 import ResultScene from './scenes/ResultScene';
 import { GAME_WIDTH, GAME_HEIGHT, BACKGROUND_COLOR, GRAVITY_Y } from './config/constants';
 
+// 微信小游戏环境(适配层会设置 __WX_GAME__):用 Canvas 渲染器、不依赖 DOM
+const isWxGame = typeof window !== 'undefined' && !!(window as any).__WX_GAME__;
+
 const game = new Phaser.Game({
-  type: Phaser.AUTO,
-  parent: 'app',
+  type: isWxGame ? Phaser.CANVAS : Phaser.AUTO,
+  parent: isWxGame ? undefined : 'app',
   width: GAME_WIDTH,
   height: GAME_HEIGHT,
   backgroundColor: BACKGROUND_COLOR,
