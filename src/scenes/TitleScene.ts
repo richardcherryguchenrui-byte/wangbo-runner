@@ -2,11 +2,14 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, GROUND_TOP, GAME_VERSION } from '../config/constants';
 import { loadProgress, getTitle, TITLE_MILESTONES } from '../systems/progress';
 import { makeButton } from '../systems/ui';
+import { startBgm } from '../systems/audio';
+import { hasCustomHead } from '../systems/customhead';
 
 export default class TitleScene extends Phaser.Scene {
   constructor() { super('Title'); }
 
   create() {
+    startBgm(this);
     const p = loadProgress();
 
     // 背景:天空 + 云朵 + 地面(与游戏一致)
@@ -35,10 +38,13 @@ export default class TitleScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // 角色立绘展示
-    this.add.image(GAME_WIDTH / 2, 320, 'player-idle');
+    this.add.image(GAME_WIDTH / 2, 320, hasCustomHead() ? 'player-custom-idle' : 'player-idle');
 
     makeButton(this, GAME_WIDTH / 2, 430, 300, 64, '▶ 开始游戏', () => this.scene.start('Game'), 26);
     makeButton(this, GAME_WIDTH / 2, 496, 220, 42, '🛒 晋升商店', () => this.scene.start('Shop'), 18);
+    // 右下角:自定义人物 + 设置
+    makeButton(this, GAME_WIDTH - 110, GAME_HEIGHT - 40, 180, 40, '🎨 自定义人物', () => this.scene.start('CustomChar'), 15);
+    makeButton(this, GAME_WIDTH - 110, GAME_HEIGHT - 86, 180, 40, '⚙️ 设置', () => this.scene.start('Settings'), 15);
 
     this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('Game'));
 
@@ -47,7 +53,7 @@ export default class TitleScene extends Phaser.Scene {
 
     // ---- 右下角:工作室署名 + 当前版本 ----
     this.add
-      .text(GAME_WIDTH - 8, GAME_HEIGHT - 6, `nmjdzmy反贪工作室出品/v${GAME_VERSION}`, {
+      .text(GAME_WIDTH - 8, GAME_HEIGHT - 6, `nmjdzmy反弹工作室出品/v${GAME_VERSION}`, {
         fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '12px', resolution: 2, color: '#dce8f5', stroke: '#1d3557', strokeThickness: 2
       })
       .setOrigin(1, 1)

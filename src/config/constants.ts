@@ -1,6 +1,6 @@
 // 分辨率:960×540(16:9,在 1080p/4K 屏幕上均为整数倍缩放,像素清晰)
 // 游戏版本号(标题页右下角展示)
-export const GAME_VERSION = '1.7';
+export const GAME_VERSION = '1.8';
 
 export const GAME_WIDTH = 960;
 export const GAME_HEIGHT = 540;

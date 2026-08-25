@@ -10,11 +10,13 @@ import {
   type ShopItem
 } from '../systems/progress';
 import { makeButton, showToast } from '../systems/ui';
+import { startBgm } from '../systems/audio';
 
 export default class ShopScene extends Phaser.Scene {
   constructor() { super('Shop'); }
 
   create() {
+    startBgm(this);
     const p = loadProgress();
     this.draw(p);
   }

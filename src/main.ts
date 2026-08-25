@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import BootScene from './scenes/BootScene';
 import SplashScene from './scenes/SplashScene';
 import GuShopScene from './scenes/GuShopScene';
+import SettingsScene from './scenes/SettingsScene';
+import CustomCharScene from './scenes/CustomCharScene';
 import PreloadScene from './scenes/PreloadScene';
 import TitleScene from './scenes/TitleScene';
 import ShopScene from './scenes/ShopScene';
@@ -32,7 +34,7 @@ const game = new Phaser.Game({
     autoCenter: Phaser.Scale.CENTER_BOTH,
     zoom: 2 // 画布 2x 渲染,文字与画面高清
   },
-  scene: [BootScene, PreloadScene, SplashScene, TitleScene, ShopScene, GuShopScene, GameScene, ResultScene]
+  scene: [BootScene, PreloadScene, SplashScene, TitleScene, ShopScene, GuShopScene, SettingsScene, CustomCharScene, GameScene, ResultScene]
 });
 
 export default game;

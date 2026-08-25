@@ -69,9 +69,9 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'life', name: '❤️ 初始生命 +1', desc: '每级需更多累计翻越', price: 0, kind: 'life' },
   { id: 'skin-qitongwei', name: '👤 皮肤·祁同伟', desc: '更换主角皮肤', price: 0, kind: 'skin' },
   { id: 'pistol', name: '🔫 反腐手枪', desc: '每局 3 发子弹,射击摧毁障碍', price: 30, kind: 'pistol' },
-  { id: 'pendant-star', name: '挂件·星星', desc: '头顶 ⭐', price: 25, kind: 'pendant', pendant: 'star' },
-  { id: 'pendant-briefcase', name: '挂件·公文包', desc: '头顶 💼', price: 35, kind: 'pendant', pendant: 'briefcase' },
-  { id: 'pendant-crown', name: '挂件·皇冠', desc: '头顶 👑', price: 60, kind: 'pendant', pendant: 'crown' }
+  { id: 'pendant-star', name: '反弹之星', desc: '头顶 ⭐', price: 25, kind: 'pendant', pendant: 'star' },
+  { id: 'pendant-briefcase', name: '连结之包', desc: '头顶 💼', price: 35, kind: 'pendant', pendant: 'briefcase' },
+  { id: 'pendant-crown', name: '反复之官', desc: '头顶 👑', price: 60, kind: 'pendant', pendant: 'crown' }
 ];
 
 export const PENDANT_EMOJI: Record<PendantId, string> = {

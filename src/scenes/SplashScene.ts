@@ -8,7 +8,7 @@ export default class SplashScene extends Phaser.Scene {
   create() {
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x0e1a2f);
 
-    const text = '你们觉得怎么样反贪工作室出品';
+    const text = '你们觉得怎么样反弹工作室出品';
     const colors = ['#ff6b6b', '#ffa94d', '#ffd43b', '#69db7c', '#4dabf7', '#b197fc', '#f783ac'];
     const fontSize = 34;
     const totalWidth = text.length * fontSize; // 等宽字体近似

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config/constants';
 import { loadProgress, saveProgress } from '../systems/progress';
 import { makeButton, showToast } from '../systems/ui';
+import { startBgm } from '../systems/audio';
 
 const BRIBE_MOON_PRICE = 500;
 const BRIBE_MOON_MAX_CARRY = 3;
@@ -10,6 +11,7 @@ export default class GuShopScene extends Phaser.Scene {
   constructor() { super('GuShop'); }
 
   create() {
+    startBgm(this);
     this.draw();
   }
 

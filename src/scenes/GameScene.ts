@@ -29,6 +29,8 @@ import {
   PENDANT_EMOJI
 } from '../systems/progress';
 import { showToast } from '../systems/ui';
+import { startBgm, playSfx } from '../systems/audio';
+import { hasCustomHead } from '../systems/customhead';
 
 type HUDText = {
   lives: Phaser.GameObjects.Text;
@@ -41,6 +43,7 @@ type HUDText = {
 export default class GameScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
   private useQiSkin = false;
+  private playerTex = (n: string) => `player-${n}`;
   private bobTween?: Phaser.Tweens.Tween;
   private pendantText?: Phaser.GameObjects.Text;
   private groundDetail!: Phaser.GameObjects.TileSprite;
@@ -107,7 +110,9 @@ export default class GameScene extends Phaser.Scene {
 
     // ---- 玩家角色:新素材包跑步动画(祁同伟皮肤=旧贴图+颠动) ----
     this.useQiSkin = this.progress.skin === 'qitongwei';
-    this.player = this.physics.add.sprite(120, GROUND_TOP, this.useQiSkin ? 'player-qi' : 'player-run-1');
+    const useCustom = !this.useQiSkin && hasCustomHead();
+    this.playerTex = (n: string) => (useCustom ? `player-custom-${n}` : `player-${n}`);
+    this.player = this.physics.add.sprite(120, GROUND_TOP, this.useQiSkin ? 'player-qi' : this.playerTex('run-1'));
     this.player.setY(GROUND_TOP - this.player.height / 2);
     this.player.setDepth(5);
     {
@@ -124,11 +129,13 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this.anims.create({
         key: 'player-run',
-        frames: [{ key: 'player-run-1' }, { key: 'player-run-2' }],
-        frameRate: 9,
+        // 经典两帧跑:并腿(接触帧)+ 跨步(迈步帧),动作差异大,看起来在跑而不是闪烁
+        frames: [{ key: this.playerTex('idle') }, { key: this.playerTex('run-1') }],
+        frameRate: 7,
         repeat: -1
       });
       this.player.play('player-run');
+      this.startBob(); // 呼吸缩放增强跑动感
     }
 
     // 挂件(头顶表情)
@@ -210,10 +217,8 @@ export default class GameScene extends Phaser.Scene {
     };
     if (this.fireBtn) this.updateBulletsHud();
 
-    // ---- BGM(原创芯片音乐,循环播放) ----
-    try {
-      this.sound.play('bgm', { loop: true, volume: 0.35 });
-    } catch {}
+    // ---- BGM(原创芯片音乐,循环播放;结算场景会停止) ----
+    startBgm(this);
 
     // ---- 出屏回收 ----
     this.physics.world.on('worldstep', () => {
@@ -308,10 +313,10 @@ export default class GameScene extends Phaser.Scene {
     this.hud.tip.setVisible(false);
     if (!this.useQiSkin) {
       this.player.anims.stop();
-      this.player.setTexture('player-jump');
+      this.player.setTexture(this.playerTex('jump'));
     }
     if (isDouble) this.poof(this.player.x, this.player.y + this.player.height / 2, 5);
-    try { this.sound.play('jump', { volume: 0.4 }); } catch {}
+    playSfx(this, 'jump', 0.4)
   }
 
   private tryJump(now: number) {
@@ -445,7 +450,7 @@ export default class GameScene extends Phaser.Scene {
       this.shieldRing.setVisible(false);
       this.poof(this.player.x, this.player.y + this.player.height / 2, 8);
       this.enterInvulnerable(600); // 短暂无敌,防止同一障碍连续判定
-      try { this.sound.play('shield', { volume: 0.5 }); } catch {}
+      playSfx(this, 'shield', 0.5)
       return;
     }
 
@@ -455,7 +460,7 @@ export default class GameScene extends Phaser.Scene {
     const left = this.totalLives - this.hits;
     if (left >= 1) {
       this.enterInvulnerable();
-      try { this.sound.play('fail', { volume: 0.45 }); } catch {}
+      playSfx(this, 'fail', 0.45)
     } else {
       this.dead = true;
       this.die();
@@ -483,7 +488,7 @@ export default class GameScene extends Phaser.Scene {
     this.bobTween?.stop();
     this.player.setTint(0xff6666);
     this.physics.pause();
-    try { this.sound.play('gameover', { volume: 0.5 }); } catch {}
+    playSfx(this, 'gameover', 0.5)
     this.time.delayedCall(1000, () => this.endRun());
   }
 

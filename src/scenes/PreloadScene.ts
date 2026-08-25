@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { hasCustomHead, rebuildCustomTextures } from '../systems/customhead';
 
 export default class PreloadScene extends Phaser.Scene {
   constructor() { super('Preload'); }
@@ -41,6 +42,9 @@ export default class PreloadScene extends Phaser.Scene {
       const tex = this.textures.get(key);
       if (tex) tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
     });
+
+    // 自定义人物:合成玩家四帧的「换头」贴图
+    if (hasCustomHead()) rebuildCustomTextures(this);
 
     this.makeCloud();
     this.makeGroundPattern();

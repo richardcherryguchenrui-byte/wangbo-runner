@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GROUND_TOP } from '../config/constants';
 import { loadProgress, getTitle } from '../systems/progress';
 import { makeButton } from '../systems/ui';
+import { stopBgm } from '../systems/audio';
 
 export default class ResultScene extends Phaser.Scene {
   constructor() { super('Result'); }
@@ -13,6 +14,7 @@ export default class ResultScene extends Phaser.Scene {
   }
 
   create() {
+    stopBgm(this); // 结算界面不播 BGM
     const timeMs = this.data.get('timeMs') as number;
     const dodged = this.data.get('dodged') as number;
     const coins = this.data.get('coins') as number;
