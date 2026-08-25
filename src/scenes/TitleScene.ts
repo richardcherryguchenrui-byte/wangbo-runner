@@ -22,7 +22,7 @@ export default class TitleScene extends Phaser.Scene {
       .text(GAME_WIDTH / 2, 84, '王博晋升之路跑酷', { fontFamily: 'monospace', fontSize: '42px', color: '#ffffff', ...outline })
       .setOrigin(0.5);
     this.add
-      .text(GAME_WIDTH / 2, 132, '躲开百元大钞 · 撑满60秒晋升', { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff', ...outline })
+      .text(GAME_WIDTH / 2, 132, '躲开诱惑陷阱 · 无限生存挑战', { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff', ...outline })
       .setOrigin(0.5);
 
     // 玩家数据

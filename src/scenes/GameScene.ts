@@ -15,7 +15,7 @@ import {
   GROUND_HEIGHT,
   GAP_TIME_MIN,
   GAP_TIME_MAX,
-  LEVEL_DURATION_MS,
+  RUN_SPEED_MAX,
   DOUBLE_JUMP_UNLOCK_MS,
   DOUBLE_JUMP_SPEED_RATIO,
   PISTOL_BULLETS_PER_RUN,
@@ -190,7 +190,7 @@ export default class GameScene extends Phaser.Scene {
       lives: this.add.text(14, 12, `生命: ${this.totalLives}`, style).setScrollFactor(0),
       time: this.add.text(GAME_WIDTH - 14, 12, '00.0s', style).setOrigin(1, 0).setScrollFactor(0),
       tip: this.add
-        .text(GAME_WIDTH / 2, GROUND_TOP - 150, '点击跳跃(松手小跳)· 30秒解锁二段跳!', { ...style, fontSize: '18px' })
+        .text(GAME_WIDTH / 2, GROUND_TOP - 150, '点击跳跃(松手小跳)· 30秒解锁二段跳· 无限挑战!', { ...style, fontSize: '18px' })
         .setOrigin(0.5)
         .setScrollFactor(0),
       coins: this.add.text(14, 44, '🪙 0', { ...style, fontSize: '18px' }).setScrollFactor(0),
@@ -455,7 +455,7 @@ export default class GameScene extends Phaser.Scene {
     this.bobTween?.stop();
     this.player.setTint(0xff6666);
     this.physics.pause();
-    this.time.delayedCall(500, () => this.endRun(false));
+    this.time.delayedCall(500, () => this.endRun());
   }
 
   private updateLivesHud() {
@@ -463,10 +463,9 @@ export default class GameScene extends Phaser.Scene {
     this.hud.lives.setText(left === 1 ? '生命: 1(已双规)' : `生命: ${left}`);
   }
 
-  // ---- 结算与存档 ----
-  private endRun(win: boolean) {
-    const winBonus = win ? 5 : 0;
-    this.progress.coins += this.runCoins + winBonus;
+  // ---- 结算与存档(无限时间,生命归零才结算) ----
+  private endRun() {
+    this.progress.coins += this.runCoins;
     this.progress.totalDodged += this.dodged;
     saveProgress(this.progress);
     try {
@@ -475,17 +474,11 @@ export default class GameScene extends Phaser.Scene {
         localStorage.setItem('bestTimeMs', String(Math.round(this.elapsedMs)));
       }
     } catch {}
-    this.scene.start('Result', { timeMs: this.elapsedMs, win, dodged: this.dodged, coins: this.runCoins + winBonus });
+    this.scene.start('Result', { timeMs: this.elapsedMs, dodged: this.dodged, coins: this.runCoins });
   }
 
   update(time: number, delta: number) {
     this.elapsedMs += delta;
-
-    // 撑满一关时长即晋升成功
-    if (this.elapsedMs >= LEVEL_DURATION_MS) {
-      this.endRun(true);
-      return;
-    }
 
     // 二段跳解锁:存活 30 秒
     if (!this.doubleJumpUnlocked && this.elapsedMs >= DOUBLE_JUMP_UNLOCK_MS) {
@@ -496,7 +489,7 @@ export default class GameScene extends Phaser.Scene {
     // 速度曲线(放缓:每 10 秒 +30 px/s);被撞无敌期间减速
     this.runSpeed = this.invulnerable
       ? RUN_SPEED_BASE * 0.7
-      : RUN_SPEED_BASE + this.elapsedMs * RUN_SPEED_ACCEL;
+      : Math.min(RUN_SPEED_BASE + this.elapsedMs * RUN_SPEED_ACCEL, RUN_SPEED_MAX);
 
     // 障碍移动
     this.obstacleGroup.getChildren().forEach(child => {

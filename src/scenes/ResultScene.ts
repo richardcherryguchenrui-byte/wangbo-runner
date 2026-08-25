@@ -6,16 +6,14 @@ import { makeButton } from '../systems/ui';
 export default class ResultScene extends Phaser.Scene {
   constructor() { super('Result'); }
 
-  init(data: { timeMs?: number; win?: boolean; dodged?: number; coins?: number }) {
+  init(data: { timeMs?: number; dodged?: number; coins?: number }) {
     this.data.set('timeMs', data?.timeMs ?? 0);
-    this.data.set('win', data?.win ?? false);
     this.data.set('dodged', data?.dodged ?? 0);
     this.data.set('coins', data?.coins ?? 0);
   }
 
   create() {
     const timeMs = this.data.get('timeMs') as number;
-    const win = this.data.get('win') as boolean;
     const dodged = this.data.get('dodged') as number;
     const coins = this.data.get('coins') as number;
     const p = loadProgress();
@@ -26,11 +24,9 @@ export default class ResultScene extends Phaser.Scene {
     const centerY = GROUND_TOP / 2;
     const outline = { stroke: '#1d3557', strokeThickness: 4 };
 
-    const headline = win ? '🎉 晋升成功!' : '被鸡煎胃抓进局子';
     this.add
-      .text(GAME_WIDTH / 2, centerY - 78, headline, {
-        fontFamily: 'monospace', fontSize: '32px',
-        color: win ? '#ffe066' : '#ffffff', ...outline
+      .text(GAME_WIDTH / 2, centerY - 78, '被鸡煎胃抓进局子', {
+        fontFamily: 'monospace', fontSize: '32px', color: '#ffffff', ...outline
       })
       .setOrigin(0.5);
 
@@ -41,7 +37,7 @@ export default class ResultScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(GAME_WIDTH / 2, centerY + 16, `本局翻越:${dodged} 个障碍   银币 +${coins}${win ? '(含晋升奖金5)' : ''}`, {
+      .text(GAME_WIDTH / 2, centerY + 16, `本局翻越:${dodged} 个障碍   银币 +${coins}`, {
         fontFamily: 'monospace', fontSize: '18px', color: '#ffe066', ...outline
       })
       .setOrigin(0.5);

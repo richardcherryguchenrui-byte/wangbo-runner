@@ -42,12 +42,12 @@ export function saveProgress(p: Progress) {
   try { localStorage.setItem(KEY, JSON.stringify(p)); } catch {}
 }
 
-// 称号:按累计翻越数解锁
+// 称号:按累计翻越数解锁,每级 1000 个障碍
 export function getTitle(totalDodged: number): string {
-  if (totalDodged >= 500) return '厅长';
-  if (totalDodged >= 300) return '局长';
-  if (totalDodged >= 150) return '处长';
-  if (totalDodged >= 50) return '科长';
+  if (totalDodged >= 4000) return '厅长';
+  if (totalDodged >= 3000) return '局长';
+  if (totalDodged >= 2000) return '处长';
+  if (totalDodged >= 1000) return '科长';
   return '科员';
 }
 

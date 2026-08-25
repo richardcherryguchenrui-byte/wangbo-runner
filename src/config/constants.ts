@@ -13,6 +13,8 @@ export const GROUND_TOP = GAME_HEIGHT - GROUND_HEIGHT;
 // 跑动速度:280 px/s 起步,每 10 秒 +20 px/s(放缓,保证看清障碍物)
 export const RUN_SPEED_BASE = 280;
 export const RUN_SPEED_ACCEL = 0.02;
+// 无限时间模式下速度封顶,避免后期快到无法反应
+export const RUN_SPEED_MAX = 900;
 
 // 跳跃手感:Chrome 恐龙为 重力0.6/帧²、初速12/帧,换算到本分辨率后微调
 export const GRAVITY_Y = 2600;
@@ -24,8 +26,6 @@ export const MAX_FALL_SPEED = 1300;
 export const INVULNERABLE_TIME_MS = 1000;
 export const COYOTE_TIME_MS = 120;
 export const JUMP_BUFFER_MS = 120;
-
-export const LEVEL_DURATION_MS = 60000;
 
 // 障碍间距:按「当前速度 × 随机时间」生成,速度越快间距自动拉大
 export const GAP_TIME_MIN = 0.8;
