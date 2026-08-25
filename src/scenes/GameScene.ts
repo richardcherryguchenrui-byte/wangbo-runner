@@ -67,6 +67,11 @@ export default class GameScene extends Phaser.Scene {
   private canShootAt = 0;
   private fireBtn?: { rect: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text };
   private fireBtnBounds = { x: 0, y: 0, w: 0, h: 0 };
+  // 顾教授的贿月:开局携带(≤3)、使用后挡一次伤害
+  private bribeCarried = 0;
+  private shieldActive = false;
+  private shieldRing!: Phaser.GameObjects.Image;
+  private shieldBtn?: { rect: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text };
 
   constructor() { super('Game'); }
 
@@ -158,6 +163,27 @@ export default class GameScene extends Phaser.Scene {
       this.fireBtnBounds = { x: GAME_WIDTH - 90, y: GROUND_TOP - 30, w: 130, h: 44 };
     }
 
+    // ---- 贿月护体按钮(有库存才显示,开局最多携带 3 个) ----
+    this.bribeCarried = Math.min(this.progress.bribeMoon, 3);
+    this.shieldRing = this.add
+      .image(this.player.x, GROUND_TOP - 4, 'shield-ring')
+      .setDepth(4)
+      .setTint(0xffd43b)
+      .setVisible(false);
+    if (this.bribeCarried > 0) {
+      const btn = this.add
+        .rectangle(90, GROUND_TOP - 30, 130, 44, 0x1d3557, 0.85)
+        .setStrokeStyle(2, 0xffffff)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(20);
+      const label = this.add
+        .text(90, GROUND_TOP - 30, `🛡 贿月 ×${this.bribeCarried}`, { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff' })
+        .setOrigin(0.5)
+        .setDepth(21);
+      btn.on('pointerdown', this.activateShield, this);
+      this.shieldBtn = { rect: btn, text: label };
+    }
+
     // ---- HUD ----
     const style = { fontFamily: 'monospace', fontSize: '20px', color: '#ffffff', stroke: '#1d3557', strokeThickness: 4 };
     this.hud = {
@@ -233,14 +259,19 @@ export default class GameScene extends Phaser.Scene {
     this.canShootAt = 0;
     this.runSpeed = RUN_SPEED_BASE;
     this.fireBtn = undefined;
+    this.bribeCarried = 0;
+    this.shieldActive = false;
+    this.shieldBtn = undefined;
     this.tweens.killAll(); // 清掉上一局遗留的闪烁/颠动补间
   }
 
   private onJumpInput(pointer?: Phaser.Input.Pointer) {
-    // 点在射击按钮上时不触发跳跃
-    if (pointer && this.fireBtn) {
-      const b = this.fireBtnBounds;
-      if (Math.abs(pointer.x - b.x) <= b.w / 2 && Math.abs(pointer.y - b.y) <= b.h / 2) return;
+    // 点在射击/护盾按钮上时不触发跳跃
+    if (pointer) {
+      const inBtn = (x: number, y: number, w: number, h: number) =>
+        Math.abs(pointer.x - x) <= w / 2 && Math.abs(pointer.y - y) <= h / 2;
+      if (this.fireBtn && inBtn(this.fireBtnBounds.x, this.fireBtnBounds.y, this.fireBtnBounds.w, this.fireBtnBounds.h)) return;
+      if (this.shieldBtn && inBtn(90, GROUND_TOP - 30, 130, 44)) return;
     }
     this.lastJumpPressedAt = this.time.now;
   }
@@ -294,6 +325,15 @@ export default class GameScene extends Phaser.Scene {
     (b.body as Phaser.Physics.Arcade.Body).allowGravity = false;
     this.bulletGroup.add(b);
     (b.body as Phaser.Physics.Arcade.Body).setVelocityX(BULLET_SPEED);
+  }
+
+  private activateShield() {
+    if (!this.shieldBtn || this.bribeCarried <= 0 || this.shieldActive || this.dead) return;
+    this.bribeCarried -= 1;
+    this.shieldActive = true;
+    this.shieldRing.setVisible(true);
+    this.shieldBtn.text.setText(this.bribeCarried > 0 ? `🛡 护体中 ✨` : '🛡 护体中 ✨');
+    showToast(this, this.player.x, this.player.y - 90, '🌙 贿月护体!下次碰撞免伤');
   }
 
   private updateBulletsHud() {
@@ -372,6 +412,16 @@ export default class GameScene extends Phaser.Scene {
     if (this.invulnerable || this.dead) return;
     // 撞上的障碍不算「翻越」
     (obstacle as Phaser.GameObjects.GameObject).setData('hit', true);
+
+    // 贿月护体:消耗一次免伤,不扣生命
+    if (this.shieldActive) {
+      this.shieldActive = false;
+      this.shieldRing.setVisible(false);
+      this.poof(this.player.x, this.player.y + this.player.height / 2, 8);
+      this.enterInvulnerable(600); // 短暂无敌,防止同一障碍连续判定
+      return;
+    }
+
     this.hits += 1;
     this.updateLivesHud();
 
@@ -384,7 +434,7 @@ export default class GameScene extends Phaser.Scene {
     }
   };
 
-  private enterInvulnerable() {
+  private enterInvulnerable(duration = INVULNERABLE_TIME_MS) {
     this.invulnerable = true;
     const blink = this.tweens.add({
       targets: this.player,
@@ -394,7 +444,7 @@ export default class GameScene extends Phaser.Scene {
       repeat: -1
     });
 
-    this.time.delayedCall(INVULNERABLE_TIME_MS, () => {
+    this.time.delayedCall(duration, () => {
       blink.stop();
       this.player.setAlpha(1);
       this.invulnerable = false;
@@ -489,8 +539,9 @@ export default class GameScene extends Phaser.Scene {
       if (c.x < -60) c.x = GAME_WIDTH + 60;
     });
 
-    // 挂件跟随
+    // 挂件与护体光环跟随
     if (this.pendantText) this.pendantText.setPosition(this.player.x, this.player.y - 74);
+    if (this.shieldActive) this.shieldRing.setPosition(this.player.x, this.player.y + this.player.height / 2 - 8);
 
     this.tryJump(time);
 

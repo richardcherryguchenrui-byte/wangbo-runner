@@ -10,6 +10,7 @@ export interface Progress {
   pendant: PendantId;     // 当前装备的挂件
   extraLives: number;     // 已解锁的额外初始生命(0~3)
   skin: string;           // 当前使用的主角皮肤:''=原角色,'qitongwei'=祁同伟
+  bribeMoon: number;      // 顾教授的贿月库存(消耗品,500银币/个)
 }
 
 const KEY = 'wangboProgress';
@@ -26,7 +27,7 @@ export function nextLifeThreshold(p: Progress): number | null {
 export const SKIN_QITONGWEI_REQUIREMENT = 1000;
 
 function defaults(): Progress {
-  return { coins: 0, totalDodged: 0, owned: [], pendant: '', extraLives: 0, skin: '' };
+  return { coins: 0, totalDodged: 0, owned: [], pendant: '', extraLives: 0, skin: '', bribeMoon: 0 };
 }
 
 export function loadProgress(): Progress {

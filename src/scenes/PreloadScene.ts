@@ -16,14 +16,18 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.image('ob-beauty-2', 'assets/ob-beauty-2.png');
     this.load.image('ob-beauty-3', 'assets/ob-beauty-3.png');
     this.load.image('ob-beauty-4', 'assets/ob-beauty-4.png');
+    // 顾哥神秘商铺商品贴图
+    this.load.image('bribe-moon', 'assets/bribe-moon.png');
   }
 
   create() {
     this.makeCloud();
     this.makeGroundPattern();
     this.makeBullet();
+    this.makeBurst();
+    this.makeRing();
 
-    this.scene.start('Title');
+    this.scene.start('Splash');
   }
 
   // 简单像素云朵:三个圆叠加
@@ -38,6 +42,47 @@ export default class PreloadScene extends Phaser.Scene {
     ctx.arc(78, 20, 12, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillRect(20, 20, 64, 12);
+    canvas.refresh();
+  }
+
+  // 五彩爆炸星形:顾哥神秘商铺招牌底色(12 根彩色尖刺)
+  private makeBurst() {
+    const canvas = this.textures.createCanvas('burst', 190, 140);
+    if (!canvas) return;
+    const ctx = canvas.getContext();
+    const colors = ['#ff5a5a', '#ffd43b', '#4dabf7', '#69db7c', '#b197fc', '#ff922b'];
+    const cx = 95, cy = 70;
+    for (let i = 0; i < 12; i++) {
+      const a1 = (i / 12) * Math.PI * 2;
+      const a2 = ((i + 0.5) / 12) * Math.PI * 2;
+      const a3 = ((i + 1) / 12) * Math.PI * 2;
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(a1) * 92, cy + Math.sin(a1) * 66);
+      ctx.lineTo(cx + Math.cos(a2) * 40, cy + Math.sin(a2) * 30);
+      ctx.lineTo(cx + Math.cos(a3) * 92, cy + Math.sin(a3) * 66);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // 中央深色圆底,放文字
+    ctx.fillStyle = '#2a1b4a';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 46, 0, Math.PI * 2);
+    ctx.fill();
+    canvas.refresh();
+  }
+
+  // 护体光环:白色椭圆环(游戏中按需染色为金色)
+  private makeRing() {
+    const canvas = this.textures.createCanvas('shield-ring', 88, 30);
+    if (!canvas) return;
+    const ctx = canvas.getContext();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.ellipse(44, 15, 36, 10, 0, 0, Math.PI * 2);
+    ctx.stroke();
     canvas.refresh();
   }
 

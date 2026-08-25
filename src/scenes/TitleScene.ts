@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, GROUND_TOP } from '../config/constants';
+import { GAME_WIDTH, GAME_HEIGHT, GROUND_TOP, GAME_VERSION } from '../config/constants';
 import { loadProgress, getTitle, TITLE_MILESTONES } from '../systems/progress';
 import { makeButton } from '../systems/ui';
 
@@ -41,5 +41,43 @@ export default class TitleScene extends Phaser.Scene {
     makeButton(this, GAME_WIDTH / 2, 496, 220, 42, '🛒 晋升商店', () => this.scene.start('Shop'), 18);
 
     this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('Game'));
+
+    // ---- 左侧:顾哥神秘商铺招牌(30° 倾斜,五彩爆炸底色) ----
+    this.makeGuSign();
+
+    // ---- 右下角:工作室署名 + 当前版本 ----
+    this.add
+      .text(GAME_WIDTH - 8, GAME_HEIGHT - 6, `nmjdzmy反贪工作室出品/v${GAME_VERSION}`, {
+        fontFamily: 'monospace', fontSize: '12px', color: '#dce8f5', stroke: '#1d3557', strokeThickness: 2
+      })
+      .setOrigin(1, 1)
+      .setAlpha(0.85);
+  }
+
+  private makeGuSign() {
+    const x = 130;
+    const y = 300;
+
+    // 五彩爆炸底色(放射状星形贴图)
+    const burst = this.add.image(0, 0, 'burst').setScale(1);
+    // 旋转动画,更有「爆炸」感
+    this.tweens.add({ targets: burst, angle: 360, duration: 6000, repeat: -1 });
+
+    const label = this.add
+      .text(0, 0, '顾哥\n神秘商铺', {
+        fontFamily: 'monospace', fontSize: '22px', color: '#ffffff',
+        stroke: '#c2255c', strokeThickness: 5, align: 'center'
+      })
+      .setOrigin(0.5);
+    const spark = this.add.text(44, -40, '✨', { fontSize: '22px' }).setOrigin(0.5);
+
+    const sign = this.add.container(x, y, [burst, label, spark]);
+    sign.setAngle(-30); // 偏转 30 度
+    sign.setSize(190, 140);
+    sign.setInteractive({ useHandCursor: true });
+    sign.on('pointerdown', () => this.scene.start('GuShop'));
+
+    // 招牌呼吸缩放
+    this.tweens.add({ targets: sign, scale: 1.06, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
   }
 }
