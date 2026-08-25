@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config/constants';
-import { loadAudioSettings, saveAudioSettings, soundMult } from '../systems/audio';
+import { loadAudioSettings, saveAudioSettings, soundMult, startBgm, stopBgm } from '../systems/audio';
 import { makeButton, showToast } from '../systems/ui';
 
 const FONT = "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif";
@@ -67,6 +67,9 @@ export default class SettingsScene extends Phaser.Scene {
       this.settings.mute = !this.settings.mute;
       saveAudioSettings(this.settings);
       this.refreshLabels();
+      // 立即生效:静音则停掉正在播的 BGM,开启则按新音量继续
+      if (this.settings.mute) stopBgm(this);
+      else startBgm(this);
       showToast(this, GAME_WIDTH / 2, GAME_HEIGHT - 80, this.settings.mute ? '🔇 已静音' : '🔊 声音已开启');
     });
     this.refreshLabels();
@@ -80,6 +83,8 @@ export default class SettingsScene extends Phaser.Scene {
     this.settings.volume = l;
     saveAudioSettings(this.settings);
     this.refreshLabels();
+    // 立即生效:按新音量重新应用正在播的 BGM
+    startBgm(this);
   }
 
   private refreshLabels() {

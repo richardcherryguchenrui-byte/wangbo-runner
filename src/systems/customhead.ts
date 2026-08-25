@@ -23,11 +23,29 @@ export function getCustomHeadData(): string | null {
 export function rebuildCustomTextures(scene: Phaser.Scene) {
   const data = getCustomHeadData();
   if (!data) return;
-  try {
-    if (scene.textures.exists('custom-head-src')) scene.textures.remove('custom-head-src');
-    scene.textures.addBase64('custom-head-src', data);
-  } catch { return; }
-  const headTex = scene.textures.get('custom-head-src');
+  const TEX = 'custom-head-src';
+
+  let done = false;
+  const doComposite = () => {
+    if (done) return;
+    const headTex = scene.textures.get(TEX);
+    if (!headTex || !headTex.getSourceImage()) return;
+    done = true;
+    compositeFrames(scene, headTex);
+  };
+
+  if (scene.textures.exists(TEX)) {
+    doComposite();
+  } else {
+    try { scene.textures.addBase64(TEX, data); } catch { return; }
+    // addBase64 是异步加载:监听贴图创建事件,另有兜底轮询
+    try { scene.textures.once('addtexture' + TEX, () => doComposite()); } catch {}
+    scene.time.delayedCall(150, () => doComposite());
+    scene.time.delayedCall(600, () => doComposite());
+  }
+}
+
+function compositeFrames(scene: Phaser.Scene, headTex: Phaser.Textures.Texture) {
   const headImg = headTex.getSourceImage() as HTMLImageElement;
 
   (['idle', 'run-1', 'run-2', 'jump'] as const).forEach(name => {

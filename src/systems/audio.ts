@@ -8,6 +8,7 @@ export interface AudioSettings {
 
 const KEY = 'wangboAudio';
 const LEVEL_VOLUME = [0.25, 0.55, 0.9]; // 低/中/高对应的音量系数
+const BGM_BASE = 0.35;
 
 export function loadAudioSettings(): AudioSettings {
   try {
@@ -27,13 +28,23 @@ export function soundMult(): number {
   return s.mute ? 0 : LEVEL_VOLUME[s.volume];
 }
 
-// 开始 BGM(主界面/商店/游戏内使用;结算页调用 stopBgm)
+// 开始/刷新 BGM(主界面/商店/游戏内调用;结算页调用 stopBgm)
+// 注意:Phaser 的声音管理器是全局共享的,跨场景持续播放,
+// 因此每次进入场景都要重新应用当前音量设置,否则设置修改不会生效
 export function startBgm(scene: Phaser.Scene) {
   const mult = soundMult();
-  if (mult <= 0) return;
   try {
-    if (!scene.sound.get('bgm')) {
-      scene.sound.play('bgm', { loop: true, volume: 0.35 * mult });
+    if (mult <= 0) {
+      stopBgm(scene);
+      return;
+    }
+    const bgm = scene.sound.get('bgm') as Phaser.Sound.WebAudioSound | null;
+    if (bgm) {
+      if (!bgm.isPlaying) bgm.play();
+      bgm.setVolume(BGM_BASE * mult); // 关键:重新应用音量
+    } else {
+      const s = scene.sound.add('bgm', { loop: true, volume: BGM_BASE * mult });
+      s.play();
     }
   } catch {}
 }
