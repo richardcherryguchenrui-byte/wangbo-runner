@@ -19,10 +19,10 @@ export default class TitleScene extends Phaser.Scene {
     const outline = { stroke: '#1d3557', strokeThickness: 5 };
 
     this.add
-      .text(GAME_WIDTH / 2, 84, '王博晋升之路跑酷', { fontFamily: 'monospace', fontSize: '42px', color: '#ffffff', ...outline })
+      .text(GAME_WIDTH / 2, 84, '王博晋升之路跑酷', { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '42px', resolution: 2, color: '#ffffff', ...outline })
       .setOrigin(0.5);
     this.add
-      .text(GAME_WIDTH / 2, 132, '躲开诱惑陷阱 · 无限生存挑战', { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff', ...outline })
+      .text(GAME_WIDTH / 2, 132, '躲开诱惑陷阱 · 无限生存挑战', { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '18px', resolution: 2, color: '#ffffff', ...outline })
       .setOrigin(0.5);
 
     // 玩家数据
@@ -31,11 +31,11 @@ export default class TitleScene extends Phaser.Scene {
     this.add
       .text(GAME_WIDTH / 2, 190,
         `称号:${getTitle(p.totalDodged)}   🪙 ${p.coins}   累计翻越:${p.totalDodged}${next ? `(再翻 ${next[0] - p.totalDodged} 个升${next[1]})` : ''}${best ? `   最佳:${(best / 1000).toFixed(1)}s` : ''}`,
-        { fontFamily: 'monospace', fontSize: '17px', color: '#ffe066', ...outline })
+        { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '17px', resolution: 2, color: '#ffe066', ...outline })
       .setOrigin(0.5);
 
     // 角色立绘展示
-    this.add.image(GAME_WIDTH / 2, 320, 'player');
+    this.add.image(GAME_WIDTH / 2, 320, 'player-idle');
 
     makeButton(this, GAME_WIDTH / 2, 430, 300, 64, '▶ 开始游戏', () => this.scene.start('Game'), 26);
     makeButton(this, GAME_WIDTH / 2, 496, 220, 42, '🛒 晋升商店', () => this.scene.start('Shop'), 18);
@@ -48,7 +48,7 @@ export default class TitleScene extends Phaser.Scene {
     // ---- 右下角:工作室署名 + 当前版本 ----
     this.add
       .text(GAME_WIDTH - 8, GAME_HEIGHT - 6, `nmjdzmy反贪工作室出品/v${GAME_VERSION}`, {
-        fontFamily: 'monospace', fontSize: '12px', color: '#dce8f5', stroke: '#1d3557', strokeThickness: 2
+        fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '12px', resolution: 2, color: '#dce8f5', stroke: '#1d3557', strokeThickness: 2
       })
       .setOrigin(1, 1)
       .setAlpha(0.85);
@@ -65,11 +65,11 @@ export default class TitleScene extends Phaser.Scene {
 
     const label = this.add
       .text(0, 0, '顾哥\n神秘商铺', {
-        fontFamily: 'monospace', fontSize: '22px', color: '#ffffff',
+        fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '22px', resolution: 2, color: '#ffffff',
         stroke: '#c2255c', strokeThickness: 5, align: 'center'
       })
       .setOrigin(0.5);
-    const spark = this.add.text(44, -40, '✨', { fontSize: '22px' }).setOrigin(0.5);
+    const spark = this.add.text(44, -40, '✨', { fontSize: '22px', resolution: 2 }).setOrigin(0.5);
 
     const sign = this.add.container(x, y, [burst, label, spark]);
     sign.setAngle(-30); // 偏转 30 度

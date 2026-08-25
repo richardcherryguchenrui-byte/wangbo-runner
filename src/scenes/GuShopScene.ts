@@ -20,16 +20,16 @@ export default class GuShopScene extends Phaser.Scene {
     // 神秘紫色背景
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x2a1b4a);
 
-    this.add.text(GAME_WIDTH / 2, 40, '🌙 顾哥神秘商铺', { fontFamily: 'monospace', fontSize: '30px', color: '#ffd43b', ...outline }).setOrigin(0.5);
-    this.add.text(GAME_WIDTH / 2, 82, `余额:🪙 ${p.coins}   已持有贿月:${p.bribeMoon} 个`, { fontFamily: 'monospace', fontSize: '16px', color: '#cfe3ff', ...outline }).setOrigin(0.5);
+    this.add.text(GAME_WIDTH / 2, 40, '🌙 顾哥神秘商铺', { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '30px', resolution: 2, color: '#ffd43b', ...outline }).setOrigin(0.5);
+    this.add.text(GAME_WIDTH / 2, 82, `余额:🪙 ${p.coins}   已持有贿月:${p.bribeMoon} 个`, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '16px', resolution: 2, color: '#cfe3ff', ...outline }).setOrigin(0.5);
 
     // 商品展示
     this.add.image(GAME_WIDTH / 2, 250, 'bribe-moon').setScale(1.3);
     this.add
-      .text(GAME_WIDTH / 2, 352, '顾教授的贿月', { fontFamily: 'monospace', fontSize: '26px', color: '#ffe066', ...outline })
+      .text(GAME_WIDTH / 2, 352, '顾教授的贿月', { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '26px', resolution: 2, color: '#ffe066', ...outline })
       .setOrigin(0.5);
     this.add
-      .text(GAME_WIDTH / 2, 392, `使用后获得一次免伤效果(开局最多携带 ${BRIBE_MOON_MAX_CARRY} 个)`, { fontFamily: 'monospace', fontSize: '15px', color: '#ffffff', ...outline })
+      .text(GAME_WIDTH / 2, 392, `使用后获得一次免伤效果(开局最多携带 ${BRIBE_MOON_MAX_CARRY} 个)`, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '15px', resolution: 2, color: '#ffffff', ...outline })
       .setOrigin(0.5);
 
     const buyBtn = makeButton(this, GAME_WIDTH / 2, 452, 260, 56, `🪙${BRIBE_MOON_PRICE} 购买一个`, () => {

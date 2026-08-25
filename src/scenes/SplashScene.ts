@@ -18,7 +18,7 @@ export default class SplashScene extends Phaser.Scene {
     for (let i = 0; i < text.length; i++) {
       const c = this.add
         .text(x, GAME_HEIGHT / 2, text[i], {
-          fontFamily: 'monospace',
+          fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif",
           fontSize: `${fontSize}px`,
           color: colors[i % colors.length],
           stroke: '#ffffff',

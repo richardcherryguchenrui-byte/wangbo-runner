@@ -29,7 +29,8 @@ const game = new Phaser.Game({
   },
   scale: {
     mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    zoom: 2 // 画布 2x 渲染,文字与画面高清
   },
   scene: [BootScene, PreloadScene, SplashScene, TitleScene, ShopScene, GuShopScene, GameScene, ResultScene]
 });

@@ -16,7 +16,7 @@ export function makeButton(
     .setStrokeStyle(2, 0xffffff)
     .setInteractive({ useHandCursor: true });
   const text = scene.add
-    .text(x, y, label, { fontFamily: 'monospace', fontSize: `${fontSize}px`, color: '#ffffff' })
+    .text(x, y, label, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: `${fontSize}px`, color: '#ffffff' })
     .setOrigin(0.5);
   rect.on('pointerdown', onClick);
   return { rect, text };
@@ -25,7 +25,7 @@ export function makeButton(
 // 短暂提示:浮起渐隐
 export function showToast(scene: Phaser.Scene, x: number, y: number, msg: string, color = '#ffe066') {
   const t = scene.add
-    .text(x, y, msg, { fontFamily: 'monospace', fontSize: '20px', color, stroke: '#1d3557', strokeThickness: 4 })
+    .text(x, y, msg, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '20px', resolution: 2, color, stroke: '#1d3557', strokeThickness: 4 })
     .setOrigin(0.5)
     .setDepth(100);
   scene.tweens.add({

@@ -21,8 +21,8 @@ export default class ShopScene extends Phaser.Scene {
 
   private draw(p: ReturnType<typeof loadProgress>) {
     const outline = { stroke: '#1d3557', strokeThickness: 4 };
-    this.add.text(GAME_WIDTH / 2, 30, '🛒 晋升商店', { fontFamily: 'monospace', fontSize: '28px', color: '#ffffff', ...outline }).setOrigin(0.5);
-    this.add.text(GAME_WIDTH / 2, 66, `余额:🪙 ${p.coins}   累计翻越:${p.totalDodged}   翻越障碍赚银币,兑换装备`, { fontFamily: 'monospace', fontSize: '15px', color: '#ffe066', ...outline }).setOrigin(0.5);
+    this.add.text(GAME_WIDTH / 2, 30, '🛒 晋升商店', { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '28px', resolution: 2, color: '#ffffff', ...outline }).setOrigin(0.5);
+    this.add.text(GAME_WIDTH / 2, 66, `余额:🪙 ${p.coins}   累计翻越:${p.totalDodged}   翻越障碍赚银币,兑换装备`, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '15px', resolution: 2, color: '#ffe066', ...outline }).setOrigin(0.5);
 
     SHOP_ITEMS.forEach((item, i) => {
       this.drawRow(item, i, p);
@@ -51,9 +51,9 @@ export default class ShopScene extends Phaser.Scene {
         .rectangle(GAME_WIDTH / 2, y, 700, 44, 0x1d3557, 0.55)
         .setStrokeStyle(1, 0xffffff, 0.4)
         .setInteractive({ useHandCursor: true });
-      this.add.text(90, y, item.name, { fontFamily: 'monospace', fontSize: '17px', color: '#ffffff' }).setOrigin(0, 0.5);
-      this.add.text(270, y, `当前:初始生命 ${2 + p.extraLives} 条`, { fontFamily: 'monospace', fontSize: '14px', color: '#cfe3ff' }).setOrigin(0, 0.5);
-      this.add.text(840, y, statusText, { fontFamily: 'monospace', fontSize: '14px', color: statusColor }).setOrigin(1, 0.5);
+      this.add.text(90, y, item.name, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '17px', resolution: 2, color: '#ffffff' }).setOrigin(0, 0.5);
+      this.add.text(270, y, `当前:初始生命 ${2 + p.extraLives} 条`, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '14px', resolution: 2, color: '#cfe3ff' }).setOrigin(0, 0.5);
+      this.add.text(840, y, statusText, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '14px', resolution: 2, color: statusColor }).setOrigin(1, 0.5);
 
       row.on('pointerdown', () => {
         if (maxed) {
@@ -84,9 +84,9 @@ export default class ShopScene extends Phaser.Scene {
         .rectangle(GAME_WIDTH / 2, y, 700, 44, 0x1d3557, 0.55)
         .setStrokeStyle(1, 0xffffff, 0.4)
         .setInteractive({ useHandCursor: true });
-      this.add.text(90, y, item.name, { fontFamily: 'monospace', fontSize: '17px', color: '#ffffff' }).setOrigin(0, 0.5);
-      this.add.text(270, y, item.desc, { fontFamily: 'monospace', fontSize: '14px', color: '#cfe3ff' }).setOrigin(0, 0.5);
-      this.add.text(840, y, statusText, { fontFamily: 'monospace', fontSize: '14px', color: statusColor }).setOrigin(1, 0.5);
+      this.add.text(90, y, item.name, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '17px', resolution: 2, color: '#ffffff' }).setOrigin(0, 0.5);
+      this.add.text(270, y, item.desc, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '14px', resolution: 2, color: '#cfe3ff' }).setOrigin(0, 0.5);
+      this.add.text(840, y, statusText, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '14px', resolution: 2, color: statusColor }).setOrigin(1, 0.5);
 
       row.on('pointerdown', () => {
         if (using) {
@@ -119,9 +119,9 @@ export default class ShopScene extends Phaser.Scene {
 
     const statusColor = (equipped || (owned && item.kind === 'pistol')) ? '#7dffa8' : p.coins >= item.price ? '#ffe066' : '#ff9999';
 
-    this.add.text(90, y, item.name, { fontFamily: 'monospace', fontSize: '17px', color: '#ffffff' }).setOrigin(0, 0.5);
-    this.add.text(270, y, item.desc, { fontFamily: 'monospace', fontSize: '14px', color: '#cfe3ff' }).setOrigin(0, 0.5);
-    this.add.text(840, y, statusText, { fontFamily: 'monospace', fontSize: '15px', color: statusColor }).setOrigin(1, 0.5);
+    this.add.text(90, y, item.name, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '17px', resolution: 2, color: '#ffffff' }).setOrigin(0, 0.5);
+    this.add.text(270, y, item.desc, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '14px', resolution: 2, color: '#cfe3ff' }).setOrigin(0, 0.5);
+    this.add.text(840, y, statusText, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '15px', resolution: 2, color: statusColor }).setOrigin(1, 0.5);
 
     row.on('pointerdown', () => {
       if (!owned) {

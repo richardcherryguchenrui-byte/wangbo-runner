@@ -26,25 +26,25 @@ export default class ResultScene extends Phaser.Scene {
 
     this.add
       .text(GAME_WIDTH / 2, centerY - 78, '被鸡煎胃抓进局子', {
-        fontFamily: 'monospace', fontSize: '32px', color: '#ffffff', ...outline
+        fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '32px', resolution: 2, color: '#ffffff', ...outline
       })
       .setOrigin(0.5);
 
     this.add
       .text(GAME_WIDTH / 2, centerY - 24, `${timeText}  |  ${bestText}`, {
-        fontFamily: 'monospace', fontSize: '20px', color: '#ffffff', ...outline
+        fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '20px', resolution: 2, color: '#ffffff', ...outline
       })
       .setOrigin(0.5);
 
     this.add
       .text(GAME_WIDTH / 2, centerY + 16, `本局翻越:${dodged} 个障碍   银币 +${coins}`, {
-        fontFamily: 'monospace', fontSize: '18px', color: '#ffe066', ...outline
+        fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '18px', resolution: 2, color: '#ffe066', ...outline
       })
       .setOrigin(0.5);
 
     this.add
       .text(GAME_WIDTH / 2, centerY + 52, `当前称号:${getTitle(p.totalDodged)}   累计翻越:${p.totalDodged}   🪙 ${p.coins}`, {
-        fontFamily: 'monospace', fontSize: '16px', color: '#ffffff', ...outline
+        fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '16px', resolution: 2, color: '#ffffff', ...outline
       })
       .setOrigin(0.5);
 

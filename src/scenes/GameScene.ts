@@ -40,6 +40,7 @@ type HUDText = {
 
 export default class GameScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
+  private useQiSkin = false;
   private bobTween?: Phaser.Tweens.Tween;
   private pendantText?: Phaser.GameObjects.Text;
   private groundDetail!: Phaser.GameObjects.TileSprite;
@@ -104,25 +105,36 @@ export default class GameScene extends Phaser.Scene {
       );
     }
 
-    // ---- 玩家角色(祁同伟皮肤替换贴图,碰撞箱公式通用) ----
-    const skinKey = this.progress.skin === 'qitongwei' ? 'player-qi' : 'player';
-    this.player = this.physics.add.sprite(120, GROUND_TOP, skinKey);
+    // ---- 玩家角色:新素材包跑步动画(祁同伟皮肤=旧贴图+颠动) ----
+    this.useQiSkin = this.progress.skin === 'qitongwei';
+    this.player = this.physics.add.sprite(120, GROUND_TOP, this.useQiSkin ? 'player-qi' : 'player-run-1');
     this.player.setY(GROUND_TOP - this.player.height / 2);
     this.player.setDepth(5);
     {
       const body = this.player.body as Phaser.Physics.Arcade.Body;
-      const w = Math.round(this.player.width * 0.42);
-      const h = Math.round(this.player.height * 0.65);
+      const w = Math.round(this.player.width * (this.useQiSkin ? 0.42 : 0.5));
+      const h = Math.round(this.player.height * (this.useQiSkin ? 0.65 : 0.72));
       body.setSize(w, h, false);
       body.setOffset((this.player.width - w) / 2, this.player.height - h);
     }
     this.player.setCollideWorldBounds(true);
     this.player.setMaxVelocity(9999, MAX_FALL_SPEED);
+    if (this.useQiSkin) {
+      this.startBob();
+    } else {
+      this.anims.create({
+        key: 'player-run',
+        frames: [{ key: 'player-run-1' }, { key: 'player-run-2' }],
+        frameRate: 9,
+        repeat: -1
+      });
+      this.player.play('player-run');
+    }
 
     // 挂件(头顶表情)
     if (PENDANT_EMOJI[this.progress.pendant]) {
       this.pendantText = this.add
-        .text(this.player.x, this.player.y - 72, PENDANT_EMOJI[this.progress.pendant], { fontSize: '24px' })
+        .text(this.player.x, this.player.y - 72, PENDANT_EMOJI[this.progress.pendant], { fontSize: '24px', resolution: 2 })
         .setOrigin(0.5)
         .setDepth(6);
     }
@@ -155,7 +167,7 @@ export default class GameScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true })
         .setDepth(20);
       const label = this.add
-        .text(GAME_WIDTH - 90, GROUND_TOP - 30, `🔫 射击 ×${this.bulletsLeft}`, { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff' })
+        .text(GAME_WIDTH - 90, GROUND_TOP - 30, `🔫 射击 ×${this.bulletsLeft}`, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '16px', resolution: 2, color: '#ffffff' })
         .setOrigin(0.5)
         .setDepth(21);
       btn.on('pointerdown', this.fire, this);
@@ -177,7 +189,7 @@ export default class GameScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true })
         .setDepth(20);
       const label = this.add
-        .text(90, GROUND_TOP - 30, `🛡 贿月 ×${this.bribeCarried}`, { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff' })
+        .text(90, GROUND_TOP - 30, `🛡 贿月 ×${this.bribeCarried}`, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '16px', resolution: 2, color: '#ffffff' })
         .setOrigin(0.5)
         .setDepth(21);
       btn.on('pointerdown', this.activateShield, this);
@@ -185,18 +197,23 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // ---- HUD ----
-    const style = { fontFamily: 'monospace', fontSize: '20px', color: '#ffffff', stroke: '#1d3557', strokeThickness: 4 };
+    const style = { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '20px', resolution: 2, color: '#ffffff', stroke: '#1d3557', strokeThickness: 4 };
     this.hud = {
       lives: this.add.text(14, 12, `生命: ${this.totalLives}`, style).setScrollFactor(0),
       time: this.add.text(GAME_WIDTH - 14, 12, '00.0s', style).setOrigin(1, 0).setScrollFactor(0),
       tip: this.add
-        .text(GAME_WIDTH / 2, GROUND_TOP - 150, '点击跳跃(松手小跳)· 30秒解锁二段跳· 无限挑战!', { ...style, fontSize: '18px' })
+        .text(GAME_WIDTH / 2, GROUND_TOP - 150, '点击跳跃(松手小跳)· 30秒解锁二段跳· 无限挑战!', { ...style, fontSize: '18px', resolution: 2 })
         .setOrigin(0.5)
         .setScrollFactor(0),
-      coins: this.add.text(14, 44, '🪙 0', { ...style, fontSize: '18px' }).setScrollFactor(0),
-      bullets: this.add.text(GAME_WIDTH - 14, 44, '', { ...style, fontSize: '18px' }).setOrigin(1, 0).setScrollFactor(0)
+      coins: this.add.text(14, 44, '🪙 0', { ...style, fontSize: '18px', resolution: 2 }).setScrollFactor(0),
+      bullets: this.add.text(GAME_WIDTH - 14, 44, '', { ...style, fontSize: '18px', resolution: 2 }).setOrigin(1, 0).setScrollFactor(0)
     };
     if (this.fireBtn) this.updateBulletsHud();
+
+    // ---- BGM(原创芯片音乐,循环播放) ----
+    try {
+      this.sound.play('bgm', { loop: true, volume: 0.35 });
+    } catch {}
 
     // ---- 出屏回收 ----
     this.physics.world.on('worldstep', () => {
@@ -289,7 +306,12 @@ export default class GameScene extends Phaser.Scene {
     this.bobTween?.stop();
     this.player.setScale(1, 1);
     this.hud.tip.setVisible(false);
+    if (!this.useQiSkin) {
+      this.player.anims.stop();
+      this.player.setTexture('player-jump');
+    }
     if (isDouble) this.poof(this.player.x, this.player.y + this.player.height / 2, 5);
+    try { this.sound.play('jump', { volume: 0.4 }); } catch {}
   }
 
   private tryJump(now: number) {
@@ -298,7 +320,11 @@ export default class GameScene extends Phaser.Scene {
     if (onGround) {
       this.lastOnGroundAt = now;
       this.jumpsUsed = 0;
-      if (this.bobTween && !this.bobTween.isPlaying()) this.startBob();
+      if (this.useQiSkin) {
+        if (this.bobTween && !this.bobTween.isPlaying()) this.startBob();
+      } else if (!this.player.anims.isPlaying) {
+        this.player.play('player-run');
+      }
     }
 
     const canCoyote = now - this.lastOnGroundAt <= COYOTE_TIME_MS;
@@ -419,6 +445,7 @@ export default class GameScene extends Phaser.Scene {
       this.shieldRing.setVisible(false);
       this.poof(this.player.x, this.player.y + this.player.height / 2, 8);
       this.enterInvulnerable(600); // 短暂无敌,防止同一障碍连续判定
+      try { this.sound.play('shield', { volume: 0.5 }); } catch {}
       return;
     }
 
@@ -428,6 +455,7 @@ export default class GameScene extends Phaser.Scene {
     const left = this.totalLives - this.hits;
     if (left >= 1) {
       this.enterInvulnerable();
+      try { this.sound.play('fail', { volume: 0.45 }); } catch {}
     } else {
       this.dead = true;
       this.die();
@@ -455,7 +483,8 @@ export default class GameScene extends Phaser.Scene {
     this.bobTween?.stop();
     this.player.setTint(0xff6666);
     this.physics.pause();
-    this.time.delayedCall(500, () => this.endRun());
+    try { this.sound.play('gameover', { volume: 0.5 }); } catch {}
+    this.time.delayedCall(1000, () => this.endRun());
   }
 
   private updateLivesHud() {
@@ -517,7 +546,7 @@ export default class GameScene extends Phaser.Scene {
           this.runCoins += 1;
           this.hud.coins.setText(`🪙 ${this.runCoins}`);
           const t = this.add
-            .text(this.player.x + 30, this.player.y - 70, '+1🪙', { fontFamily: 'monospace', fontSize: '16px', color: '#ffe066', stroke: '#1d3557', strokeThickness: 3 })
+            .text(this.player.x + 30, this.player.y - 70, '+1🪙', { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '16px', resolution: 2, color: '#ffe066', stroke: '#1d3557', strokeThickness: 3 })
             .setOrigin(0.5)
             .setDepth(20);
           this.tweens.add({ targets: t, y: t.y - 26, alpha: 0, duration: 650, onComplete: () => t.destroy() });
@@ -525,8 +554,7 @@ export default class GameScene extends Phaser.Scene {
       });
     }
 
-    // 地面花纹滚动 + 云朵视差
-    this.groundDetail.tilePositionX -= (this.runSpeed * delta) / 1000;
+    // 地面静止(相对障碍物固定)+ 云朵视差
     this.clouds.forEach(c => {
       c.x -= (this.runSpeed * 0.15 * delta) / 1000;
       if (c.x < -60) c.x = GAME_WIDTH + 60;

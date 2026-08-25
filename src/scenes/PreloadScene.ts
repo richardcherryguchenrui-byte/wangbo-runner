@@ -4,8 +4,11 @@ export default class PreloadScene extends Phaser.Scene {
   constructor() { super('Preload'); }
 
   preload() {
-    // 玩家角色:照片裁剪去背景后的精灵图
-    this.load.image('player', 'assets/player-sprite.png');
+    // 主角素材包:站立/跑步×2/跳跃 四帧
+    this.load.image('player-idle', 'assets/player-idle.png');
+    this.load.image('player-run-1', 'assets/player-run-1.png');
+    this.load.image('player-run-2', 'assets/player-run-2.png');
+    this.load.image('player-jump', 'assets/player-jump.png');
     // 祁同伟皮肤
     this.load.image('player-qi', 'assets/player-qi.png');
     // 障碍物:用户提供的图片,已去背景
@@ -18,9 +21,27 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.image('ob-beauty-4', 'assets/ob-beauty-4.png');
     // 顾哥神秘商铺商品贴图
     this.load.image('bribe-moon', 'assets/bribe-moon.png');
+    // 音效与 BGM(原创芯片音乐风格;小游戏环境自动静音兜底)
+    this.load.audio('bgm', 'assets/bgm.wav');
+    this.load.audio('jump', 'assets/jump.wav');
+    this.load.audio('fail', 'assets/fail.wav');
+    this.load.audio('shield', 'assets/shield.wav');
+    this.load.audio('gameover', 'assets/gameover.wav');
   }
 
   create() {
+    // 照片/AI 素材在 2x 画布下用线性过滤保持平滑;像素风小件保持最近邻
+    const smoothKeys = [
+      'player-idle', 'player-run-1', 'player-run-2', 'player-jump', 'player-qi',
+      'ob-gold', 'ob-redpacket', 'ob-treasure',
+      'ob-beauty-1', 'ob-beauty-2', 'ob-beauty-3', 'ob-beauty-4',
+      'bribe-moon', 'cloud'
+    ];
+    smoothKeys.forEach(key => {
+      const tex = this.textures.get(key);
+      if (tex) tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
+    });
+
     this.makeCloud();
     this.makeGroundPattern();
     this.makeBullet();
