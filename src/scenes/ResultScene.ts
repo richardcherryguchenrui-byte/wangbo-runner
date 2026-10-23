@@ -154,12 +154,17 @@ export default class ResultScene extends Phaser.Scene {
         resolution: 2, stroke: '#08131f', strokeThickness: 4
       })
       .setOrigin(0.5);
+    const labelBg = this.add.graphics();
+    labelBg.fillStyle(0x08131f, 0.88);
+    labelBg.fillRoundedRect(-72, 36, 144, 20, 10);
+    labelBg.lineStyle(1, 0xffffff, 0.14);
+    labelBg.strokeRoundedRect(-72, 36, 144, 20, 10);
     const gradeLabel = this.add
-      .text(0, 44, `本局评价 · ${grade.label}`, {
-        fontFamily: FONT, fontSize: '10px', color: grade.color, resolution: 2
+      .text(0, 46, `本局评价 · ${grade.label}`, {
+        fontFamily: FONT, fontSize: '11px', color: grade.color, resolution: 2
       })
       .setOrigin(0.5);
-    const gradeBadge = this.add.container(468, 116, [gradeG, gradeText, gradeLabel]).setDepth(23);
+    const gradeBadge = this.add.container(468, 116, [gradeG, gradeText, labelBg, gradeLabel]).setDepth(40);
     this.tweens.add({ targets: gradeBadge, scale: 1.05, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
 
     // 下一官阶目标:给「再来一局」一个明确的短期理由

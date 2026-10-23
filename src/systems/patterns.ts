@@ -212,6 +212,22 @@ function slalom(opts: PatternOptions): RunPattern {
   };
 }
 
+// 双低空:一次长滑铲连续钻过两个美女,把滑铲从「躲一下」变成「一段操作」
+function twinFlyer(opts: PatternOptions): RunPattern {
+  const { rng, speed } = opts;
+  const gap = Math.max(165, speed * 0.34);
+  return {
+    name: 'twin-flyer',
+    obstacles: [
+      { at: 0, flyer: true, key: pick(['ob-beauty-1', 'ob-beauty-2', 'ob-beauty-3', 'ob-beauty-4'], rng), warn: true },
+      { at: gap, flyer: true, key: pick(['ob-beauty-1', 'ob-beauty-2', 'ob-beauty-3', 'ob-beauty-4'], rng), warn: false }
+    ],
+    coins: coinLine(-20, gap + 150, 6, -46),
+    spanPx: gap + 280,
+    gapSec: baseGap(stageFor(opts.elapsedMs), rng) + 0.24
+  };
+}
+
 function coinRun(opts: PatternOptions): RunPattern {
   const { rng } = opts;
   const len = 360 + rng() * 180;
@@ -283,6 +299,7 @@ export function generatePattern(opts: PatternOptions): RunPattern {
       { fn: flyer, w: 16, name: 'flyer' },
       { fn: flyerGround, w: 15, name: 'flyer-ground' },
       { fn: groundFlyer, w: 10, name: 'ground-flyer' },
+      { fn: twinFlyer, w: 5, name: 'twin-flyer' },
       { fn: slalom, w: 7, name: 'slalom' },
       { fn: coinRun, w: 10, name: 'coin-run' },
       { fn: treasure, w: 7, name: 'treasure' },
@@ -296,6 +313,7 @@ export function generatePattern(opts: PatternOptions): RunPattern {
       { fn: flyerGround, w: 16, name: 'flyer-ground' },
       { fn: groundFlyer, w: 13, name: 'ground-flyer' },
       { fn: doubleFlyer, w: 8, name: 'double-flyer' },
+      { fn: twinFlyer, w: 6, name: 'twin-flyer' },
       { fn: slalom, w: 9, name: 'slalom' },
       { fn: coinRun, w: 7, name: 'coin-run' },
       { fn: treasure, w: 5, name: 'treasure' },

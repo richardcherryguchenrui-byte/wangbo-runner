@@ -490,14 +490,14 @@ export function buildArtTextures(scene: Phaser.Scene) {
   });
 
   makeCanvas(scene, 'ui-rank', 40, 40, (ctx) => {
-    ctx.fillStyle = 'rgba(255,255,255,0.14)';
+    // 星章:去掉外圈,只留带柔光的五角星,小尺寸下更干净
+    const glow = ctx.createRadialGradient(20, 20, 3, 20, 20, 19);
+    glow.addColorStop(0, 'rgba(255,255,255,0.34)');
+    glow.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(20, 20, 18, 0, Math.PI * 2);
+    ctx.arc(20, 20, 19, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
-    // 五角星:整体浅色,场景里按官阶颜色 tint
     const star = (r1: number, r2: number) => {
       ctx.beginPath();
       for (let i = 0; i < 10; i++) {
@@ -510,15 +510,25 @@ export function buildArtTextures(scene: Phaser.Scene) {
       }
       ctx.closePath();
     };
-    const g = ctx.createLinearGradient(0, 8, 0, 32);
+    const g = ctx.createLinearGradient(0, 5, 0, 35);
     g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.55, '#f1f7ff');
     g.addColorStop(1, '#cfe3ff');
     ctx.fillStyle = g;
-    star(13, 5.6);
+    star(15, 6.2);
     ctx.fill();
     ctx.strokeStyle = '#0d2038';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.8;
+    ctx.lineJoin = 'round';
     ctx.stroke();
+    // 左上高光,让星章有金属感
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath();
+    ctx.moveTo(20, 7);
+    ctx.lineTo(23, 14);
+    ctx.lineTo(20, 13);
+    ctx.closePath();
+    ctx.fill();
   });
 
   makeCanvas(scene, 'ui-check', 32, 32, (ctx) => {

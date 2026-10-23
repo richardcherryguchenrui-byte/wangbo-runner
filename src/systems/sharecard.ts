@@ -72,6 +72,16 @@ export function buildShareCard(scene: Phaser.Scene, d: ShareCardData): HTMLCanva
   ctx.font = `22px ${FONT}`;
   ctx.fillText(`反弹工作室 · v${GAME_VERSION}`, 70, 152);
 
+  // 单局评价:顶部左侧印章,与右侧官阶印章形成对称
+  const grade = gradeRun({
+    timeMs: d.timeMs,
+    dodged: d.dodged,
+    nearMisses: d.nearMisses,
+    overdrives: d.overdrives ?? 0,
+    hits: d.hits ?? 0,
+    combo: d.combo
+  });
+
   // 主卡
   roundRect(ctx, 60, 200, 960, 980, 42);
   const cardBg = ctx.createLinearGradient(60, 200, 1020, 1180);
@@ -100,6 +110,49 @@ export function buildShareCard(scene: Phaser.Scene, d: ShareCardData): HTMLCanva
   ctx.fillText(d.rankName, 0, 2);
   ctx.restore();
 
+  // 评价印章:大字母 + 本局评价,发群时一眼看到水平
+  ctx.save();
+  ctx.translate(196, 274);
+  ctx.globalAlpha = 0.14;
+  ctx.fillStyle = grade.color;
+  ctx.beginPath();
+  ctx.arc(0, 0, 74, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = 'rgba(8,20,38,0.9)';
+  ctx.beginPath();
+  ctx.arc(0, 0, 58, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = grade.color;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(0, 0, 58, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, 48, 0, Math.PI * 2);
+  ctx.stroke();
+  // 外圈刻度
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    ctx.strokeStyle = `rgba(255,255,255,${i % 3 === 0 ? 0.4 : 0.18})`;
+    ctx.lineWidth = i % 3 === 0 ? 2.4 : 1.4;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 64, Math.sin(a) * 64);
+    ctx.lineTo(Math.cos(a) * 70, Math.sin(a) * 70);
+    ctx.stroke();
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = grade.color;
+  ctx.font = `bold 64px ${FONT}`;
+  ctx.fillText(grade.letter, 0, -4);
+  ctx.fillStyle = 'rgba(210,230,255,0.72)';
+  ctx.font = `15px ${FONT}`;
+  ctx.fillText('本局评价', 0, 37);
+  ctx.restore();
+
   // 角色
   try {
     const tex = scene.textures.get(d.playerTexture);
@@ -121,21 +174,21 @@ export function buildShareCard(scene: Phaser.Scene, d: ShareCardData): HTMLCanva
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = 'rgba(210,230,255,0.78)';
   ctx.font = `26px ${FONT}`;
-  ctx.fillText(d.daily ? '今日挑战 · 成绩单' : '本局成绩单', 118, 370);
+  ctx.fillText(d.daily ? '今日挑战 · 成绩单' : '本局成绩单', 118, 384);
 
   // 大数字存活时间
   const sec = (d.timeMs / 1000).toFixed(1);
   ctx.fillStyle = '#ffffff';
   ctx.font = `bold 150px ${FONT}`;
-  ctx.fillText(sec, 108, 540);
+  ctx.fillText(sec, 108, 552);
   const numW = ctx.measureText(sec).width;
   ctx.fillStyle = '#ffd43b';
   ctx.font = `bold 50px ${FONT}`;
-  ctx.fillText('s', 118 + numW + 8, 540);
+  ctx.fillText('s', 118 + numW + 8, 552);
 
   ctx.fillStyle = '#8ce99a';
   ctx.font = `bold 26px ${FONT}`;
-  ctx.fillText(`最佳 ${(d.bestMs / 1000).toFixed(1)}s`, 122, 588);
+  ctx.fillText(`最佳 ${(d.bestMs / 1000).toFixed(1)}s`, 122, 600);
 
   // 数据格
   const stats: [string, string][] = [
@@ -146,7 +199,7 @@ export function buildShareCard(scene: Phaser.Scene, d: ShareCardData): HTMLCanva
   ];
   stats.forEach(([label, value], i) => {
     const x = 118 + (i % 2) * 400;
-    const y = 720 + Math.floor(i / 2) * 128;
+    const y = 730 + Math.floor(i / 2) * 128;
     ctx.fillStyle = 'rgba(255,255,255,0.06)';
     roundRect(ctx, x, y, 360, 104, 20);
     ctx.fill();
@@ -162,16 +215,8 @@ export function buildShareCard(scene: Phaser.Scene, d: ShareCardData): HTMLCanva
   });
 
   // 生存评价
-  const grade = gradeRun({
-    timeMs: d.timeMs,
-    dodged: d.dodged,
-    nearMisses: d.nearMisses,
-    overdrives: d.overdrives ?? 0,
-    hits: d.hits ?? 0,
-    combo: d.combo
-  });
   ctx.fillStyle = 'rgba(255,212,59,0.09)';
-  roundRect(ctx, 220, 976, 640, 64, 32);
+  roundRect(ctx, 220, 986, 640, 64, 32);
   ctx.fill();
   ctx.strokeStyle = 'rgba(255,212,59,0.28)';
   ctx.lineWidth = 2;
@@ -179,16 +224,16 @@ export function buildShareCard(scene: Phaser.Scene, d: ShareCardData): HTMLCanva
   ctx.textAlign = 'center';
   ctx.fillStyle = grade.color;
   ctx.font = `bold 26px ${FONT}`;
-  ctx.fillText(`本局评价 · ${grade.letter} · ${grade.label}`, W / 2, 1018);
+  ctx.fillText(`本局评价 · ${grade.letter} · ${grade.label}`, W / 2, 1028);
 
   // 底部挑衅
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffe066';
   ctx.font = `bold 32px ${FONT}`;
-  ctx.fillText('你能撑过我吗?', W / 2, 1100);
+  ctx.fillText('你能撑过我吗?', W / 2, 1106);
   ctx.fillStyle = 'rgba(210,230,255,0.55)';
   ctx.font = `20px ${FONT}`;
-  ctx.fillText('打开游戏,来比比谁升得快', W / 2, 1140);
+  ctx.fillText('打开游戏,来比比谁升得快', W / 2, 1146);
 
   // 页脚
   ctx.fillStyle = 'rgba(255,255,255,0.08)';

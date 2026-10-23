@@ -21,7 +21,7 @@ import { gradeRun } from '../src/systems/grade';
 import {
   getDailyChallenge, recordDailyRun, peekDailyState, mulberry32, DAILY_MODIFIERS
 } from '../src/systems/dailyChallenge';
-import { SLIDE_BODY_HEIGHT } from '../src/config/constants';
+import { SLIDE_BODY_HEIGHT, SLIDE_DURATION_MS } from '../src/config/constants';
 import type { Progress } from '../src/systems/progress';
 
 // ---- localStorage 桩 ----
@@ -353,7 +353,7 @@ describe('障碍 Pattern', () => {
   it('前 20 秒绝不出现低空美女或飞行 Pattern', () => {
     for (let seed = 1; seed < 120; seed++) {
       const p = generatePattern({ rng: mulberry32(seed), elapsedMs: 5000, speed: 300 });
-      expect(['flyer', 'flyer-ground', 'ground-flyer', 'double-flyer']).not.toContain(p.name);
+      expect(['flyer', 'flyer-ground', 'ground-flyer', 'double-flyer', 'slalom', 'twin-flyer']).not.toContain(p.name);
       expect(p.obstacles.some(o => o.flyer)).toBe(false);
     }
   });
@@ -380,6 +380,19 @@ describe('障碍 Pattern', () => {
   it('低空美女的碰撞底边足以让滑铲通过', () => {
     // 滑铲身高 48,地面在 y=0 时,障碍底边 -58 意味着上方至少留 58px 净空
     expect(FLYER_Y).toBeLessThanOrEqual(-SLIDE_BODY_HEIGHT);
+  });
+
+  it('双低空间距小于一次滑铲的位移,可以一口气钻过', () => {
+    let found = 0;
+    for (let seed = 1; seed < 800 && found < 6; seed++) {
+      const p = generatePattern({ rng: mulberry32(seed), elapsedMs: 90000, speed: 620 });
+      if (p.name !== 'twin-flyer') continue;
+      found += 1;
+      const gap = p.obstacles[1].at - p.obstacles[0].at;
+      expect(gap).toBeGreaterThan(0);
+      expect(gap).toBeLessThan((620 * SLIDE_DURATION_MS) / 1000);
+    }
+    expect(found).toBeGreaterThan(0);
   });
 });
 

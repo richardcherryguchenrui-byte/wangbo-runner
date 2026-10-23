@@ -125,6 +125,7 @@ interface Hud {
   time: Phaser.GameObjects.Text;
   best: Phaser.GameObjects.Text;
   combo: Phaser.GameObjects.Text;
+  comboBg: Phaser.GameObjects.Graphics;
   chips: Phaser.GameObjects.Text;
   missionTitle: Phaser.GameObjects.Text;
   missionDesc: Phaser.GameObjects.Text;
@@ -325,7 +326,7 @@ export default class GameScene extends Phaser.Scene {
     this.mission = pickRunMission(this.progress, this.rng);
     this.nextInspectionAt = this.daily && this.challenge?.modifier.inspectionFast ? 15000 : INSPECTION_FIRST_MS;
     this.hud.missionTitle.setText(`${this.mission.icon} ${this.mission.title}`);
-    this.hud.missionDesc.setText(`0/${this.mission.target}${this.mission.unit} · 完成 +${this.mission.reward}🪙`);
+    this.hud.missionDesc.setText(`0/${this.mission.target}${this.mission.unit} · 完成 +${this.mission.reward} 银币`);
     this.refreshRankHud(true);
     this.refreshLivesHud();
 
@@ -569,7 +570,7 @@ export default class GameScene extends Phaser.Scene {
   // ============================================================
 
   private buildHud() {
-    addPanel(this, 12, 10, 338, 82, { fill: 0x09182c, fillAlpha: 0.78, radius: 16 }).setDepth(80);
+    addPanel(this, 12, 10, 338, 82, { fill: 0x09182c, fillAlpha: 0.98, radius: 16 }).setDepth(80);
     const style = {
       fontFamily: FONT,
       fontSize: '18px',
@@ -595,6 +596,7 @@ export default class GameScene extends Phaser.Scene {
         })
         .setOrigin(1, 0)
         .setDepth(81),
+      comboBg: this.add.graphics().setDepth(80).setVisible(false),
       combo: this.add
         .text(GAME_WIDTH / 2, 91, '', {
           fontFamily: FONT, fontSize: '20px', color: '#ffe066', fontStyle: 'bold',
@@ -641,10 +643,10 @@ export default class GameScene extends Phaser.Scene {
 
     this.heartIcon = this.add.image(32, 31, 'ui-heart').setScale(0.62).setDepth(81);
     this.add.image(136, 31, 'coin').setScale(0.46).setDepth(81);
-    this.rankIcon = this.add.image(35, 56, 'ui-rank').setScale(0.42).setDepth(81);
+    this.rankIcon = this.add.image(35, 56, 'ui-rank').setScale(0.5).setDepth(81);
 
     const missionY = this.daily ? 132 : 104;
-    addPanel(this, 12, missionY, 252, 62, { fill: 0x09182c, fillAlpha: 0.66, radius: 12 }).setDepth(80);
+    addPanel(this, 12, missionY, 252, 62, { fill: 0x09182c, fillAlpha: 0.96, radius: 12 }).setDepth(80);
     this.hud.missionTitle.setY(missionY + 8);
     this.hud.missionDesc.setY(missionY + 31);
     drawBar(this.hud.missionBar, 24, missionY + 52, 228, 4, 0, 0x74c0fc);
@@ -1400,7 +1402,6 @@ export default class GameScene extends Phaser.Scene {
     this.bobTween?.stop();
     this.bobTween = undefined;
     this.player.setScale(this.baseScale);
-    this.hud.combo.setVisible(this.combo >= 5);
     if (!this.useQiSkin) {
       this.player.anims.stop();
       this.player.setTexture(this.playerTex('jump'));
@@ -1832,12 +1833,22 @@ export default class GameScene extends Phaser.Scene {
     this.combo += 1;
     this.comboMax = Math.max(this.comboMax, this.combo);
     const flyer = !!o.getData('flyer');
+    // 完美滑铲:从低空美女下方滑过,额外银币 + 气势 + 专属反馈
+    const perfectSlide = flyer && this.sliding;
     const comboBonus = this.combo >= COMBO_TIER_2 ? 2 : this.combo >= COMBO_TIER_1 ? 1 : 0;
-    const value = this.coinAmount((flyer ? FLYER_COIN_BONUS : 1) + comboBonus);
+    const value = this.coinAmount(
+      (flyer ? FLYER_COIN_BONUS : 1) + comboBonus + (perfectSlide ? 2 : 0)
+    );
     this.addRunCoins(value);
-    this.gainHype(HYPE_PER_DODGE);
-    this.floatText(this.player.x + 30, this.player.y - 70, `+${value}🪙`);
-    playSfx(this, 'coin', 0.15);
+    this.gainHype(HYPE_PER_DODGE + (perfectSlide ? 6 : 0));
+    if (perfectSlide) {
+      this.floatText(this.player.x + 34, this.player.y - 76, `完美滑铲! +${value}🪙`, '#b2f2bb');
+      nearMissStreak(this, this.player.x + 58, this.player.y + 4);
+      playSfx(this, 'near', 0.4);
+    } else {
+      this.floatText(this.player.x + 30, this.player.y - 70, `+${value}🪙`);
+      playSfx(this, 'coin', 0.15);
+    }
 
     if (this.combo === COMBO_TIER_1) showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, '🔥 连翻 ×10!银币加倍');
     if (this.combo === COMBO_TIER_2) showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, '🔥🔥 连翻 ×25!银币三倍');
@@ -1869,7 +1880,11 @@ export default class GameScene extends Phaser.Scene {
   private breakCombo() {
     if (this.combo >= 5) showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, `💔 连击中断(×${this.combo})`);
     this.combo = 0;
-    this.hud?.combo.setVisible(false);
+    if (this.hud?.combo) {
+      this.tweens.killTweensOf(this.hud.combo);
+      this.hud.combo.setScale(1).setVisible(false);
+      this.hud.comboBg.setVisible(false);
+    }
   }
 
   // ============================================================
@@ -2116,7 +2131,7 @@ export default class GameScene extends Phaser.Scene {
     const value = missionValue(this.mission, s);
     const done = missionDone(this.mission, s);
     const progress = missionProgressText(this.mission, s);
-    const desc = `${progress} · 完成 +${this.mission.reward}🪙`;
+    const desc = `${progress} · 完成 +${this.mission.reward} 银币`;
     if (this.hud.missionDesc.text !== desc) this.hud.missionDesc.setText(desc);
     const missionY = this.daily ? 132 : 104;
     drawBar(
@@ -2139,7 +2154,7 @@ export default class GameScene extends Phaser.Scene {
     this.gainHype(16);
     this.hud.missionTitle.setColor('#8ce99a');
     this.hud.missionDesc.setColor('#b2f2bb');
-    this.hud.missionDesc.setText(`✅ 已完成 · +${this.mission.reward}🪙`);
+    this.hud.missionDesc.setText(`✅ 已完成 · +${this.mission.reward} 银币`);
     const missionY = this.daily ? 132 : 104;
     drawBar(this.hud.missionBar, 24, missionY + 52, 228, 4, 1, 0x69db7c);
     showToast(this, GAME_WIDTH / 2, GROUND_TOP - 225, `✅ 考核完成:${this.mission.title} +${this.mission.reward}🪙`, '#8ce99a');
@@ -2151,16 +2166,40 @@ export default class GameScene extends Phaser.Scene {
   // HUD 刷新
   // ============================================================
 
+  private drawComboChip() {
+    const t = this.hud.combo;
+    const w = Math.max(96, t.width + 30);
+    const x = GAME_WIDTH / 2 - w / 2;
+    const g = this.hud.comboBg;
+    g.clear();
+    g.fillStyle(0x081525, 0.62);
+    g.fillRoundedRect(x, 78, w, 26, 13);
+    g.lineStyle(1, 0xffffff, 0.16);
+    g.strokeRoundedRect(x, 78, w, 26, 13);
+    g.setVisible(true);
+  }
+
   private updateHud() {
     const timeStr = `${(this.elapsedMs / 1000).toFixed(1)}s`;
     if (this.hud.time.text !== timeStr) this.hud.time.setText(timeStr);
 
     if (this.combo >= 5) {
       const comboStr = `🔥 连翻 ×${this.combo}`;
-      if (!this.hud.combo.visible) this.hud.combo.setVisible(true);
-      if (this.hud.combo.text !== comboStr) this.hud.combo.setText(comboStr);
+      const wasHidden = !this.hud.combo.visible;
+      if (wasHidden) this.hud.combo.setVisible(true);
+      if (wasHidden || this.hud.combo.text !== comboStr) {
+        this.hud.combo.setText(comboStr);
+        this.hud.combo.setColor(
+          this.combo >= COMBO_TIER_2 ? '#ff922b' : this.combo >= COMBO_TIER_1 ? '#ffd43b' : '#ffe066'
+        );
+        this.drawComboChip();
+        this.tweens.killTweensOf(this.hud.combo);
+        this.hud.combo.setScale(1.26);
+        this.tweens.add({ targets: this.hud.combo, scale: 1, duration: 190, ease: 'Back.out' });
+      }
     } else if (this.hud.combo.visible) {
       this.hud.combo.setVisible(false);
+      this.hud.comboBg.setVisible(false);
     }
 
     const chips: string[] = [];
@@ -2197,8 +2236,8 @@ export default class GameScene extends Phaser.Scene {
     if (this.rankIcon) {
       this.rankIcon.setTint(color);
       if (force) {
-        this.rankIcon.setScale(0.42);
-        this.tweens.add({ targets: this.rankIcon, scale: 0.58, duration: 180, yoyo: true, ease: 'Quad.out' });
+        this.rankIcon.setScale(0.5);
+        this.tweens.add({ targets: this.rankIcon, scale: 0.66, duration: 180, yoyo: true, ease: 'Quad.out' });
       }
     }
     drawBar(this.hud.rankBar, 150, 51, 187, 7, info.ratio, color);
@@ -2226,6 +2265,7 @@ export default class GameScene extends Phaser.Scene {
     this.player.setTint(0xff6666);
     this.physics.pause();
     this.hud.combo.setVisible(false);
+    this.hud.comboBg.setVisible(false);
     playSfx(this, 'gameover', 0.5);
     shake(this, 0.01, 260);
     wxVibrate('heavy');

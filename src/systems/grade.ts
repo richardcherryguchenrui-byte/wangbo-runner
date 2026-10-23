@@ -24,7 +24,7 @@ const GRADES: { min: number; letter: GradeLetter; label: string; color: string }
   { min: 620, letter: 'A', label: '处长苗子', color: '#8ce99a' },
   { min: 380, letter: 'B', label: '科班出身', color: '#74c0fc' },
   { min: 180, letter: 'C', label: '稳中带皮', color: '#ffa94d' },
-  { min: 0, letter: 'D', label: '刚热身就下班', color: '#adb5bd' }
+  { min: 0, letter: 'D', label: '刚热身就下班', color: '#ced4da' }
 ];
 
 /**
