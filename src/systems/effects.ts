@@ -80,6 +80,38 @@ export function confettiBurst(scene: Phaser.Scene, x: number, y: number, count =
   }
 }
 
+// 受击冲击:白闪 + 红环 + 碎片,配合 80ms 顿帧形成打击感
+export function impactBurst(scene: Phaser.Scene, x: number, y: number) {
+  const core = scene.add.circle(x, y, 16, 0xffffff, 0.95).setDepth(26);
+  scene.tweens.add({
+    targets: core, scale: 2.8, alpha: 0, duration: 170, ease: 'Quad.out',
+    onComplete: () => core.destroy()
+  });
+  const ring = scene.add.circle(x, y, 12, 0xff4d4d, 0).setStrokeStyle(4, 0xff4d4d, 0.9).setDepth(25);
+  scene.tweens.add({
+    targets: ring, scale: 5.4, alpha: 0, duration: 320, ease: 'Cubic.out',
+    onComplete: () => ring.destroy()
+  });
+  for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2 + Phaser.Math.FloatBetween(-0.24, 0.24);
+    const d = Phaser.Math.Between(38, 96);
+    const shard = scene.add
+      .rectangle(x, y, Phaser.Math.Between(4, 9), Phaser.Math.Between(3, 6), i % 3 === 0 ? 0xffd43b : 0xff6b6b)
+      .setDepth(26)
+      .setAngle(Phaser.Math.Between(0, 180));
+    scene.tweens.add({
+      targets: shard,
+      x: x + Math.cos(angle) * d,
+      y: y + Math.sin(angle) * d + Phaser.Math.Between(6, 24),
+      angle: shard.angle + Phaser.Math.Between(120, 300),
+      alpha: 0,
+      duration: Phaser.Math.Between(320, 520),
+      ease: 'Quad.out',
+      onComplete: () => shard.destroy()
+    });
+  }
+}
+
 // 受击震屏(轻微)
 export function shake(scene: Phaser.Scene, intensity = 0.004, duration = 120) {
   try { scene.cameras.main.shake(duration, intensity); } catch {}

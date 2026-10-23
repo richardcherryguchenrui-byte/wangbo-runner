@@ -17,6 +17,7 @@ import {
   type MissionId, type MissionState
 } from '../src/systems/missions';
 import { generatePattern, stageFor, FLYER_Y } from '../src/systems/patterns';
+import { gradeRun } from '../src/systems/grade';
 import {
   getDailyChallenge, recordDailyRun, peekDailyState, mulberry32, DAILY_MODIFIERS
 } from '../src/systems/dailyChallenge';
@@ -477,5 +478,32 @@ describe('v2 新增存档字段', () => {
     expect(p.overdrives).toBe(7);
     expect(p.nearMisses).toBe(44);
     expect(p.dailyPlays).toBe(3);
+  });
+});
+
+// ---- 单局评价 ----
+describe('单局评价(gradeRun)', () => {
+  it('短局低表现拿 D,高质量长局拿 S', () => {
+    expect(gradeRun({ timeMs: 8000, dodged: 1, nearMisses: 0, overdrives: 0, hits: 1, combo: 1 }).letter).toBe('D');
+    expect(gradeRun({ timeMs: 60000, dodged: 22, nearMisses: 10, overdrives: 3, hits: 0, combo: 20 }).letter).toBe('S');
+  });
+
+  it('受击会扣分,但不出现负分', () => {
+    const clean = gradeRun({ timeMs: 30000, dodged: 10, nearMisses: 2, overdrives: 1, hits: 0, combo: 6 });
+    const hit = gradeRun({ timeMs: 30000, dodged: 10, nearMisses: 2, overdrives: 1, hits: 2, combo: 6 });
+    expect(hit.score).toBeLessThan(clean.score);
+    expect(gradeRun({ timeMs: 0, dodged: 0, nearMisses: 0, overdrives: 0, hits: 9, combo: 0 }).score).toBe(0);
+  });
+
+  it('等级与文案字段完整', () => {
+    for (const input of [
+      { timeMs: 10000, dodged: 2, nearMisses: 0, overdrives: 0, hits: 0, combo: 2 },
+      { timeMs: 50000, dodged: 18, nearMisses: 5, overdrives: 2, hits: 1, combo: 12 }
+    ]) {
+      const g = gradeRun(input);
+      expect(g.letter).toMatch(/^[SABCD]$/);
+      expect(g.label.length).toBeGreaterThan(0);
+      expect(g.color).toMatch(/^#[0-9a-f]{6}$/i);
+    }
   });
 });

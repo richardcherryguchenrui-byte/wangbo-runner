@@ -76,7 +76,9 @@ import {
   rankBurst,
   coinPop,
   nearMissStreak,
-  windStreak
+  windStreak,
+  confettiBurst,
+  impactBurst
 } from '../systems/effects';
 import { claimNewAchievements } from '../systems/achievements';
 import { updateDailyFromRun } from '../systems/daily';
@@ -106,6 +108,7 @@ interface HudButton {
   bg: Phaser.GameObjects.Graphics;
   text: Phaser.GameObjects.Text;
   hit: Phaser.GameObjects.Rectangle;
+  icon?: Phaser.GameObjects.Image;
 }
 
 interface Bounds {
@@ -175,6 +178,8 @@ export default class GameScene extends Phaser.Scene {
   private cityFar!: Phaser.GameObjects.TileSprite;
   private cityNear!: Phaser.GameObjects.TileSprite;
   private skyRect!: Phaser.GameObjects.Rectangle;
+  private skyShade!: Phaser.GameObjects.Image;
+  private sunRays!: Phaser.GameObjects.Image;
   private nightOverlay!: Phaser.GameObjects.Rectangle;
   private goldOverlay!: Phaser.GameObjects.Rectangle;
   private inspectionOverlay!: Phaser.GameObjects.Rectangle;
@@ -183,6 +188,7 @@ export default class GameScene extends Phaser.Scene {
   private stars: { dot: Phaser.GameObjects.Rectangle; phase: number }[] = [];
   private clouds: Phaser.GameObjects.Image[] = [];
   private papers: { g: Phaser.GameObjects.Rectangle; speed: number; spin: number; sway: number; baseAlpha: number }[] = [];
+  private landmarks: Phaser.GameObjects.Image[] = [];
 
   // ---- 本局状态 ----
   private runSpeed = RUN_SPEED_BASE;
@@ -224,6 +230,10 @@ export default class GameScene extends Phaser.Scene {
   private overdriveCount = 0;
   private lastWindAt = 0;
   private lastFlyerWarnAt = 0;
+  private speedLineAcc = 0;
+  private bestAtStart = 0;
+  private recordBroken = false;
+  private hitFreezeUntil = 0;
 
   // ---- 官阶 / 考核 ----
   private rank: RunRank = RUN_RANKS[0];
@@ -244,9 +254,14 @@ export default class GameScene extends Phaser.Scene {
   private inspectionActive = false;
   private inspectionUntil = 0;
   private nextInspectionAt = INSPECTION_FIRST_MS;
+  private patrolDrone?: Phaser.GameObjects.Image;
+  private searchlight?: Phaser.GameObjects.Image;
+  private searchlightPool?: Phaser.GameObjects.Image;
 
   // ---- HUD ----
   private hud!: Hud;
+  private heartIcon?: Phaser.GameObjects.Image;
+  private rankIcon?: Phaser.GameObjects.Image;
   private fireBtn?: HudButton;
   private fireBounds: Bounds = { x: 0, y: 0, w: 0, h: 0 };
   private shieldBtn?: HudButton;
@@ -339,9 +354,17 @@ export default class GameScene extends Phaser.Scene {
       .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x5ec8f8)
       .setOrigin(0)
       .setDepth(-20);
+    this.skyShade = this.add.image(0, 0, 'sky-depth').setOrigin(0).setDepth(-19).setAlpha(0.95);
 
     // 太阳与月亮:昼夜循环里交叉淡入
     this.sun = this.add.image(790, 94, 'sun').setDepth(-18).setAlpha(0.95).setScale(1.04);
+    this.sunRays = this.add
+      .image(790, 94, 'sun-rays')
+      .setDepth(-17)
+      .setAlpha(0.32)
+      .setScale(0.92)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({ targets: this.sunRays, angle: 360, duration: 90000, repeat: -1 });
     this.moon = this.add.image(836, 122, 'moon').setDepth(-18).setAlpha(0).setScale(0.92);
     this.tweens.add({
       targets: this.sun,
@@ -367,6 +390,24 @@ export default class GameScene extends Phaser.Scene {
       .tileSprite(0, GROUND_TOP - 152, GAME_WIDTH, 200, 'bg-city-near')
       .setOrigin(0, 0)
       .setDepth(-11);
+
+    // 城市地标:固定 4 座,按同一视差速度循环,打破楼群贴图的重复感
+    this.landmarks = [];
+    const landmarkDefs: { key: string; x: number; scale: number; alpha: number }[] = [
+      { key: 'bg-tower', x: 260, scale: 1.02, alpha: 0.9 },
+      { key: 'bg-wheel', x: 700, scale: 0.94, alpha: 0.86 },
+      { key: 'bg-hotel', x: 1100, scale: 0.9, alpha: 0.86 },
+      { key: 'bg-tower', x: 1460, scale: 0.74, alpha: 0.8 }
+    ];
+    for (const d of landmarkDefs) {
+      const img = this.add
+        .image(d.x, GROUND_TOP + 4, d.key)
+        .setOrigin(0.5, 1)
+        .setScale(d.scale)
+        .setDepth(-12)
+        .setAlpha(d.alpha);
+      this.landmarks.push(img);
+    }
 
     // 星星
     for (let i = 0; i < 28; i++) {
@@ -538,9 +579,9 @@ export default class GameScene extends Phaser.Scene {
       strokeThickness: 4
     };
     this.hud = {
-      lives: this.add.text(26, 20, '', { ...style, fontStyle: 'bold' }).setDepth(81),
-      coins: this.add.text(128, 20, '', { ...style, fontStyle: 'bold' }).setDepth(81),
-      rank: this.add.text(26, 47, '', { ...style, fontSize: '15px', color: '#ffe066', fontStyle: 'bold' }).setDepth(81),
+      lives: this.add.text(50, 20, '', { ...style, fontStyle: 'bold' }).setDepth(81),
+      coins: this.add.text(154, 20, '', { ...style, fontStyle: 'bold' }).setDepth(81),
+      rank: this.add.text(48, 47, '', { ...style, fontSize: '15px', color: '#ffe066', fontStyle: 'bold' }).setDepth(81),
       time: this.add
         .text(GAME_WIDTH / 2, 13, '00.0s', {
           fontFamily: FONT, fontSize: '27px', color: '#ffffff', fontStyle: 'bold',
@@ -598,6 +639,10 @@ export default class GameScene extends Phaser.Scene {
       missionBar: this.add.graphics().setDepth(82)
     };
 
+    this.heartIcon = this.add.image(32, 31, 'ui-heart').setScale(0.62).setDepth(81);
+    this.add.image(136, 31, 'coin').setScale(0.46).setDepth(81);
+    this.rankIcon = this.add.image(35, 56, 'ui-rank').setScale(0.42).setDepth(81);
+
     const missionY = this.daily ? 132 : 104;
     addPanel(this, 12, missionY, 252, 62, { fill: 0x09182c, fillAlpha: 0.66, radius: 12 }).setDepth(80);
     this.hud.missionTitle.setY(missionY + 8);
@@ -609,21 +654,26 @@ export default class GameScene extends Phaser.Scene {
     }
 
     this.hud.best.setText(this.progress.bestTimeMs > 0 ? `最佳 ${(this.progress.bestTimeMs / 1000).toFixed(1)}s` : '最佳 —');
-    this.hud.lives.setText(`❤ ${this.totalLives}`);
-    this.hud.coins.setText('🪙 0');
+    this.hud.lives.setText(`×${this.totalLives}`);
+    this.hud.coins.setText('0');
     this.refreshRankHud(true);
     drawBar(this.hud.hypeBar, 360, 62, 260, 10, 0, 0xb197fc);
 
-    // 开局操作提示(几秒后淡出)
-    const hint = this.add
-      .text(GAME_WIDTH / 2, GROUND_TOP - 46, '点击/空格跳跃 · ↓ 滑铲', {
+    // 开局操作提示(几秒后淡出):带深色药丸底,避免和背景地标混在一起
+    const hintText = this.add
+      .text(0, 0, '点击/空格跳跃 · ↓ 滑铲', {
         fontFamily: FONT, fontSize: '15px', color: '#ffffff', resolution: 2,
         stroke: '#08131f', strokeThickness: 4
       })
-      .setOrigin(0.5)
-      .setAlpha(0)
-      .setDepth(81);
-    this.tweens.add({ targets: hint, alpha: 0.92, duration: 400, delay: 700 });
+      .setOrigin(0.5);
+    const hintW = hintText.width + 38;
+    const hintBg = this.add.graphics();
+    hintBg.fillStyle(0x081525, 0.55);
+    hintBg.fillRoundedRect(-hintW / 2, -16, hintW, 32, 16);
+    hintBg.lineStyle(1.2, 0xffffff, 0.18);
+    hintBg.strokeRoundedRect(-hintW / 2, -16, hintW, 32, 16);
+    const hint = this.add.container(GAME_WIDTH / 2, GROUND_TOP - 58, [hintBg, hintText]).setDepth(81).setAlpha(0);
+    this.tweens.add({ targets: hint, alpha: 0.95, duration: 400, delay: 700 });
     this.tweens.add({ targets: hint, alpha: 0, duration: 900, delay: 5200, onComplete: () => hint.destroy() });
   }
 
@@ -634,7 +684,8 @@ export default class GameScene extends Phaser.Scene {
     h: number,
     label: string,
     onClick: () => void,
-    fill = 0x10233d
+    fill = 0x10233d,
+    iconKey?: string
   ): HudButton {
     const bg = this.add.graphics().setDepth(80);
     bg.fillStyle(0x06101d, 0.3);
@@ -644,9 +695,18 @@ export default class GameScene extends Phaser.Scene {
     bg.lineStyle(1.6, 0xffffff, 0.24);
     bg.strokeRoundedRect(x - w / 2, y - h / 2, w, h, h / 2);
     const text = this.add
-      .text(x, y, label, { fontFamily: FONT, fontSize: '15px', color: '#ffffff', fontStyle: 'bold', resolution: 2 })
-      .setOrigin(0.5)
+      .text(iconKey ? x - w / 2 + 42 : x, y, label, {
+        fontFamily: FONT, fontSize: '15px', color: '#ffffff', fontStyle: 'bold', resolution: 2
+      })
+      .setOrigin(iconKey ? 0 : 0.5, 0.5)
       .setDepth(81);
+    let icon: Phaser.GameObjects.Image | undefined;
+    if (iconKey) {
+      icon = this.add
+        .image(x - w / 2 + 22, y, iconKey)
+        .setDepth(81)
+        .setScale(iconKey === 'ui-bullet' ? 0.82 : 0.6);
+    }
     const hit = this.add
       .rectangle(x, y, w, h, 0xffffff, 0.001)
       .setDepth(82)
@@ -655,7 +715,7 @@ export default class GameScene extends Phaser.Scene {
       playSfx(this, 'click', 0.3);
       onClick();
     });
-    return { bg, text, hit };
+    return { bg, text, hit, icon };
   }
 
   private buildButtons() {
@@ -669,9 +729,10 @@ export default class GameScene extends Phaser.Scene {
         GROUND_TOP - 30,
         136,
         42,
-        `🔫 射击 ×${this.bulletsLeft}`,
+        `射击 ×${this.bulletsLeft}`,
         () => this.fire(),
-        0x18324f
+        0x18324f,
+        'ui-bullet'
       );
       this.fireBounds = { x: GAME_WIDTH - 82, y: GROUND_TOP - 30, w: 136, h: 42 };
     }
@@ -685,24 +746,33 @@ export default class GameScene extends Phaser.Scene {
       GROUND_TOP - 84,
       136,
       42,
-      `🛡 贿月 ×${this.bribeCarried}`,
+      `贿月 ×${this.bribeCarried}`,
       () => this.activateShield(),
-      0x3a2b12
+      0x3a2b12,
+      'ui-moon'
     );
     this.shieldBounds = { x: GAME_WIDTH - 82, y: GROUND_TOP - 84, w: 136, h: 42 };
   }
 
   private updateBulletsHud() {
     if (this.fireBtn) {
-      this.fireBtn.text.setText(this.bulletsLeft > 0 ? `🔫 射击 ×${this.bulletsLeft}` : '🔫 子弹耗尽');
+      const enabled = this.bulletsLeft > 0;
+      this.fireBtn.text.setText(enabled ? `射击 ×${this.bulletsLeft}` : '子弹耗尽');
+      this.fireBtn.bg.setAlpha(enabled ? 1 : 0.55);
+      this.fireBtn.text.setAlpha(enabled ? 1 : 0.6);
+      this.fireBtn.icon?.setAlpha(enabled ? 1 : 0.45);
     }
   }
 
   private refreshShieldBtn() {
     if (this.shieldBtn) {
+      const canUse = this.bribeCarried > 0 && !this.shieldActive;
       this.shieldBtn.text.setText(
-        this.bribeCarried > 0 ? `🛡 贿月 ×${this.bribeCarried}` : this.shieldActive ? '🛡 护体中 ✨' : '🛡 已用完'
+        this.shieldActive ? '护体中' : this.bribeCarried > 0 ? `贿月 ×${this.bribeCarried}` : '已用完'
       );
+      this.shieldBtn.bg.setAlpha(canUse ? 1 : 0.62);
+      this.shieldBtn.text.setAlpha(canUse ? 1 : 0.72);
+      this.shieldBtn.icon?.setAlpha(canUse ? 1 : 0.5);
     }
   }
 
@@ -711,6 +781,7 @@ export default class GameScene extends Phaser.Scene {
     this.shieldBtn.bg.destroy();
     this.shieldBtn.text.destroy();
     this.shieldBtn.hit.destroy();
+    this.shieldBtn.icon?.destroy();
     this.shieldBtn = undefined;
   }
 
@@ -1020,8 +1091,21 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
+    // 命中顿帧:画面完全静止约 85ms
+    if (time < this.hitFreezeUntil) return;
+
     this.elapsedMs += dt;
     this.timeSinceHitMs += dt;
+
+    // 追平生涯最佳:局内即时庆祝,不用等到结算
+    if (!this.recordBroken && this.bestAtStart > 0 && this.elapsedMs > this.bestAtStart) {
+      this.recordBroken = true;
+      this.hud.best.setText('新纪录!').setColor('#ffe066');
+      this.showBanner('🏆 新纪录!', '#ffe066', 40);
+      confettiBurst(this, GAME_WIDTH / 2, 92, 24);
+      playSfx(this, 'record', 0.5);
+      wxVibrate('light');
+    }
 
     if (!this.doubleJumpUnlocked && this.elapsedMs >= DOUBLE_JUMP_UNLOCK_MS) {
       this.doubleJumpUnlocked = true;
@@ -1134,6 +1218,10 @@ export default class GameScene extends Phaser.Scene {
     this.cityNear.setTint(tint(0x64729e));
 
     this.sun.setAlpha(0.95 * (1 - this.nightness)).setY(94 + this.nightness * 54);
+    this.sunRays
+      .setPosition(this.sun.x, this.sun.y)
+      .setAlpha(0.32 * (1 - this.nightness))
+      .setScale(0.92 + this.nightness * 0.05);
     this.moon.setAlpha(0.92 * this.nightness).setY(150 - this.nightness * 82);
     this.stars.forEach(s => {
       s.dot.setAlpha(this.nightness * (0.32 + 0.68 * Math.abs(Math.sin(this.elapsedMs * 0.0016 + s.phase))));
@@ -1161,7 +1249,15 @@ export default class GameScene extends Phaser.Scene {
     this.cityNear.tilePositionX += (driftSpeed * 0.3 * dt) / 1000;
     this.groundDetail.tilePositionX += (driftSpeed * dt) / 1000;
 
+    const landmarkTint = tint(0x64729e);
+    for (const lm of this.landmarks) {
+      lm.setTint(landmarkTint);
+      lm.x -= (driftSpeed * 0.18 * dt) / 1000;
+      if (lm.x < -160) lm.x += 1500;
+    }
+
     this.nightOverlay.setAlpha(this.nightness * 0.2);
+    this.updateSpeedLines(dt, driftSpeed);
 
     if (this.overdriveActive) {
       this.goldOverlay.setAlpha(0.07 + 0.025 * Math.abs(Math.sin(this.elapsedMs * 0.012)));
@@ -1178,6 +1274,30 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this.inspectionOverlay.setAlpha(0);
     }
+  }
+
+  // 高速时的环境速度线:只在高处飘过,不遮挡障碍和 HUD
+  private updateSpeedLines(dt: number, speed: number) {
+    if (speed < 430) {
+      this.speedLineAcc = 0;
+      return;
+    }
+    this.speedLineAcc += dt;
+    const interval = Math.max(48, 170 - (speed - 430) * 0.22);
+    if (this.speedLineAcc < interval) return;
+    this.speedLineAcc = 0;
+    const line = this.add
+      .rectangle(GAME_WIDTH + 24, Phaser.Math.Between(64, GROUND_TOP - 88), Phaser.Math.Between(34, 88), Phaser.Math.Between(1, 2), 0xffffff, Phaser.Math.FloatBetween(0.05, 0.14))
+      .setOrigin(0, 0.5)
+      .setDepth(2);
+    this.tweens.add({
+      targets: line,
+      x: line.x - Phaser.Math.Between(220, 340),
+      alpha: 0,
+      duration: Phaser.Math.Between(260, 420),
+      ease: 'Quad.in',
+      onComplete: () => line.destroy()
+    });
   }
 
   private skyColorAt(t: number): number {
@@ -1576,6 +1696,7 @@ export default class GameScene extends Phaser.Scene {
 
   private handleHit: Phaser.Types.Physics.Arcade.ArcadePhysicsCallback = (_player, obstacle) => {
     if (this.invulnerable || this.dead) return;
+    if (this.time.now < this.hitFreezeUntil) return;
     const o = obstacle as Phaser.Physics.Arcade.Image;
     if (!o.active) return;
     o.setData('hit', true);
@@ -1620,9 +1741,16 @@ export default class GameScene extends Phaser.Scene {
     this.breakCombo();
     if (this.sliding) this.endSlide(false);
     redFlash(this);
-    shake(this, 0.009, 190);
+    impactBurst(this, this.player.x + 20, this.player.y - 24);
+    shake(this, 0.012, 210);
     wxVibrate('medium');
     this.floatText(this.player.x, this.player.y - 60, '-1 ❤', '#ff8787');
+    // 80ms 顿帧:命中瞬间世界静止,再恢复,打击更实
+    this.hitFreezeUntil = this.time.now + 85;
+    this.physics.pause();
+    this.time.delayedCall(95, () => {
+      if (!this.dead && !this.paused) this.physics.resume();
+    });
 
     const left = this.totalLives - this.hits;
     if (left >= 1) {
@@ -1725,7 +1853,7 @@ export default class GameScene extends Phaser.Scene {
 
   private rankUp(rank: RunRank) {
     rankBurst(this, this.player.x, this.player.y, this.hexToNum(rank.color));
-    this.showBanner(`${rank.emoji} 晋升 ${rank.name}!`, rank.color, 38);
+    this.showBanner(`晋升 ${rank.name}!`, rank.color, 38);
     playSfx(this, 'promote', 0.55);
     wxVibrate('medium');
     this.gainHype(10);
@@ -1751,7 +1879,7 @@ export default class GameScene extends Phaser.Scene {
   private addRunCoins(n: number) {
     if (n <= 0) return;
     this.runCoins += n;
-    this.hud?.coins.setText(`🪙 ${this.runCoins}`);
+    this.hud?.coins.setText(`${this.runCoins}`);
   }
 
   private coinAmount(base: number): number {
@@ -1863,12 +1991,76 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private updateInspection() {
+    if (this.patrolDrone && this.searchlight) {
+      const angle = Math.sin(this.elapsedMs * 0.0016) * 13;
+      this.searchlight
+        .setPosition(this.patrolDrone.x, this.patrolDrone.y + 16)
+        .setAngle(angle);
+      this.searchlightPool
+        ?.setPosition(
+          this.patrolDrone.x + Math.sin(Phaser.Math.DegToRad(angle)) * 300,
+          GROUND_TOP - 4
+        )
+        .setAlpha(0.78);
+    }
     if (!this.inspectionActive && this.elapsedMs >= this.nextInspectionAt) {
       this.startInspection();
       return;
     }
     if (this.inspectionActive && this.elapsedMs >= this.inspectionUntil) {
       this.endInspection(true);
+    }
+  }
+
+  private spawnPatrol() {
+    if (this.patrolDrone) return;
+    const drone = this.add.image(GAME_WIDTH + 100, 66, 'patrol-drone').setDepth(3).setAlpha(0);
+    const light = this.add
+      .image(drone.x, drone.y + 16, 'searchlight')
+      .setOrigin(0.5, 0)
+      .setDepth(2)
+      .setAlpha(0)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    const pool = this.add
+      .image(716, GROUND_TOP - 4, 'light-pool')
+      .setDepth(2)
+      .setAlpha(0)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    this.patrolDrone = drone;
+    this.searchlight = light;
+    this.searchlightPool = pool;
+    this.tweens.add({ targets: [drone, light], x: 716, duration: 900, ease: 'Cubic.out' });
+    this.tweens.add({ targets: drone, alpha: 1, duration: 500 });
+    this.tweens.add({ targets: light, alpha: 0.28, duration: 700 });
+    this.tweens.add({ targets: pool, alpha: 0.78, duration: 700 });
+    this.tweens.add({ targets: drone, y: 82, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    this.time.delayedCall(900, () => {
+      if (this.patrolDrone !== drone) return;
+      this.tweens.add({ targets: drone, x: 636, duration: 4200, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    });
+  }
+
+  private despawnPatrol() {
+    const drone = this.patrolDrone;
+    const light = this.searchlight;
+    const pool = this.searchlightPool;
+    this.patrolDrone = undefined;
+    this.searchlight = undefined;
+    this.searchlightPool = undefined;
+    if (drone) {
+      this.tweens.killTweensOf(drone);
+      this.tweens.add({
+        targets: drone, x: GAME_WIDTH + 150, alpha: 0, duration: 620, ease: 'Cubic.in',
+        onComplete: () => drone.destroy()
+      });
+    }
+    if (light) {
+      this.tweens.killTweensOf(light);
+      this.tweens.add({ targets: light, alpha: 0, duration: 420, onComplete: () => light.destroy() });
+    }
+    if (pool) {
+      this.tweens.killTweensOf(pool);
+      this.tweens.add({ targets: pool, alpha: 0, duration: 420, onComplete: () => pool.destroy() });
     }
   }
 
@@ -1884,11 +2076,13 @@ export default class GameScene extends Phaser.Scene {
     playSfx(this, 'wave_start', 0.5);
     wxVibrate('medium');
     this.showBanner('⚠ 巡视组来了!', '#ff8787', 42);
+    this.spawnPatrol();
   }
 
   private endInspection(survived: boolean) {
     this.inspectionActive = false;
     this.inspectionUntil = 0;
+    this.despawnPatrol();
     if (survived && !this.dead) {
       this.runInspections += 1;
       this.addRunCoins(INSPECTION_REWARD);
@@ -1994,18 +2188,29 @@ export default class GameScene extends Phaser.Scene {
   private refreshRankHud(force = false) {
     if (!this.hud?.rankBar) return;
     const info = rankProgress(this.dodged);
-    const label = `${info.current.emoji} ${info.current.name}`;
+    const label = info.current.name;
     if (force || this.hud.rank.text !== label) {
       this.hud.rank.setText(label);
       this.hud.rank.setColor(info.current.color);
     }
-    drawBar(this.hud.rankBar, 150, 51, 187, 7, info.ratio, this.hexToNum(info.current.color));
+    const color = this.hexToNum(info.current.color);
+    if (this.rankIcon) {
+      this.rankIcon.setTint(color);
+      if (force) {
+        this.rankIcon.setScale(0.42);
+        this.tweens.add({ targets: this.rankIcon, scale: 0.58, duration: 180, yoyo: true, ease: 'Quad.out' });
+      }
+    }
+    drawBar(this.hud.rankBar, 150, 51, 187, 7, info.ratio, color);
   }
 
   private refreshLivesHud() {
     const left = Math.max(0, this.totalLives - this.hits);
-    const hearts = left > 0 ? '❤'.repeat(left) : '💔';
-    if (this.hud?.lives) this.hud.lives.setText(hearts);
+    if (this.hud?.lives) this.hud.lives.setText(`×${left}`);
+    if (this.heartIcon) {
+      this.heartIcon.setTint(left > 0 ? 0xffffff : 0x66788f);
+      this.heartIcon.setAlpha(left > 0 ? 1 : 0.7);
+    }
   }
 
   // ============================================================
@@ -2017,6 +2222,7 @@ export default class GameScene extends Phaser.Scene {
     this.bobTween?.stop();
     this.bobTween = undefined;
     if (this.sliding) this.endSlide(false);
+    this.despawnPatrol();
     this.player.setTint(0xff6666);
     this.physics.pause();
     this.hud.combo.setVisible(false);
@@ -2157,6 +2363,7 @@ export default class GameScene extends Phaser.Scene {
       missionReward: this.missionCompleted ? this.mission.reward : 0,
       nearMisses: this.runNearMisses,
       overdrives: this.overdriveCount,
+      hits: this.hits,
       missionsDone: this.missionsCompleted,
       daily: this.daily,
       dailyReward,
@@ -2213,6 +2420,13 @@ export default class GameScene extends Phaser.Scene {
     this.overdriveCount = 0;
     this.lastWindAt = 0;
     this.lastFlyerWarnAt = 0;
+    this.speedLineAcc = 0;
+    this.bestAtStart = this.progress.bestTimeMs || 0;
+    this.recordBroken = false;
+    this.hitFreezeUntil = 0;
+    this.patrolDrone = undefined;
+    this.searchlight = undefined;
+    this.searchlightPool = undefined;
     this.rank = RUN_RANKS[0];
     this.missionCompleted = false;
     this.missionsCompleted = 0;
@@ -2241,9 +2455,12 @@ export default class GameScene extends Phaser.Scene {
     this.stars = [];
     this.clouds = [];
     this.papers = [];
+    this.landmarks = [];
     this.pauseObjects = [];
     this.tutorialObjects = [];
     this.reviveObjects = [];
     this.pendantText = undefined;
+    this.heartIcon = undefined;
+    this.rankIcon = undefined;
   }
 }

@@ -55,7 +55,10 @@ export default class PreloadScene extends Phaser.Scene {
       'bribe-moon', 'cloud',
       'bg-mountains', 'bg-city-far', 'bg-city-near', 'sun', 'moon', 'vignette',
       'coin', 'item-bag', 'item-shield', 'item-double', 'item-slow', 'item-hype',
-      'shadow', 'spark', 'spotlight'
+      'shadow', 'spark', 'spotlight',
+      'ui-heart', 'ui-moon', 'ui-bullet', 'sun-rays', 'searchlight', 'light-pool', 'patrol-drone', 'sky-depth',
+      'ui-clock', 'ui-rank', 'ui-check', 'ui-clipboard', 'ui-target', 'ui-bolt', 'ui-trophy', 'ui-envelope',
+      'bg-tower', 'bg-wheel', 'bg-hotel'
     ];
     smoothKeys.forEach(key => {
       const tex = this.textures.get(key);

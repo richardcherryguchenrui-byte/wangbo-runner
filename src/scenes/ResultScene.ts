@@ -6,6 +6,8 @@ import { stopBgm, playSfx } from '../systems/audio';
 import { confettiBurst } from '../systems/effects';
 import { isWx, wxShare } from '../systems/wxapi';
 import { buildShareCard, downloadCanvas } from '../systems/sharecard';
+import { rankProgress } from '../systems/ranks';
+import { gradeRun } from '../systems/grade';
 
 interface ResultData {
   timeMs?: number;
@@ -23,6 +25,7 @@ interface ResultData {
   missionReward?: number;
   nearMisses?: number;
   overdrives?: number;
+  hits?: number;
   missionsDone?: number;
   daily?: boolean;
   dailyReward?: number;
@@ -43,7 +46,6 @@ export default class ResultScene extends Phaser.Scene {
   private isRecord = false;
   private newAch: string[] = [];
   private rankName = '科员';
-  private rankEmoji = '📋';
   private rankColor = '#cfe3ff';
   private rankIndex = 0;
   private missionTitle = '';
@@ -51,6 +53,7 @@ export default class ResultScene extends Phaser.Scene {
   private missionReward = 0;
   private nearMisses = 0;
   private overdrives = 0;
+  private hits = 0;
   private dailyReward = 0;
   private dailyBestMs = 0;
   private dailyRecord = false;
@@ -72,7 +75,6 @@ export default class ResultScene extends Phaser.Scene {
     this.isRecord = !!data?.isRecord;
     this.newAch = data?.newAchievements ?? [];
     this.rankName = data?.rankName ?? '科员';
-    this.rankEmoji = data?.rankEmoji ?? '📋';
     this.rankColor = data?.rankColor ?? '#cfe3ff';
     this.rankIndex = data?.rankIndex ?? 0;
     this.missionTitle = data?.missionTitle ?? '';
@@ -80,6 +82,7 @@ export default class ResultScene extends Phaser.Scene {
     this.missionReward = data?.missionReward ?? 0;
     this.nearMisses = data?.nearMisses ?? 0;
     this.overdrives = data?.overdrives ?? 0;
+    this.hits = data?.hits ?? 0;
     this.daily = !!data?.daily;
     this.dailyReward = data?.dailyReward ?? 0;
     this.dailyBestMs = data?.dailyBestMs ?? 0;
@@ -126,6 +129,62 @@ export default class ResultScene extends Phaser.Scene {
       })
       .setDepth(21);
 
+    // 本局评价:S/A/B/C/D,给「这局打得怎么样」一个即时答案
+    const grade = gradeRun({
+      timeMs: this.timeMs,
+      dodged: this.dodged,
+      nearMisses: this.nearMisses,
+      overdrives: this.overdrives,
+      hits: this.hits,
+      combo: this.combo
+    });
+    const gradeColor = parseInt(grade.color.slice(1), 16);
+    const gradeG = this.add.graphics();
+    gradeG.fillStyle(0x0b1a2e, 0.92);
+    gradeG.fillCircle(0, 0, 33);
+    gradeG.lineStyle(3, gradeColor, 0.95);
+    gradeG.strokeCircle(0, 0, 33);
+    gradeG.lineStyle(1, 0xffffff, 0.16);
+    gradeG.strokeCircle(0, 0, 26);
+    gradeG.fillStyle(gradeColor, 0.12);
+    gradeG.fillCircle(0, 0, 26);
+    const gradeText = this.add
+      .text(0, -3, grade.letter, {
+        fontFamily: FONT, fontSize: '34px', color: grade.color, fontStyle: 'bold',
+        resolution: 2, stroke: '#08131f', strokeThickness: 4
+      })
+      .setOrigin(0.5);
+    const gradeLabel = this.add
+      .text(0, 44, `本局评价 · ${grade.label}`, {
+        fontFamily: FONT, fontSize: '10px', color: grade.color, resolution: 2
+      })
+      .setOrigin(0.5);
+    const gradeBadge = this.add.container(468, 116, [gradeG, gradeText, gradeLabel]).setDepth(23);
+    this.tweens.add({ targets: gradeBadge, scale: 1.05, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+
+    // 下一官阶目标:给「再来一局」一个明确的短期理由
+    const rp = rankProgress(this.dodged);
+    const nextText = rp.next
+      ? `再翻越 ${rp.remain} 个障碍晋升 ${rp.next.name}`
+      : '已到顶 · 本局厅长';
+    const nearNext = !!rp.next && rp.remain <= 3;
+    addPanel(this, 150, 184, 368, 28, {
+      fill: nearNext ? 0xffd43b : 0x8ecae6,
+      fillAlpha: nearNext ? 0.12 : 0.07,
+      stroke: nearNext ? 0xffd43b : 0x8ecae6,
+      strokeAlpha: nearNext ? 0.4 : 0.2,
+      radius: 14,
+      shadow: false
+    }).setDepth(21);
+    this.add.image(168, 198, 'ui-target').setDisplaySize(17, 17).setDepth(22);
+    this.add
+      .text(183, 198, nextText, {
+        fontFamily: FONT, fontSize: '12px', color: nearNext ? '#ffe066' : '#cfe3ff',
+        fontStyle: nearNext ? 'bold' : 'normal', resolution: 2
+      })
+      .setOrigin(0, 0.5)
+      .setDepth(22);
+
     // 主角
     const hero = this.add
       .image(578, 205, this.playerTexture)
@@ -138,16 +197,25 @@ export default class ResultScene extends Phaser.Scene {
     // 官阶印章
     const stamp = this.add.container(718, 132).setDepth(23).setAngle(4);
     const sg = this.add.graphics();
-    sg.fillStyle(0xc92a2a, 1);
+    sg.fillStyle(0x8f1d1d, 1);
     sg.fillRoundedRect(-84, -38, 168, 76, 14);
-    sg.lineStyle(3, 0xffd43b, 0.9);
+    sg.fillStyle(0xb02525, 1);
+    sg.fillRoundedRect(-80, -34, 160, 64, 11);
+    sg.lineStyle(2.5, 0xffd43b, 0.95);
     sg.strokeRoundedRect(-84, -38, 168, 76, 14);
+    sg.lineStyle(1, 0xffe8a3, 0.45);
+    sg.strokeRoundedRect(-77, -31, 154, 58, 9);
+    for (const [cx, cy] of [[-72, -26], [72, -26], [-72, 26], [72, 26]] as const) {
+      sg.fillStyle(0xffd43b, 0.9);
+      sg.fillCircle(cx, cy, 2.2);
+    }
+    const sIcon = this.add.image(-50, 0, 'ui-rank').setDisplaySize(30, 30).setTint(0xffd43b);
     const st = this.add
-      .text(0, 0, `${this.rankEmoji} ${this.rankName}`, {
+      .text(12, 0, this.rankName, {
         fontFamily: FONT, fontSize: '25px', color: '#fff3bf', fontStyle: 'bold', resolution: 2
       })
       .setOrigin(0.5);
-    stamp.add([sg, st]);
+    stamp.add([sg, sIcon, st]);
     this.tweens.add({ targets: stamp, angle: 1.5, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.add
       .text(718, 182, '本局官阶', { fontFamily: FONT, fontSize: '11px', color: '#a9c7e8', resolution: 2 })
@@ -177,35 +245,37 @@ export default class ResultScene extends Phaser.Scene {
       const x = 150 + i * 142;
       const g = this.add.graphics().setDepth(21);
       g.fillStyle(0xffffff, 0.055);
-      g.fillRoundedRect(x, 220, 128, 62, 12);
+      g.fillRoundedRect(x, 226, 128, 62, 12);
       g.lineStyle(1, 0xffffff, 0.1);
-      g.strokeRoundedRect(x, 220, 128, 62, 12);
+      g.strokeRoundedRect(x, 226, 128, 62, 12);
       this.add
-        .text(x + 12, 230, label, { fontFamily: FONT, fontSize: '11px', color: '#9db8d8', resolution: 2 })
+        .text(x + 12, 236, label, { fontFamily: FONT, fontSize: '11px', color: '#9db8d8', resolution: 2 })
         .setDepth(22);
       this.add
-        .text(x + 12, 248, value, { fontFamily: FONT, fontSize: '23px', color, fontStyle: 'bold', resolution: 2 })
+        .text(x + 12, 254, value, { fontFamily: FONT, fontSize: '23px', color, fontStyle: 'bold', resolution: 2 })
         .setDepth(22);
     });
 
     // 本局考核
     this.add
-      .text(150, 300, this.missionDone ? '✅' : '📋', { fontSize: '18px', resolution: 2 })
+      .image(159, 309, this.missionDone ? 'ui-check' : 'ui-clipboard')
+      .setDisplaySize(17, 17)
       .setDepth(22);
     this.add
-      .text(176, 301, this.missionTitle ? `本局考核「${this.missionTitle}」${this.missionDone ? `完成 +${this.missionReward}🪙` : '未完成'}` : '本局考核已完成', {
+      .text(176, 301, this.missionTitle ? `本局考核「${this.missionTitle}」${this.missionDone ? `完成 +${this.missionReward} 银币` : '未完成'}` : '本局考核已完成', {
         fontFamily: FONT, fontSize: '14px', color: this.missionDone ? '#8ce99a' : '#cfe3ff', fontStyle: 'bold', resolution: 2
       })
       .setDepth(22);
+    this.add.image(158, 335, 'ui-bolt').setDisplaySize(13, 17).setDepth(22);
     if (this.overdrives > 0) {
       this.add
-        .text(150, 326, `⚡ 高光时刻 ×${this.overdrives} · 芸芸众生,唯你高光`, {
+        .text(176, 330, `高光时刻 ×${this.overdrives} · 芸芸众生,唯你高光`, {
           fontFamily: FONT, fontSize: '12px', color: '#d0bfff', resolution: 2
         })
         .setDepth(22);
     } else {
       this.add
-        .text(150, 326, '⚡ 擦身、连翻、银币都能攒气势,满槽自动进入高光时刻', {
+        .text(176, 330, '擦身、连翻、银币都能攒气势,满槽自动进入高光时刻', {
           fontFamily: FONT, fontSize: '12px', color: '#93b5d6', resolution: 2
         })
         .setDepth(22);
@@ -213,25 +283,28 @@ export default class ResultScene extends Phaser.Scene {
 
     // 每日挑战
     if (this.daily) {
-      const reward = this.dailyReward > 0 ? ` · +${this.dailyReward}🪙` : '';
+      const reward = this.dailyReward > 0 ? ` · +${this.dailyReward} 银币` : '';
       const best = this.dailyBestMs > 0 ? ` · 今日最佳 ${(this.dailyBestMs / 1000).toFixed(1)}s` : '';
+      this.add.image(158, 361, 'ui-envelope').setDisplaySize(16, 16).setDepth(22);
       this.add
-        .text(150, 350, `🧧 今日挑战${this.dailyModifier ? ` · ${this.dailyModifier}` : ''}${best}${reward}`, {
+        .text(176, 354, `今日挑战${this.dailyModifier ? ` · ${this.dailyModifier}` : ''}${best}${reward}`, {
           fontFamily: FONT, fontSize: '13px', color: '#ffe066', fontStyle: 'bold', resolution: 2
         })
         .setDepth(22);
       if (this.dailyRecord && !this.dailyFirst) {
+        this.add.image(670, 362, 'ui-trophy').setDisplaySize(13, 13).setDepth(22);
         this.add
-          .text(700, 350, '🏅 今日新纪录', { fontFamily: FONT, fontSize: '12px', color: '#8ce99a', resolution: 2 })
-          .setOrigin(1, 0)
+          .text(684, 355, '今日新纪录', { fontFamily: FONT, fontSize: '12px', color: '#8ce99a', resolution: 2 })
+          .setOrigin(0, 0)
           .setDepth(22);
       }
     }
 
     // 新成就
     if (this.newAch.length > 0) {
+      this.add.image(158, 385, 'ui-trophy').setDisplaySize(14, 14).setDepth(22);
       this.add
-        .text(150, 374, `🏆 新成就:${this.newAch.slice(0, 3).join('、')}${this.newAch.length > 3 ? ` 等${this.newAch.length}项` : ''}`, {
+        .text(176, 378, `新成就:${this.newAch.slice(0, 3).join('、')}${this.newAch.length > 3 ? ` 等${this.newAch.length}项` : ''}`, {
           fontFamily: FONT, fontSize: '12px', color: '#7dffa8', resolution: 2
         })
         .setDepth(22);
@@ -281,9 +354,17 @@ export default class ResultScene extends Phaser.Scene {
   }
 
   private shareOrSave() {
+    const grade = gradeRun({
+      timeMs: this.timeMs,
+      dodged: this.dodged,
+      nearMisses: this.nearMisses,
+      overdrives: this.overdrives,
+      hits: this.hits,
+      combo: this.combo
+    });
     const text = this.daily
-      ? `我在《王博晋升之路》今日挑战撑过 ${(this.timeMs / 1000).toFixed(1)} 秒,官阶 ${this.rankName},来比比?`
-      : `我在《王博晋升之路》撑过 ${(this.timeMs / 1000).toFixed(1)} 秒,官阶 ${this.rankName},翻越 ${this.dodged} 个障碍,你能超过我吗?`;
+      ? `我在《王博晋升之路》今日挑战撑过 ${(this.timeMs / 1000).toFixed(1)} 秒,官阶 ${this.rankName},评价 ${grade.letter},来比比?`
+      : `我在《王博晋升之路》撑过 ${(this.timeMs / 1000).toFixed(1)} 秒,官阶 ${this.rankName},本局评价 ${grade.letter},翻越 ${this.dodged} 个障碍,你能超过我吗?`;
     if (isWx()) {
       wxShare(text);
       return;
@@ -295,6 +376,8 @@ export default class ResultScene extends Phaser.Scene {
         coins: this.coins,
         combo: this.combo,
         nearMisses: this.nearMisses,
+        overdrives: this.overdrives,
+        hits: this.hits,
         rankName: this.rankName,
         bestMs: this.bestMs,
         playerTexture: this.playerTexture,

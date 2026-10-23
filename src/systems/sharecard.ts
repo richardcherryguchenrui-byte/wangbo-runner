@@ -2,6 +2,7 @@
 // 不依赖网络与截图权限,网页/桌面端通用。
 import Phaser from 'phaser';
 import { GAME_VERSION } from '../config/constants';
+import { gradeRun } from './grade';
 
 export interface ShareCardData {
   timeMs: number;
@@ -9,6 +10,8 @@ export interface ShareCardData {
   coins: number;
   combo: number;
   nearMisses: number;
+  overdrives?: number;
+  hits?: number;
   rankName: string;
   bestMs: number;
   playerTexture: string;
@@ -159,6 +162,14 @@ export function buildShareCard(scene: Phaser.Scene, d: ShareCardData): HTMLCanva
   });
 
   // 生存评价
+  const grade = gradeRun({
+    timeMs: d.timeMs,
+    dodged: d.dodged,
+    nearMisses: d.nearMisses,
+    overdrives: d.overdrives ?? 0,
+    hits: d.hits ?? 0,
+    combo: d.combo
+  });
   ctx.fillStyle = 'rgba(255,212,59,0.09)';
   roundRect(ctx, 220, 976, 640, 64, 32);
   ctx.fill();
@@ -166,9 +177,9 @@ export function buildShareCard(scene: Phaser.Scene, d: ShareCardData): HTMLCanva
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffd43b';
+  ctx.fillStyle = grade.color;
   ctx.font = `bold 26px ${FONT}`;
-  ctx.fillText(`生存评价 · ${evalText(d.timeMs)}`, W / 2, 1018);
+  ctx.fillText(`本局评价 · ${grade.letter} · ${grade.label}`, W / 2, 1018);
 
   // 底部挑衅
   ctx.textAlign = 'center';
@@ -204,15 +215,6 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.lineTo(x, y + r);
   ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
-}
-
-function evalText(timeMs: number): string {
-  const sec = timeMs / 1000;
-  if (sec >= 90) return '处长看了都点头';
-  if (sec >= 60) return '科员中的战斗机';
-  if (sec >= 40) return '稳中带皮，前途无量';
-  if (sec >= 20) return '有点东西，但不多';
-  return '刚热身就下班';
 }
 
 function pseudo(n: number): number {

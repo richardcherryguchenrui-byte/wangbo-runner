@@ -149,24 +149,30 @@ export default class TitleScene extends Phaser.Scene {
   private buildTopStats(p: ReturnType<typeof loadProgress>) {
     const best = p.bestTimeMs || 0;
     const bestRank = RUN_RANKS[Math.min(p.bestRankIndex || 0, RUN_RANKS.length - 1)];
-    const chips = [
-      `🪙 ${p.coins}`,
-      `⏱ ${best ? (best / 1000).toFixed(1) + 's' : '—'}`,
-      `${bestRank.emoji} ${bestRank.short}`
+    const items: { icon: string; text: string; color: string; tint?: number }[] = [
+      { icon: 'coin', text: `${p.coins}`, color: '#ffe066' },
+      { icon: 'ui-clock', text: best ? (best / 1000).toFixed(1) + 's' : '—', color: '#ffffff' },
+      { icon: 'ui-rank', text: bestRank.short, color: bestRank.color, tint: parseInt(bestRank.color.slice(1), 16) }
     ];
     let x = GAME_WIDTH - 20;
-    for (let i = chips.length - 1; i >= 0; i--) {
-      const t = this.add.text(0, 0, chips[i], {
-        fontFamily: FONT, fontSize: '13px', color: '#ffffff', fontStyle: 'bold'
+    for (let i = items.length - 1; i >= 0; i--) {
+      const item = items[i];
+      const t = this.add.text(0, 0, item.text, {
+        fontFamily: FONT, fontSize: '13px', color: item.color, fontStyle: 'bold'
       }).setDepth(11);
-      const w = t.width + 22;
+      const padX = 10;
+      const iconW = 18;
+      const gap = 5;
+      const w = padX * 2 + iconW + gap + t.width;
       x -= w;
       const bg = this.add.graphics().setDepth(10);
       bg.fillStyle(0x0b1a2e, 0.6);
       bg.fillRoundedRect(x, 24, w, 28, 14);
       bg.lineStyle(1.2, 0xffffff, 0.16);
       bg.strokeRoundedRect(x, 24, w, 28, 14);
-      t.setPosition(x + 11, 31);
+      const icon = this.add.image(x + padX + iconW / 2, 38, item.icon).setDisplaySize(18, 18).setDepth(11);
+      if (item.tint) icon.setTint(item.tint);
+      t.setPosition(x + padX + iconW + gap, 38).setOrigin(0, 0.5);
       x -= 7;
     }
   }

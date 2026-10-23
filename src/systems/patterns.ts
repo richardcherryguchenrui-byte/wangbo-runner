@@ -191,6 +191,27 @@ function doubleFlyer(opts: PatternOptions): RunPattern {
   };
 }
 
+// 连续变向:滑铲 → 跳跃 → 滑铲,读起来像一段小节奏,不是无脑连点
+function slalom(opts: PatternOptions): RunPattern {
+  const { rng, speed } = opts;
+  const gap = Math.max(430, speed * 1.04);
+  return {
+    name: 'slalom',
+    obstacles: [
+      { at: 0, flyer: true, key: pick(['ob-beauty-1', 'ob-beauty-2', 'ob-beauty-3', 'ob-beauty-4'], rng), warn: true },
+      { at: gap, flyer: false, key: pick(GROUND_KEYS, rng) },
+      { at: gap * 2, flyer: true, key: pick(['ob-beauty-1', 'ob-beauty-2', 'ob-beauty-3', 'ob-beauty-4'], rng), warn: true }
+    ],
+    coins: [
+      ...coinLine(-30, 140, 3, -46),
+      ...coinArc(gap - 80, gap + 210, 5, -120, -205),
+      ...coinLine(gap * 2 - 30, gap * 2 + 140, 3, -46)
+    ],
+    spanPx: gap * 2 + 300,
+    gapSec: baseGap(stageFor(opts.elapsedMs), rng) + 0.3
+  };
+}
+
 function coinRun(opts: PatternOptions): RunPattern {
   const { rng } = opts;
   const len = 360 + rng() * 180;
@@ -262,6 +283,7 @@ export function generatePattern(opts: PatternOptions): RunPattern {
       { fn: flyer, w: 16, name: 'flyer' },
       { fn: flyerGround, w: 15, name: 'flyer-ground' },
       { fn: groundFlyer, w: 10, name: 'ground-flyer' },
+      { fn: slalom, w: 7, name: 'slalom' },
       { fn: coinRun, w: 10, name: 'coin-run' },
       { fn: treasure, w: 7, name: 'treasure' },
       { fn: breather, w: 5, name: 'breather' }
@@ -274,6 +296,7 @@ export function generatePattern(opts: PatternOptions): RunPattern {
       { fn: flyerGround, w: 16, name: 'flyer-ground' },
       { fn: groundFlyer, w: 13, name: 'ground-flyer' },
       { fn: doubleFlyer, w: 8, name: 'double-flyer' },
+      { fn: slalom, w: 9, name: 'slalom' },
       { fn: coinRun, w: 7, name: 'coin-run' },
       { fn: treasure, w: 5, name: 'treasure' },
       { fn: breather, w: 3, name: 'breather' }
