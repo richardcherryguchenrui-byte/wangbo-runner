@@ -97,6 +97,7 @@ import {
   getDailyChallenge,
   recordDailyRun,
   mulberry32,
+  dailyModifierIcon,
   type DailyChallenge
 } from '../systems/dailyChallenge';
 
@@ -129,8 +130,10 @@ interface Hud {
   chips: Phaser.GameObjects.Text;
   missionTitle: Phaser.GameObjects.Text;
   missionDesc: Phaser.GameObjects.Text;
+  missionIcon: Phaser.GameObjects.Image;
   hypeLabel: Phaser.GameObjects.Text;
   daily: Phaser.GameObjects.Text;
+  dailyIcon: Phaser.GameObjects.Image;
   rankBar: Phaser.GameObjects.Graphics;
   hypeBar: Phaser.GameObjects.Graphics;
   missionBar: Phaser.GameObjects.Graphics;
@@ -165,6 +168,7 @@ export default class GameScene extends Phaser.Scene {
   private bobTween?: Phaser.Tweens.Tween;
   private pendantText?: Phaser.GameObjects.Text;
   private shieldRing!: Phaser.GameObjects.Image;
+  private hypeAura!: Phaser.GameObjects.Image;
   private airborne = false;
   private runDustAcc = 0;
 
@@ -190,6 +194,7 @@ export default class GameScene extends Phaser.Scene {
   private clouds: Phaser.GameObjects.Image[] = [];
   private papers: { g: Phaser.GameObjects.Rectangle; speed: number; spin: number; sway: number; baseAlpha: number }[] = [];
   private landmarks: Phaser.GameObjects.Image[] = [];
+  private landmarkNeons: Phaser.GameObjects.Image[] = [];
 
   // ---- 本局状态 ----
   private runSpeed = RUN_SPEED_BASE;
@@ -325,14 +330,17 @@ export default class GameScene extends Phaser.Scene {
 
     this.mission = pickRunMission(this.progress, this.rng);
     this.nextInspectionAt = this.daily && this.challenge?.modifier.inspectionFast ? 15000 : INSPECTION_FIRST_MS;
-    this.hud.missionTitle.setText(`${this.mission.icon} ${this.mission.title}`);
+    this.hud.missionTitle.setText(this.mission.title);
+    this.hud.missionIcon.setTexture(`mi-${this.mission.id}`);
     this.hud.missionDesc.setText(`0/${this.mission.target}${this.mission.unit} · 完成 +${this.mission.reward} 银币`);
     this.refreshRankHud(true);
     this.refreshLivesHud();
 
     if (this.daily && this.challenge) {
-      this.hud.daily.setText(`${this.challenge.modifier.icon} 每日 · ${this.challenge.modifier.name}`);
+      this.hud.daily.setText(`每日 · ${this.challenge.modifier.name}`);
       this.hud.daily.setVisible(true);
+      this.hud.dailyIcon.setTexture(dailyModifierIcon(this.challenge.modifier.id));
+      this.hud.dailyIcon.setVisible(true);
     }
 
     startBgm(this);
@@ -394,6 +402,7 @@ export default class GameScene extends Phaser.Scene {
 
     // 城市地标:固定 4 座,按同一视差速度循环,打破楼群贴图的重复感
     this.landmarks = [];
+    this.landmarkNeons = [];
     const landmarkDefs: { key: string; x: number; scale: number; alpha: number }[] = [
       { key: 'bg-tower', x: 260, scale: 1.02, alpha: 0.9 },
       { key: 'bg-wheel', x: 700, scale: 0.94, alpha: 0.86 },
@@ -408,6 +417,15 @@ export default class GameScene extends Phaser.Scene {
         .setDepth(-12)
         .setAlpha(d.alpha);
       this.landmarks.push(img);
+      // 夜景霓虹层:只在夜间淡入,让地标从深蓝楼群里跳出来
+      const neon = this.add
+        .image(d.x, GROUND_TOP + 4, `${d.key}-neon`)
+        .setOrigin(0.5, 1)
+        .setScale(d.scale)
+        .setDepth(-11.6)
+        .setAlpha(0)
+        .setBlendMode(Phaser.BlendModes.ADD);
+      this.landmarkNeons.push(neon);
     }
 
     // 星星
@@ -549,6 +567,13 @@ export default class GameScene extends Phaser.Scene {
       .setDepth(5)
       .setTint(0xffd43b)
       .setVisible(false);
+
+    // 气势光环:只在气势过半后淡入,给玩家一个「快满了」的体感提示
+    this.hypeAura = this.add
+      .image(this.player.x, this.player.y, 'hype-aura')
+      .setDepth(5)
+      .setAlpha(0)
+      .setBlendMode(Phaser.BlendModes.ADD);
   }
 
   private buildGroups() {
@@ -612,16 +637,17 @@ export default class GameScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setDepth(81),
       missionTitle: this.add
-        .text(24, 112, '', {
+        .text(48, 112, '', {
           fontFamily: FONT, fontSize: '14px', color: '#ffe066', fontStyle: 'bold',
           resolution: 2, stroke: '#08131f', strokeThickness: 3
         })
         .setDepth(81),
       missionDesc: this.add
-        .text(24, 136, '', {
+        .text(48, 136, '', {
           fontFamily: FONT, fontSize: '11px', color: '#dbe9ff', resolution: 2, stroke: '#08131f', strokeThickness: 3
         })
         .setDepth(81),
+      missionIcon: this.add.image(30, 118, 'mi-dodge').setScale(0.68).setDepth(81),
       hypeLabel: this.add
         .text(360, 46, '气势', {
           fontFamily: FONT, fontSize: '11px', color: '#d9c7ff', fontStyle: 'bold',
@@ -630,10 +656,15 @@ export default class GameScene extends Phaser.Scene {
         .setOrigin(0, 0)
         .setDepth(81),
       daily: this.add
-        .text(24, 102, '', {
+        .text(40, 102, '', {
           fontFamily: FONT, fontSize: '12px', color: '#ffe066', fontStyle: 'bold',
           resolution: 2, stroke: '#08131f', strokeThickness: 3
         })
+        .setVisible(false)
+        .setDepth(81),
+      dailyIcon: this.add
+        .image(26, 108, 'ui-bolt')
+        .setDisplaySize(13, 16)
         .setVisible(false)
         .setDepth(81),
       rankBar: this.add.graphics().setDepth(82),
@@ -649,6 +680,7 @@ export default class GameScene extends Phaser.Scene {
     addPanel(this, 12, missionY, 252, 62, { fill: 0x09182c, fillAlpha: 0.96, radius: 12 }).setDepth(80);
     this.hud.missionTitle.setY(missionY + 8);
     this.hud.missionDesc.setY(missionY + 31);
+    this.hud.missionIcon.setY(missionY + 27);
     drawBar(this.hud.missionBar, 24, missionY + 52, 228, 4, 0, 0x74c0fc);
     if (this.daily) {
       this.hud.daily.setY(101);
@@ -1252,10 +1284,18 @@ export default class GameScene extends Phaser.Scene {
     this.groundDetail.tilePositionX += (driftSpeed * dt) / 1000;
 
     const landmarkTint = tint(0x64729e);
-    for (const lm of this.landmarks) {
+    const neonAlpha = Math.max(0, (this.nightness - 0.2) / 0.8);
+    for (let i = 0; i < this.landmarks.length; i++) {
+      const lm = this.landmarks[i];
       lm.setTint(landmarkTint);
       lm.x -= (driftSpeed * 0.18 * dt) / 1000;
       if (lm.x < -160) lm.x += 1500;
+      const neon = this.landmarkNeons[i];
+      if (neon) {
+        neon.x = lm.x;
+        // 缓慢呼吸,避免夜景灯带死板;压到 0.72,保证不抢障碍物的视觉焦点
+        neon.setAlpha(neonAlpha * 0.72 * (0.82 + 0.18 * Math.sin(this.elapsedMs * 0.0018 + i * 1.9)));
+      }
     }
 
     this.nightOverlay.setAlpha(this.nightness * 0.2);
@@ -1352,6 +1392,33 @@ export default class GameScene extends Phaser.Scene {
         dust(this, this.player.x - 22, feetY - 4, 1);
       }
     }
+
+    this.updateHypeAura();
+  }
+
+  private updateHypeAura() {
+    if (!this.hypeAura) return;
+    if (this.dead) {
+      this.hypeAura.setAlpha(0);
+      return;
+    }
+    this.hypeAura.setPosition(this.player.x, this.player.y);
+    if (this.overdriveActive) {
+      const pulse = 0.5 + 0.5 * Math.sin(this.elapsedMs * 0.012);
+      this.hypeAura.setTint(0xffd43b);
+      this.hypeAura.setScale(1.12 + 0.1 * pulse);
+      this.hypeAura.setAlpha(0.32 + 0.16 * pulse);
+      return;
+    }
+    const t = Phaser.Math.Clamp((this.hype / HYPE_MAX - 0.55) / 0.45, 0, 1);
+    if (t <= 0) {
+      this.hypeAura.setAlpha(0);
+      return;
+    }
+    const pulse = 0.5 + 0.5 * Math.sin(this.elapsedMs * 0.009);
+    this.hypeAura.clearTint();
+    this.hypeAura.setScale(0.84 + 0.1 * pulse + 0.14 * t);
+    this.hypeAura.setAlpha(t * (0.4 + 0.24 * pulse));
   }
 
   // ============================================================
@@ -2155,6 +2222,8 @@ export default class GameScene extends Phaser.Scene {
     this.hud.missionTitle.setColor('#8ce99a');
     this.hud.missionDesc.setColor('#b2f2bb');
     this.hud.missionDesc.setText(`✅ 已完成 · +${this.mission.reward} 银币`);
+    this.hud.missionIcon.setTint(0x8ce99a);
+    this.tweens.add({ targets: this.hud.missionIcon, scale: 0.88, duration: 160, yoyo: true, ease: 'Quad.out' });
     const missionY = this.daily ? 132 : 104;
     drawBar(this.hud.missionBar, 24, missionY + 52, 228, 4, 1, 0x69db7c);
     showToast(this, GAME_WIDTH / 2, GROUND_TOP - 225, `✅ 考核完成:${this.mission.title} +${this.mission.reward}🪙`, '#8ce99a');
@@ -2266,6 +2335,7 @@ export default class GameScene extends Phaser.Scene {
     this.physics.pause();
     this.hud.combo.setVisible(false);
     this.hud.comboBg.setVisible(false);
+    this.hypeAura?.setAlpha(0);
     playSfx(this, 'gameover', 0.5);
     shake(this, 0.01, 260);
     wxVibrate('heavy');
@@ -2496,6 +2566,7 @@ export default class GameScene extends Phaser.Scene {
     this.clouds = [];
     this.papers = [];
     this.landmarks = [];
+    this.landmarkNeons = [];
     this.pauseObjects = [];
     this.tutorialObjects = [];
     this.reviveObjects = [];

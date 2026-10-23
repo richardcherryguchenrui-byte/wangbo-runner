@@ -35,6 +35,14 @@ export interface DailyChallenge {
   state: DailyState;
 }
 
+// 每日规则对应的手绘图标(避免 emoji 跨平台差异)
+export function dailyModifierIcon(id: string): string {
+  if (id === 'speed') return 'ui-bolt';
+  if (id === 'redpacket') return 'ui-envelope';
+  if (id === 'inspection') return 'ui-siren';
+  return 'ui-broken-heart';
+}
+
 const KEY = 'wangboDaily';
 
 function hashDate(s: string): number {

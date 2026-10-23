@@ -47,24 +47,6 @@ export default class PreloadScene extends Phaser.Scene {
   }
 
   create() {
-    // 照片/AI 素材在 2x 画布下用线性过滤保持平滑;像素风小件保持最近邻
-    const smoothKeys = [
-      'player-idle', 'player-run-1', 'player-run-2', 'player-jump', 'player-qi',
-      'ob-gold', 'ob-redpacket', 'ob-treasure',
-      'ob-beauty-1', 'ob-beauty-2', 'ob-beauty-3', 'ob-beauty-4',
-      'bribe-moon', 'cloud',
-      'bg-mountains', 'bg-city-far', 'bg-city-near', 'sun', 'moon', 'vignette',
-      'coin', 'item-bag', 'item-shield', 'item-double', 'item-slow', 'item-hype',
-      'shadow', 'spark', 'spotlight',
-      'ui-heart', 'ui-moon', 'ui-bullet', 'sun-rays', 'searchlight', 'light-pool', 'patrol-drone', 'sky-depth',
-      'ui-clock', 'ui-rank', 'ui-check', 'ui-clipboard', 'ui-target', 'ui-bolt', 'ui-trophy', 'ui-envelope',
-      'bg-tower', 'bg-wheel', 'bg-hotel'
-    ];
-    smoothKeys.forEach(key => {
-      const tex = this.textures.get(key);
-      if (tex) tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
-    });
-
     // 自定义人物:合成玩家四帧的「换头」贴图
     if (hasCustomHead()) rebuildCustomTextures(this);
 
@@ -76,6 +58,29 @@ export default class PreloadScene extends Phaser.Scene {
     this.makeSkyline();
     // 视差城市、日月、暗角、银币与道具图标
     buildArtTextures(this);
+
+    // 程序化纹理全部创建完之后再设置过滤:
+    // 照片/AI 素材与 UI 图标用线性过滤保持平滑;像素风小件保持最近邻。
+    const smoothKeys = [
+      'player-idle', 'player-run-1', 'player-run-2', 'player-jump', 'player-qi',
+      'ob-gold', 'ob-redpacket', 'ob-treasure',
+      'ob-beauty-1', 'ob-beauty-2', 'ob-beauty-3', 'ob-beauty-4',
+      'bribe-moon', 'cloud',
+      'bg-mountains', 'bg-city-far', 'bg-city-near', 'sun', 'moon', 'vignette',
+      'coin', 'item-bag', 'item-shield', 'item-double', 'item-slow', 'item-hype',
+      'shadow', 'spark', 'spotlight',
+      'ui-heart', 'ui-moon', 'ui-bullet', 'sun-rays', 'searchlight', 'light-pool', 'patrol-drone', 'sky-depth',
+      'ui-clock', 'ui-rank', 'ui-check', 'ui-clipboard', 'ui-target', 'ui-bolt', 'ui-trophy', 'ui-envelope',
+      'ui-shop', 'ui-palette', 'ui-gear', 'ui-siren', 'ui-broken-heart',
+      'mi-dodge', 'mi-survive', 'mi-pickup', 'mi-combo', 'mi-kill', 'mi-nearmiss', 'mi-flawless',
+      'hype-aura',
+      'bg-tower', 'bg-wheel', 'bg-hotel',
+      'bg-tower-neon', 'bg-wheel-neon', 'bg-hotel-neon'
+    ];
+    smoothKeys.forEach(key => {
+      const tex = this.textures.get(key);
+      if (tex) tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
+    });
 
     this.scene.start('Splash');
   }

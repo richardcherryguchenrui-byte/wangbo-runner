@@ -7,7 +7,7 @@ import { ensureSkinTextures, playerFrameKey } from '../systems/skins';
 import { checkIn } from '../systems/daily';
 import { hasCustomHead } from '../systems/customhead';
 import { RUN_RANKS } from '../systems/ranks';
-import { getDailyChallenge } from '../systems/dailyChallenge';
+import { getDailyChallenge, dailyModifierIcon } from '../systems/dailyChallenge';
 
 export default class TitleScene extends Phaser.Scene {
   private guSign?: Phaser.GameObjects.Container;
@@ -258,10 +258,11 @@ export default class TitleScene extends Phaser.Scene {
     dcBg.fillRoundedRect(px + 18, dy, pw - 36, 66, 14);
     dcBg.lineStyle(1.5, 0xc9a7ff, 0.5);
     dcBg.strokeRoundedRect(px + 18, dy, pw - 36, 66, 14);
-    this.add.text(px + 34, dy + 12, `${dc.modifier.icon} 今日挑战 · ${dc.modifier.name}`, {
+    this.add.image(px + 41, dy + 31, dailyModifierIcon(dc.modifier.id)).setDisplaySize(22, 22).setDepth(11);
+    this.add.text(px + 58, dy + 12, `今日挑战 · ${dc.modifier.name}`, {
       fontFamily: FONT, fontSize: '16px', color: '#ffe066', fontStyle: 'bold'
     }).setDepth(11);
-    this.add.text(px + 34, dy + 36, `${dc.modifier.desc}${dc.state.bestMs ? `  ·  最佳 ${(dc.state.bestMs / 1000).toFixed(1)}s` : '  ·  首次完成 +40🪙'}`, {
+    this.add.text(px + 58, dy + 36, `${dc.modifier.desc}${dc.state.bestMs ? `  ·  最佳 ${(dc.state.bestMs / 1000).toFixed(1)}s` : '  ·  首次完成 +40 银币'}`, {
       fontFamily: FONT, fontSize: '11px', color: '#d8c7ff'
     }).setDepth(11);
     const dcHit = this.add.rectangle(px + pw / 2, dy + 33, pw - 36, 66, 0xffffff, 0.001).setDepth(12).setInteractive({ useHandCursor: true });
@@ -269,10 +270,10 @@ export default class TitleScene extends Phaser.Scene {
 
     // 次级按钮四宫格
     const items: { icon: string; label: string; sub: string; onClick: () => void }[] = [
-      { icon: '🛒', label: '晋升商店', sub: '皮肤 · 手枪', onClick: () => this.scene.start('Shop') },
-      { icon: '📋', label: '任务成就', sub: '签到 · 排行', onClick: () => this.scene.start('Quest') },
-      { icon: '🎨', label: '自定义人物', sub: '换上你的脸', onClick: () => this.scene.start('CustomChar') },
-      { icon: '⚙️', label: '设置', sub: '声音 · 存档', onClick: () => this.scene.start('Settings') }
+      { icon: 'ui-shop', label: '晋升商店', sub: '皮肤 · 手枪', onClick: () => this.scene.start('Shop') },
+      { icon: 'ui-clipboard', label: '任务成就', sub: '签到 · 排行', onClick: () => this.scene.start('Quest') },
+      { icon: 'ui-palette', label: '自定义人物', sub: '换上你的脸', onClick: () => this.scene.start('CustomChar') },
+      { icon: 'ui-gear', label: '设置', sub: '声音 · 存档', onClick: () => this.scene.start('Settings') }
     ];
     items.forEach((it, i) => {
       const bx = px + 18 + (i % 2) * ((pw - 44) / 2 + 8);
@@ -283,8 +284,9 @@ export default class TitleScene extends Phaser.Scene {
       bg.fillRoundedRect(bx, by, bw, 58, 12);
       bg.lineStyle(1.2, 0xffffff, 0.12);
       bg.strokeRoundedRect(bx, by, bw, 58, 12);
-      this.add.text(bx + 12, by + 10, `${it.icon} ${it.label}`, { fontFamily: FONT, fontSize: '14px', color: '#ffffff', fontStyle: 'bold' }).setDepth(11);
-      this.add.text(bx + 12, by + 33, it.sub, { fontFamily: FONT, fontSize: '10px', color: '#93b5d6' }).setDepth(11);
+      this.add.image(bx + 20, by + 19, it.icon).setDisplaySize(17, 17).setDepth(11);
+      this.add.text(bx + 34, by + 10, it.label, { fontFamily: FONT, fontSize: '14px', color: '#ffffff', fontStyle: 'bold' }).setDepth(11);
+      this.add.text(bx + 34, by + 33, it.sub, { fontFamily: FONT, fontSize: '10px', color: '#93b5d6' }).setDepth(11);
       const hit = this.add.rectangle(bx + bw / 2, by + 29, bw, 58, 0xffffff, 0.001).setDepth(12).setInteractive({ useHandCursor: true });
       hit.on('pointerover', () => bg.setAlpha(0.95));
       hit.on('pointerout', () => bg.setAlpha(1));
