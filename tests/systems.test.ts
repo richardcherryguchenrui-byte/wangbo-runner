@@ -394,6 +394,26 @@ describe('障碍 Pattern', () => {
     }
     expect(found).toBeGreaterThan(0);
   });
+
+  it('hurdle 的间距足够完成跳跃→滑铲→跳跃', () => {
+    let found = 0;
+    for (let seed = 1; seed < 1600 && found < 6; seed++) {
+      const p = generatePattern({ rng: mulberry32(seed), elapsedMs: 90000, speed: 620 });
+      if (p.name !== 'hurdle') continue;
+      found += 1;
+      expect(p.obstacles.map(o => o.flyer)).toEqual([false, true, false]);
+      const gaps = [
+        p.obstacles[1].at - p.obstacles[0].at,
+        p.obstacles[2].at - p.obstacles[1].at
+      ];
+      gaps.forEach(gap => {
+        // 一次满跳约 500px,落地后还要留出滑铲与再次起跳的时间
+        expect(gap).toBeGreaterThan(520);
+        expect(gap).toBeGreaterThan((620 * SLIDE_DURATION_MS) / 1000);
+      });
+    }
+    expect(found).toBeGreaterThan(0);
+  });
 });
 
 // ---- 每日挑战 ----

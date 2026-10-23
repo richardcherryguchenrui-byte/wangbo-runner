@@ -228,6 +228,27 @@ function twinFlyer(opts: PatternOptions): RunPattern {
   };
 }
 
+// 跳跃 → 滑铲 → 跳跃:把三种动作串成一段,只在中期之后出现
+function hurdle(opts: PatternOptions): RunPattern {
+  const { rng, speed } = opts;
+  const gap = Math.max(560, speed * 1.1);
+  return {
+    name: 'hurdle',
+    obstacles: [
+      { at: 0, flyer: false, key: pick(GROUND_KEYS, rng) },
+      { at: gap, flyer: true, key: pick(['ob-beauty-1', 'ob-beauty-2', 'ob-beauty-3', 'ob-beauty-4'], rng), warn: true },
+      { at: gap * 2, flyer: false, key: pick(GROUND_KEYS, rng) }
+    ],
+    coins: [
+      ...coinArc(-30, 200, 5, -110, -200),
+      ...coinLine(gap - 30, gap + 150, 3, -46),
+      ...coinArc(gap * 2 - 40, gap * 2 + 200, 5, -110, -200)
+    ],
+    spanPx: gap * 2 + 300,
+    gapSec: baseGap(stageFor(opts.elapsedMs), rng) + 0.34
+  };
+}
+
 function coinRun(opts: PatternOptions): RunPattern {
   const { rng } = opts;
   const len = 360 + rng() * 180;
@@ -301,6 +322,7 @@ export function generatePattern(opts: PatternOptions): RunPattern {
       { fn: groundFlyer, w: 10, name: 'ground-flyer' },
       { fn: twinFlyer, w: 5, name: 'twin-flyer' },
       { fn: slalom, w: 7, name: 'slalom' },
+      { fn: hurdle, w: 6, name: 'hurdle' },
       { fn: coinRun, w: 10, name: 'coin-run' },
       { fn: treasure, w: 7, name: 'treasure' },
       { fn: breather, w: 5, name: 'breather' }
@@ -315,6 +337,7 @@ export function generatePattern(opts: PatternOptions): RunPattern {
       { fn: doubleFlyer, w: 8, name: 'double-flyer' },
       { fn: twinFlyer, w: 6, name: 'twin-flyer' },
       { fn: slalom, w: 9, name: 'slalom' },
+      { fn: hurdle, w: 8, name: 'hurdle' },
       { fn: coinRun, w: 7, name: 'coin-run' },
       { fn: treasure, w: 5, name: 'treasure' },
       { fn: breather, w: 3, name: 'breather' }

@@ -155,15 +155,16 @@ export default class ResultScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     const labelBg = this.add.graphics();
-    labelBg.fillStyle(0x08131f, 0.88);
-    labelBg.fillRoundedRect(-72, 36, 144, 20, 10);
-    labelBg.lineStyle(1, 0xffffff, 0.14);
-    labelBg.strokeRoundedRect(-72, 36, 144, 20, 10);
     const gradeLabel = this.add
       .text(0, 46, `本局评价 · ${grade.label}`, {
         fontFamily: FONT, fontSize: '11px', color: grade.color, resolution: 2
       })
       .setOrigin(0.5);
+    const labelW = Math.max(144, gradeLabel.width + 26);
+    labelBg.fillStyle(0x08131f, 0.88);
+    labelBg.fillRoundedRect(-labelW / 2, 36, labelW, 20, 10);
+    labelBg.lineStyle(1, 0xffffff, 0.14);
+    labelBg.strokeRoundedRect(-labelW / 2, 36, labelW, 20, 10);
     const gradeBadge = this.add.container(468, 116, [gradeG, gradeText, labelBg, gradeLabel]).setDepth(40);
     this.tweens.add({ targets: gradeBadge, scale: 1.05, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
 
@@ -228,12 +229,18 @@ export default class ResultScene extends Phaser.Scene {
       .setDepth(22);
 
     if (this.isRecord && this.timeMs > 0) {
-      const badge = this.add
-        .text(GAME_WIDTH / 2, 30, '🎉 新纪录!', {
+      const recordText = this.add
+        .text(0, 0, '新纪录!', {
           fontFamily: FONT, fontSize: '26px', color: '#ffe066', fontStyle: 'bold',
           resolution: 2, stroke: '#c2255c', strokeThickness: 5
         })
-        .setOrigin(0.5)
+        .setOrigin(0.5);
+      const recordIcon = this.add.image(0, 0, 'ui-trophy').setDisplaySize(27, 27);
+      const totalW = 27 + 9 + recordText.width;
+      recordIcon.setX(-totalW / 2 + 13.5);
+      recordText.setX(-totalW / 2 + 36 + recordText.width / 2);
+      const badge = this.add
+        .container(GAME_WIDTH / 2, 30, [recordIcon, recordText])
         .setDepth(30)
         .setScale(0.4);
       this.tweens.add({ targets: badge, scale: 1.08, duration: 380, ease: 'Back.out', yoyo: true, repeat: 1, hold: 300 });
@@ -247,12 +254,12 @@ export default class ResultScene extends Phaser.Scene {
       ['擦身而过', `${this.nearMisses}`, '#8ce99a']
     ];
     stats.forEach(([label, value, color], i) => {
-      const x = 150 + i * 142;
+      const x = 150 + i * 168;
       const g = this.add.graphics().setDepth(21);
       g.fillStyle(0xffffff, 0.055);
-      g.fillRoundedRect(x, 226, 128, 62, 12);
+      g.fillRoundedRect(x, 226, 156, 62, 12);
       g.lineStyle(1, 0xffffff, 0.1);
-      g.strokeRoundedRect(x, 226, 128, 62, 12);
+      g.strokeRoundedRect(x, 226, 156, 62, 12);
       this.add
         .text(x + 12, 236, label, { fontFamily: FONT, fontSize: '11px', color: '#9db8d8', resolution: 2 })
         .setDepth(22);
@@ -321,14 +328,22 @@ export default class ResultScene extends Phaser.Scene {
     replay.text.setDepth(25);
     replay.hit.setDepth(26);
 
-    const cardLabel = isWx() ? '📤 分享成绩' : '🖼 保存战绩卡';
-    const cardBtn = makeButton(this, 550, 438, 188, 46, cardLabel, () => this.shareOrSave(), 16);
+    const cardLabel = isWx() ? '分享成绩' : '保存战绩卡';
+    const cardBtn = makeButton(this, 550, 438, 188, 46, cardLabel, () => this.shareOrSave(), 16, {
+      iconKey: isWx() ? 'ui-share' : 'ui-image',
+      iconSize: 17
+    });
     cardBtn.rect.setDepth(24);
     cardBtn.text.setDepth(25);
+    cardBtn.icon?.setDepth(25);
 
-    const homeBtn = makeButton(this, 740, 438, 140, 46, '🏠 主菜单', () => this.scene.start('Title'), 15);
+    const homeBtn = makeButton(this, 740, 438, 140, 46, '主菜单', () => this.scene.start('Title'), 15, {
+      iconKey: 'ui-home',
+      iconSize: 16
+    });
     homeBtn.rect.setDepth(24);
     homeBtn.text.setDepth(25);
+    homeBtn.icon?.setDepth(25);
 
     this.add
       .text(GAME_WIDTH / 2, 476, this.daily ? '空格再来一局(保持今日挑战) · ESC 回主菜单' : '空格再来一局 · ESC 回主菜单', {
@@ -389,7 +404,7 @@ export default class ResultScene extends Phaser.Scene {
         daily: this.daily
       });
       const ok = downloadCanvas(canvas, `王博晋升之路-${(this.timeMs / 1000).toFixed(1)}s.png`);
-      showToast(this, GAME_WIDTH / 2, 138, ok ? '🖼 战绩卡已保存,发群里炫耀吧!' : '保存失败,请截图分享', ok ? '#8ce99a' : '#ff8787');
+      showToast(this, GAME_WIDTH / 2, 138, ok ? '战绩卡已保存,发群里炫耀吧!' : '保存失败,请截图分享', ok ? '#8ce99a' : '#ff8787', 'ui-image');
       if (ok) playSfx(this, 'record', 0.35);
     } catch {
       showToast(this, GAME_WIDTH / 2, 138, '保存失败,请截图分享', '#ff8787');

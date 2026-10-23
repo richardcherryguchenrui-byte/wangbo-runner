@@ -54,9 +54,9 @@ export function makeButton(
   label: string,
   onClick: () => void,
   fontSize = 22,
-  options: { fill?: number; textColor?: string; depth?: number; disabled?: boolean } = {}
+  options: { fill?: number; textColor?: string; depth?: number; disabled?: boolean; iconKey?: string; iconSize?: number } = {}
 ) {
-  const { fill = 0x16324f, textColor = '#ffffff', depth = 20, disabled = false } = options;
+  const { fill = 0x16324f, textColor = '#ffffff', depth = 20, disabled = false, iconKey, iconSize = 18 } = options;
   const g = scene.add.graphics().setDepth(depth);
   const r = h / 2;
   const draw = (hover = false, lift = 0) => {
@@ -80,6 +80,18 @@ export function makeButton(
     })
     .setOrigin(0.5)
     .setDepth(depth + 1);
+  let icon: Phaser.GameObjects.Image | undefined;
+  if (iconKey) {
+    icon = scene.add
+      .image(0, y, iconKey)
+      .setDisplaySize(iconSize, iconSize)
+      .setDepth(depth + 1)
+      .setAlpha(disabled ? 0.55 : 1);
+    const gap = 8;
+    const total = iconSize + gap + text.width;
+    icon.setX(x - total / 2 + iconSize / 2);
+    text.setX(x - total / 2 + iconSize + gap + text.width / 2);
+  }
   const hit = scene.add.rectangle(x, y, w, h, 0xffffff, 0.001).setInteractive({ useHandCursor: !disabled }).setDepth(depth + 2);
   if (!disabled) {
     hit.on('pointerover', () => draw(true));
@@ -88,14 +100,15 @@ export function makeButton(
       playSfx(scene, 'click', 0.35);
       draw(true, 2);
       text.setY(y + 2);
-      scene.time.delayedCall(90, () => { draw(true, 0); text.setY(y); });
+      icon?.setY(y + 2);
+      scene.time.delayedCall(90, () => { draw(true, 0); text.setY(y); icon?.setY(y); });
       onClick();
     });
   } else {
     g.setAlpha(0.55);
     text.setAlpha(0.7);
   }
-  return { rect: g, text, hit };
+  return { rect: g, text, hit, icon };
 }
 
 // 强调按钮:渐变金/红底、圆角、光晕,用于「开始游戏」「再来一局」
@@ -149,23 +162,33 @@ export function makeHeroButton(
   return { g, text, hit };
 }
 
-// 短暂提示:深色药丸底 + 浮起渐隐
-export function showToast(scene: Phaser.Scene, x: number, y: number, msg: string, color = '#ffe066') {
+// 短暂提示:深色药丸底 + 浮起渐隐;可选左侧图标,避免依赖 emoji
+export function showToast(scene: Phaser.Scene, x: number, y: number, msg: string, color = '#ffe066', iconKey?: string) {
   const text = scene.add
     .text(0, 0, msg, {
       fontFamily: FONT, fontSize: '20px', color, stroke: '#10233d', strokeThickness: 4,
       align: 'center', lineSpacing: 4
     })
     .setOrigin(0.5);
+  const iconSize = 20;
+  const iconGap = 8;
+  const totalW = iconKey ? iconSize + iconGap + text.width : text.width;
   const padX = 22;
-  const w = Math.max(120, text.width + padX * 2);
-  const h = text.height + 18;
+  const w = Math.max(120, totalW + padX * 2);
+  const h = Math.max(text.height + 18, iconKey ? 40 : 0);
   const bg = scene.add.graphics();
   bg.fillStyle(0x081525, 0.82);
   bg.fillRoundedRect(-w / 2, -h / 2, w, h, h / 2);
   bg.lineStyle(1.5, 0xffffff, 0.2);
   bg.strokeRoundedRect(-w / 2, -h / 2, w, h, h / 2);
-  const c = scene.add.container(x, y, [bg, text]).setDepth(100);
+  const children: Phaser.GameObjects.GameObject[] = [bg];
+  if (iconKey) {
+    const icon = scene.add.image(-totalW / 2 + iconSize / 2, 0, iconKey).setDisplaySize(iconSize, iconSize);
+    text.setX(-totalW / 2 + iconSize + iconGap + text.width / 2);
+    children.push(icon);
+  }
+  children.push(text);
+  const c = scene.add.container(x, y, children).setDepth(100);
   c.setAlpha(0);
   scene.tweens.add({ targets: c, alpha: 1, y: y - 8, duration: 140, ease: 'Quad.out' });
   scene.tweens.add({

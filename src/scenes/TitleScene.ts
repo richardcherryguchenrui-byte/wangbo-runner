@@ -24,7 +24,7 @@ export default class TitleScene extends Phaser.Scene {
     if (sign.signed) {
       saveProgress(p);
       this.time.delayedCall(650, () => {
-        showToast(this, GAME_WIDTH / 2, 76, `📅 签到 +${sign.coins}🪙 · 连续 ${sign.streak} 天`);
+        showToast(this, GAME_WIDTH / 2, 76, `签到 +${sign.coins} 银币 · 连续 ${sign.streak} 天`, '#ffe066', 'ui-calendar');
       });
     }
 
@@ -226,7 +226,7 @@ export default class TitleScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '14px', color: '#ffffff', stroke: '#c2255c', strokeThickness: 4,
       align: 'center', fontStyle: 'bold'
     }).setOrigin(0.5);
-    const spark = this.add.text(30, -27, '✨', { fontSize: '14px' }).setOrigin(0.5);
+    const spark = this.add.image(30, -27, 'spark').setDisplaySize(15, 15).setTint(0xffd43b);
     const sign = this.add.container(538, 392, [burst, label, spark]).setDepth(12).setAngle(-24);
     sign.setSize(130, 100).setInteractive({ useHandCursor: true });
     sign.on('pointerdown', () => { playSfx(this, 'click', 0.4); this.scene.start('GuShop'); });

@@ -666,6 +666,248 @@ export function buildArtTextures(scene: Phaser.Scene) {
     ctx.fillText('¥', 18, 22);
   });
 
+  // ---- 通用操作图标:主菜单 / 重开 / 分享 / 战绩卡 / 暂停 / 提示 / 签到 ----
+  makeCanvas(scene, 'ui-home', 32, 32, (ctx) => {
+    // 屋顶
+    ctx.fillStyle = '#e8590c';
+    ctx.strokeStyle = '#7a2c00';
+    ctx.lineWidth = 1.6;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(16, 3);
+    ctx.lineTo(29, 14);
+    ctx.lineTo(26, 14);
+    ctx.lineTo(26, 29);
+    ctx.lineTo(6, 29);
+    ctx.lineTo(6, 14);
+    ctx.lineTo(3, 14);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // 墙体
+    ctx.fillStyle = '#f1e3c8';
+    ctx.fillRect(8.5, 15, 15, 13);
+    // 门与窗
+    ctx.fillStyle = '#1c4f7c';
+    roundRectPath(ctx, 13.5, 21, 5.5, 8, 1.2);
+    ctx.fill();
+    ctx.fillStyle = '#ffd43b';
+    ctx.fillRect(10, 17.5, 3, 3);
+    ctx.fillStyle = '#8a6a43';
+    ctx.fillRect(19, 17.5, 2.6, 3);
+  });
+
+  makeCanvas(scene, 'ui-restart', 32, 32, (ctx) => {
+    const g = ctx.createLinearGradient(0, 4, 0, 29);
+    g.addColorStop(0, '#e7f5ff');
+    g.addColorStop(1, '#74c0fc');
+    ctx.strokeStyle = g;
+    ctx.fillStyle = g;
+    ctx.lineWidth = 3.2;
+    ctx.lineCap = 'round';
+    const a1 = Math.PI * 1.25;
+    ctx.beginPath();
+    ctx.arc(16, 16, 10, -Math.PI * 0.35, a1);
+    ctx.stroke();
+    // 箭头:沿切线方向收尾
+    const ex = 16 + Math.cos(a1) * 10;
+    const ey = 16 + Math.sin(a1) * 10;
+    const tx = -Math.sin(a1);
+    const ty = Math.cos(a1);
+    const nx = Math.cos(a1);
+    const ny = Math.sin(a1);
+    ctx.beginPath();
+    ctx.moveTo(ex + tx * 7, ey + ty * 7);
+    ctx.lineTo(ex + nx * 4.6, ey + ny * 4.6);
+    ctx.lineTo(ex - nx * 4.6, ey - ny * 4.6);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  makeCanvas(scene, 'ui-share', 32, 32, (ctx) => {
+    // 托盘
+    ctx.strokeStyle = '#cfe3ff';
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(6, 18);
+    ctx.lineTo(6, 27);
+    ctx.lineTo(26, 27);
+    ctx.lineTo(26, 18);
+    ctx.stroke();
+    // 上传箭头
+    ctx.fillStyle = '#ffd43b';
+    ctx.strokeStyle = '#8a5200';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(16, 3);
+    ctx.lineTo(23, 11);
+    ctx.lineTo(18.5, 11);
+    ctx.lineTo(18.5, 20);
+    ctx.lineTo(13.5, 20);
+    ctx.lineTo(13.5, 11);
+    ctx.lineTo(9, 11);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  makeCanvas(scene, 'ui-image', 32, 32, (ctx) => {
+    // 相框
+    ctx.fillStyle = '#f1e3c8';
+    ctx.strokeStyle = '#8a6a43';
+    ctx.lineWidth = 1.6;
+    roundRectPath(ctx, 4, 6, 24, 20, 3);
+    ctx.fill();
+    ctx.stroke();
+    // 天空与山
+    ctx.fillStyle = '#74c0fc';
+    ctx.fillRect(6.5, 8.5, 19, 15);
+    ctx.fillStyle = '#ffd43b';
+    ctx.beginPath();
+    ctx.arc(11, 12.5, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#2f9e44';
+    ctx.beginPath();
+    ctx.moveTo(6.5, 23.5);
+    ctx.lineTo(13, 14.5);
+    ctx.lineTo(18, 20.5);
+    ctx.lineTo(21, 16.5);
+    ctx.lineTo(25.5, 23.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillRect(8, 9.5, 5, 1.4);
+  });
+
+  makeCanvas(scene, 'ui-pause', 32, 32, (ctx) => {
+    ctx.fillStyle = '#e7f5ff';
+    ctx.strokeStyle = '#10233d';
+    ctx.lineWidth = 1.4;
+    roundRectPath(ctx, 9, 6, 5, 20, 2.5);
+    ctx.fill();
+    ctx.stroke();
+    roundRectPath(ctx, 18, 6, 5, 20, 2.5);
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  makeCanvas(scene, 'ui-tips', 32, 32, (ctx) => {
+    const g = ctx.createLinearGradient(0, 4, 0, 24);
+    g.addColorStop(0, '#fff3bf');
+    g.addColorStop(1, '#f59f00');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = '#8a5200';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(16, 12.5, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#adb5bd';
+    roundRectPath(ctx, 12.5, 21, 7, 3.2, 1.2);
+    ctx.fill();
+    roundRectPath(ctx, 13.5, 25, 5, 2.6, 1);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,212,59,0.9)';
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(3, 9); ctx.lineTo(6, 10.5);
+    ctx.moveTo(29, 9); ctx.lineTo(26, 10.5);
+    ctx.moveTo(16, 0.5); ctx.lineTo(16, 2.5);
+    ctx.stroke();
+  });
+
+  makeCanvas(scene, 'ui-calendar', 32, 32, (ctx) => {
+    // 挂环
+    ctx.fillStyle = '#adb5bd';
+    ctx.fillRect(9.5, 3, 2.4, 6);
+    ctx.fillRect(20, 3, 2.4, 6);
+    // 纸面
+    ctx.fillStyle = '#f8fbff';
+    ctx.strokeStyle = '#1c4f7c';
+    ctx.lineWidth = 1.6;
+    roundRectPath(ctx, 4.5, 7, 23, 22, 3);
+    ctx.fill();
+    ctx.stroke();
+    // 红色抬头
+    ctx.fillStyle = '#e03131';
+    ctx.beginPath();
+    ctx.moveTo(4.5, 10);
+    ctx.lineTo(4.5, 10);
+    ctx.quadraticCurveTo(4.5, 7, 7.5, 7);
+    ctx.lineTo(24.5, 7);
+    ctx.quadraticCurveTo(27.5, 7, 27.5, 10);
+    ctx.lineTo(27.5, 12.5);
+    ctx.lineTo(4.5, 12.5);
+    ctx.closePath();
+    ctx.fill();
+    // 日期格
+    ctx.fillStyle = '#74c0fc';
+    for (let r = 0; r < 2; r++) {
+      for (let c = 0; c < 3; c++) {
+        ctx.fillRect(8.5 + c * 5.5, 16 + r * 5.5, 3.6, 3.4);
+      }
+    }
+    ctx.fillStyle = '#ffd43b';
+    ctx.fillRect(19.5, 21.5, 3.6, 3.4);
+  });
+
+  makeCanvas(scene, 'ui-arrow-up', 32, 32, (ctx) => {
+    const g = ctx.createLinearGradient(0, 3, 0, 29);
+    g.addColorStop(0, '#fff3bf');
+    g.addColorStop(1, '#f59f00');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = '#8a5200';
+    ctx.lineWidth = 1.6;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(16, 2.5);
+    ctx.lineTo(28, 15);
+    ctx.lineTo(21, 15);
+    ctx.lineTo(21, 29.5);
+    ctx.lineTo(11, 29.5);
+    ctx.lineTo(11, 15);
+    ctx.lineTo(4, 15);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(16, 6);
+    ctx.lineTo(24, 13);
+    ctx.stroke();
+  });
+
+  makeCanvas(scene, 'ui-arrow-down', 32, 32, (ctx) => {
+    const g = ctx.createLinearGradient(0, 3, 0, 29);
+    g.addColorStop(0, '#d0ebff');
+    g.addColorStop(1, '#1c7ed6');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = '#0b4a8f';
+    ctx.lineWidth = 1.6;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(16, 29.5);
+    ctx.lineTo(28, 17);
+    ctx.lineTo(21, 17);
+    ctx.lineTo(21, 2.5);
+    ctx.lineTo(11, 2.5);
+    ctx.lineTo(11, 17);
+    ctx.lineTo(4, 17);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(16, 26);
+    ctx.lineTo(24, 19);
+    ctx.stroke();
+  });
+
   // ---- 单局考核图标:统一为手绘徽章,避免 emoji 跨平台差异 ----
   const miGold = (ctx: CanvasRenderingContext2D, y0 = 4, y1 = 28) => {
     const g = ctx.createLinearGradient(0, y0, 0, y1);

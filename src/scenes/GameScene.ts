@@ -126,6 +126,7 @@ interface Hud {
   time: Phaser.GameObjects.Text;
   best: Phaser.GameObjects.Text;
   combo: Phaser.GameObjects.Text;
+  comboIcon: Phaser.GameObjects.Image;
   comboBg: Phaser.GameObjects.Graphics;
   chips: Phaser.GameObjects.Text;
   missionTitle: Phaser.GameObjects.Text;
@@ -630,6 +631,11 @@ export default class GameScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setVisible(false)
         .setDepth(81),
+      comboIcon: this.add
+        .image(GAME_WIDTH / 2, 91, 'mi-combo')
+        .setDisplaySize(18, 18)
+        .setVisible(false)
+        .setDepth(81),
       chips: this.add
         .text(GAME_WIDTH / 2, 118, '', {
           fontFamily: FONT, fontSize: '12px', color: '#cfe3ff', resolution: 2, stroke: '#08131f', strokeThickness: 3
@@ -728,16 +734,18 @@ export default class GameScene extends Phaser.Scene {
     bg.fillRoundedRect(x - w / 2, y - h / 2, w, h, h / 2);
     bg.lineStyle(1.6, 0xffffff, 0.24);
     bg.strokeRoundedRect(x - w / 2, y - h / 2, w, h, h / 2);
+    const hasLabel = label.length > 0;
     const text = this.add
-      .text(iconKey ? x - w / 2 + 42 : x, y, label, {
+      .text(iconKey && hasLabel ? x - w / 2 + 42 : x, y, label, {
         fontFamily: FONT, fontSize: '15px', color: '#ffffff', fontStyle: 'bold', resolution: 2
       })
-      .setOrigin(iconKey ? 0 : 0.5, 0.5)
-      .setDepth(81);
+      .setOrigin(iconKey && hasLabel ? 0 : 0.5, 0.5)
+      .setDepth(81)
+      .setVisible(hasLabel);
     let icon: Phaser.GameObjects.Image | undefined;
     if (iconKey) {
       icon = this.add
-        .image(x - w / 2 + 22, y, iconKey)
+        .image(hasLabel ? x - w / 2 + 22 : x, y, iconKey)
         .setDepth(81)
         .setScale(iconKey === 'ui-bullet' ? 0.82 : 0.6);
     }
@@ -753,7 +761,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private buildButtons() {
-    this.pauseBtn = this.makeHudButton(GAME_WIDTH - 38, 26, 52, 34, '⏸', () => this.togglePause());
+    this.pauseBtn = this.makeHudButton(GAME_WIDTH - 38, 26, 52, 34, '', () => this.togglePause(), 0x10233d, 'ui-pause');
     this.pauseBounds = { x: GAME_WIDTH - 38, y: 26, w: 52, h: 34 };
 
     if (hasPistol(this.progress)) {
@@ -933,22 +941,22 @@ export default class GameScene extends Phaser.Scene {
     this.destroyOverlay(this.tutorialObjects);
     const steps = [
       {
-        icon: '👆',
+        iconKey: 'ui-arrow-up',
         title: '跳跃',
         body: '点击屏幕 / 空格键跳跃\n长按跳得更高,松手就是小跳\n存活 30 秒后解锁二段跳'
       },
       {
-        icon: '⬇️',
+        iconKey: 'ui-arrow-down',
         title: '滑铲',
         body: '按 ↓ / S,或在屏幕下半部点按、向下滑动\n低空飞来的美女必须滑铲钻过去\n滑铲时身体高度只有一半'
       },
       {
-        icon: '🔥',
+        iconKey: 'mi-combo',
         title: '擦身 & 气势',
         body: '贴着障碍躲过 = 擦身而过,额外银币 + 气势\n气势攒满自动进入「高光时刻」\n无敌冲刺,直接撞碎障碍!'
       },
       {
-        icon: '🏅',
+        iconKey: 'ui-rank',
         title: '官阶 & 考核',
         body: '每翻越一定数量自动升官,单局最高到「厅长」\n左侧是本局考核,完成立刻发银币\n生命归零,本局结束'
       }
@@ -969,8 +977,8 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(302);
     const icon = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 82, step.icon, { fontSize: '42px', resolution: 2 })
-      .setOrigin(0.5)
+      .image(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 82, step.iconKey)
+      .setDisplaySize(52, 52)
       .setDepth(302);
     const title = this.add
       .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, step.title, {
@@ -1007,7 +1015,7 @@ export default class GameScene extends Phaser.Scene {
           this.progress.tutorialDone = true;
           saveProgress(this.progress);
           this.physics.resume();
-          showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '🏃 跑起来!官阶在等你');
+          showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '跑起来!官阶在等你', '#ffe066', 'ui-rank');
           this.announceStart();
         } else {
           this.tutorialStep += 1;
@@ -1021,8 +1029,9 @@ export default class GameScene extends Phaser.Scene {
     dim.on('pointerdown', () => { /* 遮罩挡住跳跃输入 */ });
   }
 
-  private makeOverlayButton(x: number, y: number, label: string, onClick: () => void, depth = 302): Phaser.GameObjects.GameObject[] {
-    const w = Math.max(210, Math.min(300, 60 + label.length * 20));
+  private makeOverlayButton(x: number, y: number, label: string, onClick: () => void, depth = 302, iconKey?: string): Phaser.GameObjects.GameObject[] {
+    const iconSize = 18;
+    const w = Math.max(210, Math.min(320, 60 + label.length * 20 + (iconKey ? 26 : 0)));
     const h = 50;
     const bg = this.add.graphics().setDepth(depth);
     bg.fillStyle(0x06101d, 0.4);
@@ -1035,16 +1044,24 @@ export default class GameScene extends Phaser.Scene {
       .text(x, y, label, { fontFamily: FONT, fontSize: '19px', color: '#ffffff', fontStyle: 'bold', resolution: 2 })
       .setOrigin(0.5)
       .setDepth(depth + 1);
+    let icon: Phaser.GameObjects.Image | undefined;
+    if (iconKey) {
+      icon = this.add.image(0, y, iconKey).setDisplaySize(iconSize, iconSize).setDepth(depth + 1);
+      const gap = 8;
+      const total = iconSize + gap + text.width;
+      icon.setX(x - total / 2 + iconSize / 2);
+      text.setX(x - total / 2 + iconSize + gap + text.width / 2);
+    }
     const hit = this.add
       .rectangle(x, y, w, h, 0xffffff, 0.001)
       .setDepth(depth + 2)
       .setInteractive({ useHandCursor: true });
     hit.on('pointerdown', () => {
       playSfx(this, 'click', 0.35);
-      this.tweens.add({ targets: [text, bg], scale: 0.95, duration: 70, yoyo: true });
+      this.tweens.add({ targets: icon ? [text, bg, icon] : [text, bg], scale: 0.95, duration: 70, yoyo: true });
       onClick();
     });
-    return [bg, text, hit];
+    return icon ? [bg, icon, text, hit] : [bg, text, hit];
   }
 
   private pauseGame() {
@@ -1061,35 +1078,57 @@ export default class GameScene extends Phaser.Scene {
     const panel = addPanel(this, GAME_WIDTH / 2 - 230, 70, 460, 396, {
       fill: 0x0d2038, fillAlpha: 0.98, stroke: 0xffffff, strokeAlpha: 0.2, radius: 26
     }).setDepth(301);
-    const title = this.add
-      .text(GAME_WIDTH / 2, 112, '⏸ 已暂停', {
+    const titleText = this.add
+      .text(0, 0, '已暂停', {
         fontFamily: FONT, fontSize: '32px', color: '#ffffff', fontStyle: 'bold',
         resolution: 2, stroke: '#08131f', strokeThickness: 5
       })
       .setOrigin(0.5)
       .setDepth(302);
+    const titleIcon = this.add.image(0, 0, 'ui-pause').setDisplaySize(24, 24).setDepth(302);
+    const titleW = 24 + 10 + titleText.width;
+    titleIcon.setPosition(GAME_WIDTH / 2 - titleW / 2 + 12, 112);
+    titleText.setPosition(GAME_WIDTH / 2 - titleW / 2 + 34 + titleText.width / 2, 112);
     const stats = this.add
       .text(GAME_WIDTH / 2, 158, `存活 ${(this.elapsedMs / 1000).toFixed(1)}s · 翻越 ${this.dodged} · 官阶 ${this.rank.name}`, {
         fontFamily: FONT, fontSize: '14px', color: '#a9c7e8', resolution: 2
       })
       .setOrigin(0.5)
       .setDepth(302);
-    this.pauseObjects = [dim, panel, title, stats];
+    this.pauseObjects = [dim, panel, titleIcon, titleText, stats];
     this.pauseObjects.push(...this.makeOverlayButton(GAME_WIDTH / 2, 216, '▶ 继续', () => this.resumeGame()));
     this.pauseObjects.push(
-      ...this.makeOverlayButton(GAME_WIDTH / 2, 278, '🔄 重新开始', () => {
+      ...this.makeOverlayButton(GAME_WIDTH / 2, 278, '重新开始', () => {
         this.scene.restart({ daily: this.daily });
-      })
+      }, 302, 'ui-restart')
     );
     this.pauseObjects.push(
-      ...this.makeOverlayButton(GAME_WIDTH / 2, 340, '🏠 主菜单', () => {
+      ...this.makeOverlayButton(GAME_WIDTH / 2, 340, '主菜单', () => {
         this.scene.start('Title');
-      })
+      }, 302, 'ui-home')
     );
     this.pauseObjects.push(
-      ...this.makeOverlayButton(GAME_WIDTH / 2, 402, this.daily ? '📅 今日挑战规则' : '💡 操作提示', () => {
-        showToast(this, GAME_WIDTH / 2, 210, '点击/空格跳跃 · ↓/S 滑铲 · J 射击');
-      })
+      ...this.makeOverlayButton(
+        GAME_WIDTH / 2,
+        402,
+        this.daily ? '今日挑战规则' : '操作提示',
+        () => {
+          if (this.daily && this.challenge) {
+            showToast(
+              this,
+              GAME_WIDTH / 2,
+              210,
+              `${this.challenge.modifier.name}:${this.challenge.modifier.desc}`,
+              '#ffe066',
+              dailyModifierIcon(this.challenge.modifier.id)
+            );
+          } else {
+            showToast(this, GAME_WIDTH / 2, 210, '点击/空格跳跃 · ↓/S 滑铲 · J 射击', '#ffe066', 'ui-tips');
+          }
+        },
+        302,
+        this.daily && this.challenge ? dailyModifierIcon(this.challenge.modifier.id) : 'ui-tips'
+      )
     );
   }
 
@@ -1135,7 +1174,7 @@ export default class GameScene extends Phaser.Scene {
     if (!this.recordBroken && this.bestAtStart > 0 && this.elapsedMs > this.bestAtStart) {
       this.recordBroken = true;
       this.hud.best.setText('新纪录!').setColor('#ffe066');
-      this.showBanner('🏆 新纪录!', '#ffe066', 40);
+      this.showBanner('新纪录!', '#ffe066', 40, 'ui-trophy');
       confettiBurst(this, GAME_WIDTH / 2, 92, 24);
       playSfx(this, 'record', 0.5);
       wxVibrate('light');
@@ -1143,7 +1182,7 @@ export default class GameScene extends Phaser.Scene {
 
     if (!this.doubleJumpUnlocked && this.elapsedMs >= DOUBLE_JUMP_UNLOCK_MS) {
       this.doubleJumpUnlocked = true;
-      showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '✨ 二段跳解锁!空中可再跳一次');
+      showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '二段跳解锁!空中可再跳一次', '#ffe066', 'ui-arrow-up');
       playSfx(this, 'unlock', 0.5);
       wxVibrate('light');
     }
@@ -1702,7 +1741,7 @@ export default class GameScene extends Phaser.Scene {
     this.addRunCoins(value);
     this.gainHype(HYPE_PER_COIN);
     coinPop(this, c.x, c.y, 2);
-    if (value > 1) this.floatText(c.x, c.y - 18, `+${value}🪙`);
+    if (value > 1) this.floatText(c.x, c.y - 18, `+${value} 银币`);
     playSfx(this, 'coin', 0.1);
   };
 
@@ -1720,28 +1759,28 @@ export default class GameScene extends Phaser.Scene {
       case 'coin': {
         const value = this.coinAmount(PICKUP_COIN_BONUS);
         this.addRunCoins(value);
-        this.floatText(this.player.x + 24, this.player.y - 84, `+${value}🪙`);
-        showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, `🪙 银币袋 +${value}!`);
+        this.floatText(this.player.x + 24, this.player.y - 84, `+${value} 银币`);
+        showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, `银币袋 +${value}!`, '#ffe066', 'coin');
         break;
       }
       case 'shield': {
         this.tempShieldUntil = Math.max(this.tempShieldUntil, this.elapsedMs + PICKUP_SHIELD_MS);
-        showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, '🛡 临时护盾 8 秒!');
+        showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, '临时护盾 8 秒!', '#ffe066', 'item-shield');
         break;
       }
       case 'double': {
         this.doubleCoinsUntil = Math.max(this.doubleCoinsUntil, this.elapsedMs + PICKUP_DOUBLE_MS);
-        showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, '💰 双倍银币 10 秒!');
+        showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, '双倍银币 10 秒!', '#ffe066', 'item-double');
         break;
       }
       case 'slow': {
         this.slowUntil = Math.max(this.slowUntil, this.elapsedMs + PICKUP_SLOW_MS);
-        showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, '🐢 缓刑!速度放缓 5 秒');
+        showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, '缓刑!速度放缓 5 秒', '#ffe066', 'item-slow');
         break;
       }
       case 'hype': {
         this.gainHype(HYPE_PER_PICKUP + 12);
-        showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, '⚡ 气势暴涨!');
+        showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, '气势暴涨!', '#ffe066', 'ui-bolt');
         break;
       }
     }
@@ -1758,7 +1797,7 @@ export default class GameScene extends Phaser.Scene {
     const value = this.coinAmount(1);
     this.addRunCoins(value);
     this.gainHype(HYPE_PER_KILL);
-    this.floatText(o.x, o.y - o.height - 20, `+${value}🪙`);
+    this.floatText(o.x, o.y - o.height - 20, `+${value} 银币`);
     playSfx(this, 'coin', 0.18);
   };
 
@@ -1775,7 +1814,7 @@ export default class GameScene extends Phaser.Scene {
       this.destroyObstacle(o);
       const value = this.coinAmount(2);
       this.addRunCoins(value);
-      this.floatText(this.player.x + 28, this.player.y - 70, `+${value}🪙 撞碎!`);
+      this.floatText(this.player.x + 28, this.player.y - 70, `撞碎! +${value} 银币`);
       playSfx(this, 'shield', 0.3);
       return;
     }
@@ -1786,7 +1825,7 @@ export default class GameScene extends Phaser.Scene {
       poof(this, this.player.x, this.player.y + 22, 8);
       this.enterInvulnerable(650);
       playSfx(this, 'shield', 0.5);
-      showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '🛡 护盾挡下了一次!');
+      showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '护盾挡下了一次!', '#ffe066', 'item-shield');
       return;
     }
 
@@ -1796,7 +1835,7 @@ export default class GameScene extends Phaser.Scene {
       poof(this, this.player.x, this.player.y + 22, 9);
       this.enterInvulnerable(700);
       playSfx(this, 'shield', 0.5);
-      showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '🌙 贿月护体挡下!');
+      showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '贿月护体挡下!', '#ffe066', 'ui-moon');
       this.refreshShieldBtn();
       if (this.bribeCarried <= 0) this.time.delayedCall(450, () => this.removeShieldBtn());
       return;
@@ -1873,11 +1912,11 @@ export default class GameScene extends Phaser.Scene {
     const value = this.coinAmount(NEAR_MISS_COINS);
     this.addRunCoins(value);
     this.gainHype(NEAR_MISS_HYPE);
-    this.floatText(this.player.x + 26, this.player.y - 58, `擦身! +${value}🪙`, '#b2f2bb');
+    this.floatText(this.player.x + 26, this.player.y - 58, `擦身! +${value} 银币`, '#b2f2bb');
     nearMissStreak(this, this.player.x + 54, this.player.y);
     playSfx(this, 'near', 0.34);
     if (this.runNearMisses === 3) {
-      showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '😱 擦身大师!继续保持', '#b2f2bb');
+      showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '擦身大师!继续保持', '#b2f2bb', 'mi-nearmiss');
     }
     void o;
   }
@@ -1909,16 +1948,16 @@ export default class GameScene extends Phaser.Scene {
     this.addRunCoins(value);
     this.gainHype(HYPE_PER_DODGE + (perfectSlide ? 6 : 0));
     if (perfectSlide) {
-      this.floatText(this.player.x + 34, this.player.y - 76, `完美滑铲! +${value}🪙`, '#b2f2bb');
+      this.floatText(this.player.x + 34, this.player.y - 76, `完美滑铲! +${value} 银币`, '#b2f2bb');
       nearMissStreak(this, this.player.x + 58, this.player.y + 4);
       playSfx(this, 'near', 0.4);
     } else {
-      this.floatText(this.player.x + 30, this.player.y - 70, `+${value}🪙`);
+      this.floatText(this.player.x + 30, this.player.y - 70, `+${value}`);
       playSfx(this, 'coin', 0.15);
     }
 
-    if (this.combo === COMBO_TIER_1) showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, '🔥 连翻 ×10!银币加倍');
-    if (this.combo === COMBO_TIER_2) showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, '🔥🔥 连翻 ×25!银币三倍');
+    if (this.combo === COMBO_TIER_1) showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, '连翻 ×10!银币加倍', '#ffe066', 'mi-combo');
+    if (this.combo === COMBO_TIER_2) showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, '连翻 ×25!银币三倍', '#ffe066', 'mi-combo');
 
     const info = rankProgress(this.dodged);
     this.refreshRankHud();
@@ -1931,12 +1970,12 @@ export default class GameScene extends Phaser.Scene {
 
   private rankUp(rank: RunRank) {
     rankBurst(this, this.player.x, this.player.y, this.hexToNum(rank.color));
-    this.showBanner(`晋升 ${rank.name}!`, rank.color, 38);
+    this.showBanner(`晋升 ${rank.name}!`, rank.color, 38, 'ui-rank');
     playSfx(this, 'promote', 0.55);
     wxVibrate('medium');
     this.gainHype(10);
     this.addRunCoins(5);
-    this.floatText(this.player.x, this.player.y - 100, '+5🪙 升官', '#ffe066');
+    this.floatText(this.player.x, this.player.y - 100, '升官 +5 银币', '#ffe066');
   }
 
   private hexToNum(css: string): number {
@@ -1945,7 +1984,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private breakCombo() {
-    if (this.combo >= 5) showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, `💔 连击中断(×${this.combo})`);
+    if (this.combo >= 5) showToast(this, GAME_WIDTH / 2, GROUND_TOP - 230, `连击中断(×${this.combo})`, '#ffe066', 'ui-broken-heart');
     this.combo = 0;
     if (this.hud?.combo) {
       this.tweens.killTweensOf(this.hud.combo);
@@ -2021,25 +2060,36 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  private showBanner(msg: string, color = '#ffe066', size = 40) {
+  private showBanner(msg: string, color = '#ffe066', size = 40, iconKey?: string) {
     const t = this.add
-      .text(GAME_WIDTH / 2, 194, msg, {
+      .text(0, 0, msg, {
         fontFamily: FONT, fontSize: `${size}px`, color, fontStyle: 'bold',
         align: 'center', resolution: 2, stroke: '#08131f', strokeThickness: 7
       })
-      .setOrigin(0.5)
+      .setOrigin(0.5);
+    const iconSize = Math.round(size * 0.8);
+    const icon = iconKey
+      ? this.add.image(0, 0, iconKey).setDisplaySize(iconSize, iconSize)
+      : undefined;
+    const totalW = icon ? iconSize + 10 + t.width : t.width;
+    if (icon) {
+      icon.setX(-totalW / 2 + iconSize / 2);
+      t.setX(-totalW / 2 + iconSize + 10 + t.width / 2);
+    }
+    const c = this.add
+      .container(GAME_WIDTH / 2, 194, icon ? [icon, t] : [t])
       .setDepth(92)
       .setScale(0.45)
       .setAlpha(0);
-    this.tweens.add({ targets: t, scale: 1.08, alpha: 1, duration: 260, ease: 'Back.out' });
+    this.tweens.add({ targets: c, scale: 1.08, alpha: 1, duration: 260, ease: 'Back.out' });
     this.tweens.add({
-      targets: t,
+      targets: c,
       scale: 1.22,
       alpha: 0,
       delay: 950,
       duration: 380,
       ease: 'Quad.in',
-      onComplete: () => t.destroy()
+      onComplete: () => c.destroy()
     });
   }
 
@@ -2069,7 +2119,7 @@ export default class GameScene extends Phaser.Scene {
     this.shieldRing.setTint(0xffd43b);
     this.refreshShieldBtn();
     playSfx(this, 'shield', 0.5);
-    showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '🌙 贿月护体!下次碰撞免伤');
+    showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '贿月护体!下次碰撞免伤', '#ffe066', 'ui-moon');
   }
 
   private updateInspection() {
@@ -2170,7 +2220,7 @@ export default class GameScene extends Phaser.Scene {
       this.addRunCoins(INSPECTION_REWARD);
       this.gainHype(10);
       playSfx(this, 'wave_clear', 0.5);
-      this.showBanner(`✅ 平安度过!+${INSPECTION_REWARD}🪙`, '#8ce99a', 34);
+      this.showBanner(`平安度过!+${INSPECTION_REWARD} 银币`, '#8ce99a', 34, 'ui-check');
     }
   }
 
@@ -2221,12 +2271,12 @@ export default class GameScene extends Phaser.Scene {
     this.gainHype(16);
     this.hud.missionTitle.setColor('#8ce99a');
     this.hud.missionDesc.setColor('#b2f2bb');
-    this.hud.missionDesc.setText(`✅ 已完成 · +${this.mission.reward} 银币`);
+    this.hud.missionDesc.setText(`已完成 · +${this.mission.reward} 银币`);
     this.hud.missionIcon.setTint(0x8ce99a);
     this.tweens.add({ targets: this.hud.missionIcon, scale: 0.88, duration: 160, yoyo: true, ease: 'Quad.out' });
     const missionY = this.daily ? 132 : 104;
     drawBar(this.hud.missionBar, 24, missionY + 52, 228, 4, 1, 0x69db7c);
-    showToast(this, GAME_WIDTH / 2, GROUND_TOP - 225, `✅ 考核完成:${this.mission.title} +${this.mission.reward}🪙`, '#8ce99a');
+    showToast(this, GAME_WIDTH / 2, GROUND_TOP - 225, `考核完成:${this.mission.title} +${this.mission.reward} 银币`, '#8ce99a', 'ui-check');
     playSfx(this, 'mission', 0.55);
     wxVibrate('light');
   }
@@ -2237,7 +2287,10 @@ export default class GameScene extends Phaser.Scene {
 
   private drawComboChip() {
     const t = this.hud.combo;
-    const w = Math.max(96, t.width + 30);
+    const iconW = 18;
+    const gap = 6;
+    const total = iconW + gap + t.width;
+    const w = Math.max(96, total + 30);
     const x = GAME_WIDTH / 2 - w / 2;
     const g = this.hud.comboBg;
     g.clear();
@@ -2245,6 +2298,9 @@ export default class GameScene extends Phaser.Scene {
     g.fillRoundedRect(x, 78, w, 26, 13);
     g.lineStyle(1, 0xffffff, 0.16);
     g.strokeRoundedRect(x, 78, w, 26, 13);
+    const left = GAME_WIDTH / 2 - total / 2;
+    this.hud.comboIcon.setPosition(left + iconW / 2, 91);
+    t.setX(left + iconW + gap + t.width / 2);
     g.setVisible(true);
   }
 
@@ -2253,9 +2309,12 @@ export default class GameScene extends Phaser.Scene {
     if (this.hud.time.text !== timeStr) this.hud.time.setText(timeStr);
 
     if (this.combo >= 5) {
-      const comboStr = `🔥 连翻 ×${this.combo}`;
+      const comboStr = `连翻 ×${this.combo}`;
       const wasHidden = !this.hud.combo.visible;
-      if (wasHidden) this.hud.combo.setVisible(true);
+      if (wasHidden) {
+        this.hud.combo.setVisible(true);
+        this.hud.comboIcon.setVisible(true);
+      }
       if (wasHidden || this.hud.combo.text !== comboStr) {
         this.hud.combo.setText(comboStr);
         this.hud.combo.setColor(
@@ -2268,15 +2327,16 @@ export default class GameScene extends Phaser.Scene {
       }
     } else if (this.hud.combo.visible) {
       this.hud.combo.setVisible(false);
+      this.hud.comboIcon.setVisible(false);
       this.hud.comboBg.setVisible(false);
     }
 
     const chips: string[] = [];
-    if (this.elapsedMs < this.doubleCoinsUntil) chips.push(`💰×2 ${Math.ceil((this.doubleCoinsUntil - this.elapsedMs) / 1000)}s`);
-    if (this.elapsedMs < this.slowUntil) chips.push(`🐢 ${Math.ceil((this.slowUntil - this.elapsedMs) / 1000)}s`);
-    if (this.elapsedMs < this.tempShieldUntil) chips.push(`🛡 ${Math.ceil((this.tempShieldUntil - this.elapsedMs) / 1000)}s`);
-    if (this.inspectionActive) chips.push(`🚨 巡视中 ${Math.ceil((this.inspectionUntil - this.elapsedMs) / 1000)}s`);
-    const chipStr = chips.join('   ');
+    if (this.elapsedMs < this.doubleCoinsUntil) chips.push(`银币×2 ${Math.ceil((this.doubleCoinsUntil - this.elapsedMs) / 1000)}s`);
+    if (this.elapsedMs < this.slowUntil) chips.push(`减速 ${Math.ceil((this.slowUntil - this.elapsedMs) / 1000)}s`);
+    if (this.elapsedMs < this.tempShieldUntil) chips.push(`护盾 ${Math.ceil((this.tempShieldUntil - this.elapsedMs) / 1000)}s`);
+    if (this.inspectionActive) chips.push(`巡视中 ${Math.ceil((this.inspectionUntil - this.elapsedMs) / 1000)}s`);
+    const chipStr = chips.join('   ·   ');
     if (this.hud.chips.text !== chipStr) this.hud.chips.setText(chipStr);
 
     if (this.overdriveActive) {
@@ -2356,7 +2416,7 @@ export default class GameScene extends Phaser.Scene {
       fill: 0x0d2038, fillAlpha: 0.98, stroke: 0xffd43b, strokeAlpha: 0.36, radius: 26
     }).setDepth(301);
     const title = this.add
-      .text(GAME_WIDTH / 2, 128, '😱 被鸡煎胃抓了!', {
+      .text(GAME_WIDTH / 2, 128, '被鸡煎胃抓了!', {
         fontFamily: FONT, fontSize: '30px', color: '#ff8787', fontStyle: 'bold',
         resolution: 2, stroke: '#08131f', strokeThickness: 5
       })
@@ -2372,9 +2432,9 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(302);
     this.reviveObjects = [dim, panel, title, sub];
-    this.reviveObjects.push(...this.makeOverlayButton(GAME_WIDTH / 2, 264, '📤 分享复活', () => this.tryShareRevive()));
+    this.reviveObjects.push(...this.makeOverlayButton(GAME_WIDTH / 2, 264, '分享复活', () => this.tryShareRevive(), 302, 'ui-share'));
     this.reviveObjects.push(
-      ...this.makeOverlayButton(GAME_WIDTH / 2, 330, '😵 结束本局', () => {
+      ...this.makeOverlayButton(GAME_WIDTH / 2, 330, '结束本局', () => {
         this.destroyOverlay(this.reviveObjects);
         this.time.delayedCall(320, () => this.endRun());
       })
@@ -2407,7 +2467,7 @@ export default class GameScene extends Phaser.Scene {
     this.enterInvulnerable(1800);
     playSfx(this, 'unlock', 0.5);
     wxVibrate('medium');
-    showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '💪 原地复活!再撑一轮');
+    showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '原地复活!再撑一轮', '#ffe066', 'ui-heart');
   }
 
   private endRun() {

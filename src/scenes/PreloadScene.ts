@@ -72,6 +72,8 @@ export default class PreloadScene extends Phaser.Scene {
       'ui-heart', 'ui-moon', 'ui-bullet', 'sun-rays', 'searchlight', 'light-pool', 'patrol-drone', 'sky-depth',
       'ui-clock', 'ui-rank', 'ui-check', 'ui-clipboard', 'ui-target', 'ui-bolt', 'ui-trophy', 'ui-envelope',
       'ui-shop', 'ui-palette', 'ui-gear', 'ui-siren', 'ui-broken-heart',
+      'ui-home', 'ui-restart', 'ui-share', 'ui-image', 'ui-pause', 'ui-tips', 'ui-calendar',
+      'ui-arrow-up', 'ui-arrow-down',
       'mi-dodge', 'mi-survive', 'mi-pickup', 'mi-combo', 'mi-kill', 'mi-nearmiss', 'mi-flawless',
       'hype-aura',
       'bg-tower', 'bg-wheel', 'bg-hotel',
