@@ -3,9 +3,10 @@ import { GAME_WIDTH, GAME_HEIGHT } from '../config/constants';
 import {
   hasCustomHead, saveCustomHead, clearCustomHead, rebuildCustomTextures
 } from '../systems/customhead';
-import { makeButton, showToast } from '../systems/ui';
+import { makeButton, makeHeroButton, showToast, FONT } from '../systems/ui';
+import { buildMenuBackdrop, buildMenuHeader, addMenuCard, addMenuFooter } from '../systems/menu';
+import { wxChooseImage } from '../systems/wxapi';
 
-const FONT = "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif";
 const UPLOAD_TEX = 'upload-src';
 
 export default class CustomCharScene extends Phaser.Scene {
@@ -33,30 +34,92 @@ export default class CustomCharScene extends Phaser.Scene {
   // ---- 预览模式 ----
   private drawPreview() {
     const custom = hasCustomHead();
-    const outline = { stroke: '#1d3557', strokeThickness: 4 };
-    this.add.text(GAME_WIDTH / 2, 40, '🎨 自定义人物', { fontFamily: FONT, fontSize: '28px', color: '#ffffff', ...outline, resolution: 2 }).setOrigin(0.5);
-    this.add
-      .text(GAME_WIDTH / 2, 84, '上传一张照片,拖动选框选中区域,即可替换主角头部', { fontFamily: FONT, fontSize: '15px', color: '#ffe066', ...outline, resolution: 2 })
-      .setOrigin(0.5);
+    buildMenuBackdrop(this, { mood: 'night' });
+    buildMenuHeader(this, '🎨 自定义人物', '上传一张照片,把主角的脸换成你的', {});
 
+    // 左侧舞台
+    addMenuCard(this, 120, 120, 360, 340, { depth: 21, radius: 22 });
+    this.add.image(300, 138, 'spotlight').setOrigin(0.5, 0).setDepth(22).setAlpha(0.3).setScale(0.9);
+    this.add.image(300, 438, 'shadow').setDepth(22).setScale(2.0, 0.7).setAlpha(0.7);
+    this.add.ellipse(300, 436, 230, 22, 0xffd43b, 0.08).setDepth(22);
     const previewKey = custom ? 'player-custom-run-1' : 'player-run-1';
-    this.add.image(GAME_WIDTH / 2, 290, previewKey).setScale(1.6);
+    const hero = this.add.image(300, 430, previewKey).setOrigin(0.5, 1).setDepth(23).setScale(1.9);
+    this.tweens.add({ targets: hero, scaleY: 1.94, scaleX: 1.88, duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    this.add
+      .text(300, 456, custom ? '当前:你的自定义头像' : '当前:默认主角', {
+        fontFamily: FONT, fontSize: '12px', color: custom ? '#8ce99a' : '#93b5d6', fontStyle: 'bold', resolution: 2
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(24);
 
-    makeButton(this, GAME_WIDTH / 2, 440, 260, 56, '📷 上传照片', () => this.pickFile(), 20);
+    // 右侧说明
+    addMenuCard(this, 510, 120, 410, 210, { depth: 21 });
+    this.add
+      .text(532, 142, '三步换脸', {
+        fontFamily: FONT, fontSize: '18px', color: '#ffe066', fontStyle: 'bold', resolution: 2
+      })
+      .setDepth(22);
+    const steps = [
+      '1  点击「上传照片」,选择一张清晰的正面照',
+      '2  拖动白色选框框住头部,右下手柄可缩放',
+      '3  确认后立即生效,游戏里和结算页同步换脸'
+    ];
+    steps.forEach((line, i) => {
+      this.add
+        .text(532, 178 + i * 34, line, {
+          fontFamily: FONT, fontSize: '12px', color: '#cfe3ff', resolution: 2, lineSpacing: 4
+        })
+        .setDepth(22);
+    });
+    this.add
+      .text(532, 300, '小提示:正脸、光线均匀、头部占画面一半效果最好', {
+        fontFamily: FONT, fontSize: '10px', color: '#7f9cbd', resolution: 2
+      })
+      .setDepth(22);
+
+    makeHeroButton(this, 715, 372, 300, 56, '上传照片', () => this.pickFile(), { icon: '📷', fontSize: 19, depth: 22 });
     if (custom) {
-      makeButton(this, GAME_WIDTH / 2, 500, 260, 44, '↩ 恢复默认主角', () => {
+      makeButton(this, 715, 440, 300, 42, '↩ 恢复默认主角', () => {
         clearCustomHead();
-        showToast(this, GAME_WIDTH / 2, 120, '已恢复默认主角');
+        showToast(this, GAME_WIDTH / 2, 500, '已恢复默认主角');
         this.scene.restart();
-      }, 16);
+      }, 14, { depth: 22 });
+    } else {
+      this.add
+        .text(715, 440, '只有你自己能看到这个头像,本机保存', {
+          fontFamily: FONT, fontSize: '10px', color: '#7f9cbd', resolution: 2
+        })
+        .setOrigin(0.5)
+        .setDepth(22);
     }
-    makeButton(this, 66, 26, 100, 36, '← 返回', () => this.scene.start('Title'), 15);
+
+    addMenuFooter(this, '头像只保存在本机,不会上传服务器');
   }
 
-  // 浏览器选择文件(小游戏环境不支持,给出提示)
-  private pickFile() {
+  // 选择图片:网页用文件选择,微信小游戏用 wx.chooseImage
+  private async pickFile() {
     if ((window as any).__WX_GAME__) {
-      showToast(this, GAME_WIDTH / 2, 120, '微信小游戏暂不支持上传,请用网页版或 APP');
+      const path = await wxChooseImage();
+      if (!path) return; // 用户取消
+      const img = document.createElement('img') as any;
+      img.onload = () => {
+        try {
+          const c = document.createElement('canvas') as HTMLCanvasElement;
+          c.width = img.width || 256;
+          c.height = img.height || 256;
+          const ctx = c.getContext('2d');
+          if (!ctx) throw new Error('no ctx');
+          ctx.drawImage(img, 0, 0);
+          const dataUrl = c.toDataURL('image/png');
+          if (this.textures.exists(UPLOAD_TEX)) this.textures.remove(UPLOAD_TEX);
+          this.textures.addBase64(UPLOAD_TEX, dataUrl);
+          this.scene.restart({ mode: 'crop' });
+        } catch {
+          showToast(this, GAME_WIDTH / 2, 120, '图片处理失败,换一张试试');
+        }
+      };
+      img.onerror = () => showToast(this, GAME_WIDTH / 2, 120, '图片加载失败,换一张试试');
+      img.src = path;
       return;
     }
     try {
@@ -85,30 +148,34 @@ export default class CustomCharScene extends Phaser.Scene {
 
   // ---- 裁剪模式 ----
   private drawCropMode() {
-    const outline = { stroke: '#1d3557', strokeThickness: 4 };
-    this.add.text(GAME_WIDTH / 2, 26, '拖动选框选择头部区域(右下角手柄调大小)', { fontFamily: FONT, fontSize: '16px', color: '#ffffff', ...outline, resolution: 2 }).setOrigin(0.5);
+    buildMenuBackdrop(this, { mood: 'night' });
+    buildMenuHeader(this, '✂️ 调整头像', '拖动选框框住头部 · 右下角手柄缩放', {});
 
     const tex = this.textures.get(UPLOAD_TEX);
     const dispW = 480;
-    const dispH = 340;
+    const dispH = 320;
     const scale = Math.min(dispW / tex.getSourceImage().width, dispH / tex.getSourceImage().height);
     this.imgBounds = {
       x: GAME_WIDTH / 2 - (tex.getSourceImage().width * scale) / 2,
-      y: 250 - (tex.getSourceImage().height * scale) / 2,
+      y: 252 - (tex.getSourceImage().height * scale) / 2,
       w: tex.getSourceImage().width * scale,
       h: tex.getSourceImage().height * scale
     };
 
-    this.add.image(GAME_WIDTH / 2, 250, UPLOAD_TEX).setDisplaySize(this.imgBounds.w, this.imgBounds.h);
+    this.add.image(GAME_WIDTH / 2, 252, UPLOAD_TEX).setDisplaySize(this.imgBounds.w, this.imgBounds.h).setDepth(21);
+    // 图片外框
+    const frame = this.add.graphics().setDepth(22);
+    frame.lineStyle(2, 0xffffff, 0.25);
+    frame.strokeRect(this.imgBounds.x - 2, this.imgBounds.y - 2, this.imgBounds.w + 4, this.imgBounds.h + 4);
 
     // 初始选区:图像中央,边长取图像短边的一半(不小于 80)
     this.sel = {
       size: Math.max(80, Math.round(Math.min(this.imgBounds.w, this.imgBounds.h) * 0.5)),
       x: GAME_WIDTH / 2 - Math.round(Math.min(this.imgBounds.w, this.imgBounds.h) * 0.25),
-      y: 250 - Math.round(Math.min(this.imgBounds.w, this.imgBounds.h) * 0.25)
+      y: 252 - Math.round(Math.min(this.imgBounds.w, this.imgBounds.h) * 0.25)
     };
 
-    this.selGraphics = this.add.graphics().setDepth(10);
+    this.selGraphics = this.add.graphics().setDepth(30);
     this.drawSelection();
 
     // 拖动:框内移动,右下角手柄缩放
@@ -133,8 +200,9 @@ export default class CustomCharScene extends Phaser.Scene {
     });
     this.input.on('pointerup', () => { this.dragging = false; this.resizing = false; });
 
-    makeButton(this, GAME_WIDTH / 2 - 130, 490, 200, 48, '✓ 确认替换头部', () => this.confirm(), 17);
-    makeButton(this, GAME_WIDTH / 2 + 130, 490, 200, 48, '✗ 取消', () => this.scene.restart(), 17);
+    makeButton(this, GAME_WIDTH / 2 - 130, 480, 200, 48, '✓ 确认替换头部', () => this.confirm(), 17, { depth: 40 });
+    makeButton(this, GAME_WIDTH / 2 + 130, 480, 200, 48, '✗ 取消', () => this.scene.restart(), 17, { depth: 40 });
+    addMenuFooter(this, '建议只框住头部 · 可随时重新上传');
   }
 
   private dragOffset?: { x: number; y: number };

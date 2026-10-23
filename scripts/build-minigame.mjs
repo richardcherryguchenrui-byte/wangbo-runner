@@ -11,6 +11,7 @@ cpSync('minigame/adapter.js', `${OUT}/adapter.js`);
 cpSync('minigame/game.js', `${OUT}/game.js`);
 cpSync('minigame/game.json', `${OUT}/game.json`);
 cpSync('minigame/project.config.json', `${OUT}/project.config.json`);
+cpSync('minigame/open-data', `${OUT}/open-data`, { recursive: true });
 
 if (!existsSync(`${OUT}/game-bundle.js`)) {
   console.error('❌ 构建失败:未找到 game-bundle.js');

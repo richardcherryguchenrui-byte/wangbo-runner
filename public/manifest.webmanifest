@@ -1,18 +1,27 @@
 {
-  "name": "王博晋升之路跑酷",
+  "name": "王博晋升之路 · 跑酷",
   "short_name": "王博跑酷",
+  "description": "滑铲、擦身、攒气势、冲官阶的横版跑酷,单局一路升到厅长。",
+  "lang": "zh-CN",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#5ec8f8",
-  "theme_color": "#5ec8f8",
+  "background_color": "#07142a",
+  "theme_color": "#07142a",
   "orientation": "landscape",
+  "categories": ["games", "entertainment"],
   "icons": [
     {
-      "src": "./像素角色.jpeg",
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any"
     }
   ]
 }
-

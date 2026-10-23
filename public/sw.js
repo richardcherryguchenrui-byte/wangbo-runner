@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wb-runner-v1';
+const CACHE_NAME = 'wb-runner-v3';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

@@ -11,9 +11,11 @@
   "app": {
     "windows": [
       {
-        "title": "wangbo-promotion-runner",
-        "width": 800,
-        "height": 600,
+        "title": "王博晋升之路 · 跑酷",
+        "width": 960,
+        "height": 540,
+        "minWidth": 800,
+        "minHeight": 450,
         "resizable": true,
         "fullscreen": false
       }

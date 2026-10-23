@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config/constants';
-import { loadProgress, saveProgress } from '../systems/progress';
-import { makeButton, showToast } from '../systems/ui';
+import { loadProgress, saveProgress, bribeCarryLimit } from '../systems/progress';
+import { makeHeroButton, showToast, FONT, addPanel } from '../systems/ui';
 import { startBgm } from '../systems/audio';
+import { buildMenuBackdrop, buildMenuHeader, addMenuFooter } from '../systems/menu';
 
 const BRIBE_MOON_PRICE = 500;
-const BRIBE_MOON_MAX_CARRY = 3;
 
 export default class GuShopScene extends Phaser.Scene {
   constructor() { super('GuShop'); }
@@ -17,36 +17,103 @@ export default class GuShopScene extends Phaser.Scene {
 
   private draw() {
     const p = loadProgress();
-    const outline = { stroke: '#1d3557', strokeThickness: 4 };
+    const maxCarry = bribeCarryLimit(p);
+    buildMenuBackdrop(this, { mood: 'purple' });
+    buildMenuHeader(this, '🌙 顾哥神秘商铺', '顾教授的贿月 · 只收银币,不问来路', { coins: p.coins });
 
-    // 神秘紫色背景
-    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x2a1b4a);
+    // 商品大卡
+    addPanel(this, 150, 110, 660, 330, {
+      fill: 0x241542, fillAlpha: 0.85, stroke: 0xc9a7ff, strokeAlpha: 0.32, radius: 26
+    }).setDepth(21);
 
-    this.add.text(GAME_WIDTH / 2, 40, '🌙 顾哥神秘商铺', { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '30px', resolution: 2, color: '#ffd43b', ...outline }).setOrigin(0.5);
-    this.add.text(GAME_WIDTH / 2, 82, `余额:🪙 ${p.coins}   已持有贿月:${p.bribeMoon} 个`, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '16px', resolution: 2, color: '#cfe3ff', ...outline }).setOrigin(0.5);
+    const burst = this.add
+      .image(480, 230, 'burst')
+      .setScale(1.2)
+      .setAlpha(0.22)
+      .setTint(0xc9a7ff)
+      .setDepth(22);
+    this.tweens.add({ targets: burst, angle: 360, duration: 18000, repeat: -1 });
 
-    // 商品展示
-    this.add.image(GAME_WIDTH / 2, 250, 'bribe-moon').setScale(1.3);
+    const moon = this.add.image(480, 212, 'bribe-moon').setScale(2.3).setDepth(23);
+    this.tweens.add({
+      targets: moon, y: moon.y - 10, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.inOut'
+    });
+
     this.add
-      .text(GAME_WIDTH / 2, 352, '顾教授的贿月', { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '26px', resolution: 2, color: '#ffe066', ...outline })
-      .setOrigin(0.5);
+      .text(480, 294, '顾教授的贿月', {
+        fontFamily: FONT, fontSize: '26px', color: '#ffe066', fontStyle: 'bold',
+        resolution: 2, stroke: '#150c2b', strokeThickness: 6
+      })
+      .setOrigin(0.5)
+      .setDepth(24);
     this.add
-      .text(GAME_WIDTH / 2, 392, `使用后获得一次免伤效果(开局最多携带 ${BRIBE_MOON_MAX_CARRY} 个)`, { fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '15px', resolution: 2, color: '#ffffff', ...outline })
-      .setOrigin(0.5);
+      .text(480, 326, `使用后获得一次免伤 · 可多次使用，每次消耗 1 个 · 开局最多携带 ${maxCarry} 个`, {
+        fontFamily: FONT, fontSize: '12px', color: '#d8c7ff', resolution: 2
+      })
+      .setOrigin(0.5)
+      .setDepth(24);
 
-    const buyBtn = makeButton(this, GAME_WIDTH / 2, 452, 260, 56, `🪙${BRIBE_MOON_PRICE} 购买一个`, () => {
+    // 三个小数据
+    const stats: [string, string][] = [
+      ['免伤', '1 次'],
+      ['库存', `${p.bribeMoon}/${maxCarry} 个`],
+      ['价格', `🪙${BRIBE_MOON_PRICE}`]
+    ];
+    stats.forEach(([label, value], i) => {
+      const x = 300 + i * 180;
+      const g = this.add.graphics().setDepth(23);
+      g.fillStyle(0xffffff, 0.055);
+      g.fillRoundedRect(x - 72, 342, 144, 32, 10);
+      g.lineStyle(1, 0xffffff, 0.1);
+      g.strokeRoundedRect(x - 72, 342, 144, 32, 10);
+      this.add
+        .text(x - 58, 358, label, { fontFamily: FONT, fontSize: '10px', color: '#a98bd0', resolution: 2 })
+        .setOrigin(0, 0.5)
+        .setDepth(24);
+      this.add
+        .text(x + 58, 358, value, { fontFamily: FONT, fontSize: '13px', color: '#ffe066', fontStyle: 'bold', resolution: 2 })
+        .setOrigin(1, 0.5)
+        .setDepth(24);
+    });
+
+    const full = p.bribeMoon >= maxCarry;
+    const buy = makeHeroButton(this, 480, 400, 264, 50, full ? '库存已满' : `🪙${BRIBE_MOON_PRICE} 购买一个`, () => {
+      if (full) {
+        showToast(this, GAME_WIDTH / 2, 486, `最多持有 ${maxCarry} 个贿月,先用掉再来`);
+        return;
+      }
       const cur = loadProgress();
+      if (cur.bribeMoon >= maxCarry) {
+        showToast(this, GAME_WIDTH / 2, 486, `最多持有 ${maxCarry} 个贿月,先用掉再来`);
+        return;
+      }
       if (cur.coins >= BRIBE_MOON_PRICE) {
         cur.coins -= BRIBE_MOON_PRICE;
+        cur.totalSpent += BRIBE_MOON_PRICE;
         cur.bribeMoon += 1;
         saveProgress(cur);
-        showToast(this, GAME_WIDTH / 2, GAME_HEIGHT - 70, `购买成功!贿月库存 +1(共 ${cur.bribeMoon} 个)`);
-        this.scene.restart();
+        showToast(this, GAME_WIDTH / 2, 486, `购买成功!贿月库存 +1(共 ${cur.bribeMoon} 个)`);
+        this.time.delayedCall(650, () => this.scene.restart());
       } else {
-        showToast(this, GAME_WIDTH / 2, GAME_HEIGHT - 70, '银币不足!多翻越障碍赚银币吧');
+        showToast(this, GAME_WIDTH / 2, 486, '银币不足!多翻越障碍赚银币吧');
       }
-    }, 20);
+    }, { icon: full ? '' : '🌙', fontSize: 20 });
+    buy.g.setDepth(26);
+    buy.text.setDepth(27);
+    buy.hit.setDepth(28);
+    if (full) {
+      buy.g.setAlpha(0.5);
+      buy.text.setAlpha(0.7);
+    }
 
-    makeButton(this, 66, 26, 100, 36, '← 返回', () => this.scene.start('Title'), 15);
+    this.add
+      .text(480, 466, '「有些忙,月亮会替你摆平。」—— 顾教授', {
+        fontFamily: FONT, fontSize: '12px', color: '#c9a7ff', fontStyle: 'italic', resolution: 2
+      })
+      .setOrigin(0.5)
+      .setDepth(24)
+      .setAlpha(0.85);
+
+    addMenuFooter(this, '顾哥神秘商铺 · 仅此一家 · 童叟无欺');
   }
 }

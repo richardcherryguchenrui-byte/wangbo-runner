@@ -20,3 +20,6 @@ ios/DerivedData/
 # 日志
 *.log
 dist-minigame/
+
+.shots
+.src-backup-*

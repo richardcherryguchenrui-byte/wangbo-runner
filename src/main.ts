@@ -4,6 +4,7 @@ import SplashScene from './scenes/SplashScene';
 import GuShopScene from './scenes/GuShopScene';
 import SettingsScene from './scenes/SettingsScene';
 import CustomCharScene from './scenes/CustomCharScene';
+import QuestScene from './scenes/QuestScene';
 import PreloadScene from './scenes/PreloadScene';
 import TitleScene from './scenes/TitleScene';
 import ShopScene from './scenes/ShopScene';
@@ -34,10 +35,22 @@ const game = new Phaser.Game({
     autoCenter: Phaser.Scale.CENTER_BOTH,
     zoom: 2 // 画布 2x 渲染,文字与画面高清
   },
-  scene: [BootScene, PreloadScene, SplashScene, TitleScene, ShopScene, GuShopScene, SettingsScene, CustomCharScene, GameScene, ResultScene]
+  scene: [BootScene, PreloadScene, SplashScene, TitleScene, ShopScene, GuShopScene, SettingsScene, CustomCharScene, QuestScene, GameScene, ResultScene]
 });
 
 export default game;
+
+// 调试钩子:自动化测试/排障用(对玩家无影响)
+try { (window as any).__game = game; } catch {}
+
+// 原生 App:保持屏幕常亮,游戏进行中不自动息屏(网页/小游戏环境自动忽略)
+try {
+  if ((window as any).Capacitor?.isNativePlatform?.()) {
+    import('@capacitor-community/keep-awake').then(m => {
+      m.KeepAwake.keepAwake().catch(() => {});
+    }).catch(() => {});
+  }
+} catch {}
 
 
 
@@ -47,3 +60,13 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   });
 }
+
+// 竖屏提示:可跳过;本局会话内不再打扰
+try {
+  const hint = document.getElementById('rotate-hint');
+  if (sessionStorage.getItem('rotateHintDismissed') === '1') hint?.classList.add('hidden');
+  document.getElementById('rotate-dismiss')?.addEventListener('click', () => {
+    hint?.classList.add('hidden');
+    sessionStorage.setItem('rotateHintDismissed', '1');
+  });
+} catch {}

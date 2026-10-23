@@ -3,16 +3,92 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1" />
+    <meta name="description" content="王博晋升之路:一路高升的横版跑酷。滑铲、擦身、攒气势、冲官阶,今日挑战等你来。" />
+    <meta name="theme-color" content="#07142a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="王博晋升之路 · 跑酷" />
+    <meta property="og:description" content="点击跳跃、下滑铲人,擦身而过攒满气势,单局一路升到厅长!" />
+    <meta property="og:image" content="./icon-512.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <meta name="theme-color" content="#5ec8f8" />
-    <link rel="apple-touch-icon" href="./像素角色.jpeg" />
-    <title>王博晋升之路跑酷</title>
+    <link rel="icon" href="./icon-192.png" />
+    <link rel="apple-touch-icon" href="./icon-180.png" />
+    <title>王博晋升之路 · 跑酷</title>
     <style>
-      html, body, #app { height: 100%; margin: 0; background: #5ec8f8; }
+      html, body, #app {
+        height: 100%;
+        margin: 0;
+        background: radial-gradient(circle at 50% 42%, #10233d 0%, #07142a 62%, #040b16 100%);
+        overflow: hidden;
+        touch-action: none;
+        overscroll-behavior: none;
+      }
+      #rotate-hint {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background:
+          radial-gradient(circle at 50% 36%, rgba(29, 53, 87, 0.94), rgba(4, 11, 22, 0.98) 68%),
+          #040b16;
+        color: #fff;
+        text-align: center;
+        font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      }
+      #rotate-hint.hidden { display: none !important; }
+      .rotate-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding: 34px 28px 26px;
+        border: 1px solid rgba(255, 212, 59, 0.28);
+        border-radius: 24px;
+        background: rgba(8, 21, 37, 0.86);
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+      }
+      .rotate-icon {
+        font-size: 52px;
+        line-height: 1;
+        color: #ffd43b;
+        animation: rotate-tip 2.4s ease-in-out infinite;
+      }
+      .rotate-card strong { font-size: 24px; letter-spacing: 2px; }
+      .rotate-card span { font-size: 13px; color: #a9c7e8; }
+      .rotate-card button {
+        margin-top: 8px;
+        padding: 10px 24px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 999px;
+        background: #16324f;
+        color: #cfe3ff;
+        font: inherit;
+        font-size: 13px;
+      }
+      @keyframes rotate-tip {
+        0%, 100% { transform: rotate(0deg); }
+        45% { transform: rotate(90deg); }
+      }
+      @media (orientation: portrait) and (max-width: 900px) {
+        #rotate-hint:not(.hidden) { display: flex; }
+      }
     </style>
   </head>
   <body>
     <div id="app"></div>
+    <div id="rotate-hint" role="dialog" aria-label="横屏提示">
+      <div class="rotate-card">
+        <div class="rotate-icon">↻</div>
+        <strong>横屏体验更佳</strong>
+        <span>旋转手机,仕途更开阔</span>
+        <button id="rotate-dismiss" type="button">继续竖屏</button>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
   </html>

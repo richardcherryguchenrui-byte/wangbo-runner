@@ -1,58 +1,348 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GROUND_TOP } from '../config/constants';
+import { GAME_WIDTH, GAME_HEIGHT, GROUND_TOP } from '../config/constants';
 import { loadProgress, getTitle } from '../systems/progress';
-import { makeButton } from '../systems/ui';
-import { stopBgm } from '../systems/audio';
+import { addPanel, makeButton, makeHeroButton, showToast, FONT } from '../systems/ui';
+import { stopBgm, playSfx } from '../systems/audio';
+import { confettiBurst } from '../systems/effects';
+import { isWx, wxShare } from '../systems/wxapi';
+import { buildShareCard, downloadCanvas } from '../systems/sharecard';
+
+interface ResultData {
+  timeMs?: number;
+  dodged?: number;
+  coins?: number;
+  combo?: number;
+  isRecord?: boolean;
+  newAchievements?: string[];
+  rankIndex?: number;
+  rankName?: string;
+  rankEmoji?: string;
+  rankColor?: string;
+  missionTitle?: string;
+  missionDone?: boolean;
+  missionReward?: number;
+  nearMisses?: number;
+  overdrives?: number;
+  missionsDone?: number;
+  daily?: boolean;
+  dailyReward?: number;
+  dailyBestMs?: number;
+  dailyRecord?: boolean;
+  dailyFirst?: boolean;
+  dailyModifier?: string;
+  bestMs?: number;
+  playerTexture?: string;
+}
 
 export default class ResultScene extends Phaser.Scene {
-  constructor() { super('Result'); }
+  private daily = false;
+  private timeMs = 0;
+  private dodged = 0;
+  private coins = 0;
+  private combo = 0;
+  private isRecord = false;
+  private newAch: string[] = [];
+  private rankName = '科员';
+  private rankEmoji = '📋';
+  private rankColor = '#cfe3ff';
+  private rankIndex = 0;
+  private missionTitle = '';
+  private missionDone = false;
+  private missionReward = 0;
+  private nearMisses = 0;
+  private overdrives = 0;
+  private dailyReward = 0;
+  private dailyBestMs = 0;
+  private dailyRecord = false;
+  private dailyFirst = false;
+  private dailyModifier = '';
+  private bestMs = 0;
+  private playerTexture = 'player-idle';
+  private leaving = false;
 
-  init(data: { timeMs?: number; dodged?: number; coins?: number }) {
-    this.data.set('timeMs', data?.timeMs ?? 0);
-    this.data.set('dodged', data?.dodged ?? 0);
-    this.data.set('coins', data?.coins ?? 0);
+  constructor() {
+    super('Result');
+  }
+
+  init(data: ResultData) {
+    this.timeMs = data?.timeMs ?? 0;
+    this.dodged = data?.dodged ?? 0;
+    this.coins = data?.coins ?? 0;
+    this.combo = data?.combo ?? 0;
+    this.isRecord = !!data?.isRecord;
+    this.newAch = data?.newAchievements ?? [];
+    this.rankName = data?.rankName ?? '科员';
+    this.rankEmoji = data?.rankEmoji ?? '📋';
+    this.rankColor = data?.rankColor ?? '#cfe3ff';
+    this.rankIndex = data?.rankIndex ?? 0;
+    this.missionTitle = data?.missionTitle ?? '';
+    this.missionDone = !!data?.missionDone;
+    this.missionReward = data?.missionReward ?? 0;
+    this.nearMisses = data?.nearMisses ?? 0;
+    this.overdrives = data?.overdrives ?? 0;
+    this.daily = !!data?.daily;
+    this.dailyReward = data?.dailyReward ?? 0;
+    this.dailyBestMs = data?.dailyBestMs ?? 0;
+    this.dailyRecord = !!data?.dailyRecord;
+    this.dailyFirst = !!data?.dailyFirst;
+    this.dailyModifier = data?.dailyModifier ?? '';
+    this.bestMs = data?.bestMs ?? 0;
+    this.playerTexture = data?.playerTexture ?? 'player-idle';
   }
 
   create() {
-    stopBgm(this); // 结算界面不播 BGM
-    const timeMs = this.data.get('timeMs') as number;
-    const dodged = this.data.get('dodged') as number;
-    const coins = this.data.get('coins') as number;
+    stopBgm(this);
     const p = loadProgress();
-    const best = Number(localStorage.getItem('bestTimeMs') || '0');
-    const timeText = `用时:${(timeMs / 1000).toFixed(1)}s`;
-    const bestText = best ? `最佳:${(best / 1000).toFixed(1)}s` : '最佳:—';
+    this.buildBackdrop();
 
-    const centerY = GROUND_TOP / 2;
-    const outline = { stroke: '#1d3557', strokeThickness: 4 };
+    if (this.isRecord && this.timeMs > 0) {
+      playSfx(this, 'record', 0.6);
+      confettiBurst(this, GAME_WIDTH / 2, 100, 34);
+      this.time.delayedCall(900, () => confettiBurst(this, GAME_WIDTH / 2, 30, 22));
+    }
 
+    // 主卡片
+    addPanel(this, 120, 54, 720, 430, {
+      fill: 0x0a1930,
+      fillAlpha: 0.96,
+      stroke: 0xffffff,
+      strokeAlpha: 0.14,
+      radius: 24
+    }).setDepth(20);
     this.add
-      .text(GAME_WIDTH / 2, centerY - 78, '被鸡煎胃抓进局子', {
-        fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '32px', resolution: 2, color: '#ffffff', ...outline
+      .text(150, 72, '本局成绩单', {
+        fontFamily: FONT, fontSize: '13px', color: '#9db8d8', fontStyle: 'bold', resolution: 2
+      })
+      .setDepth(21);
+    this.add
+      .text(150, 92, this.timeMs > 0 ? `${(this.timeMs / 1000).toFixed(1)}s` : '0.0s', {
+        fontFamily: FONT, fontSize: '58px', color: '#ffffff', fontStyle: 'bold',
+        resolution: 2, stroke: '#08131f', strokeThickness: 7
+      })
+      .setDepth(22);
+    this.add
+      .text(150, 164, this.timeMs > 0 ? `最佳 ${(this.bestMs / 1000).toFixed(1)}s · 生涯称号 ${getTitle(p.totalDodged)}` : `生涯称号 ${getTitle(p.totalDodged)}`, {
+        fontFamily: FONT, fontSize: '13px', color: '#8ce99a', resolution: 2
+      })
+      .setDepth(21);
+
+    // 主角
+    const hero = this.add
+      .image(578, 205, this.playerTexture)
+      .setOrigin(0.5, 1)
+      .setScale(1.35)
+      .setDepth(22);
+    this.tweens.add({ targets: hero, scaleY: 1.39, scaleX: 1.32, duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    this.add.image(582, 208, 'shadow').setDepth(21).setScale(1.35, 0.72).setAlpha(0.6);
+
+    // 官阶印章
+    const stamp = this.add.container(718, 132).setDepth(23).setAngle(4);
+    const sg = this.add.graphics();
+    sg.fillStyle(0xc92a2a, 1);
+    sg.fillRoundedRect(-84, -38, 168, 76, 14);
+    sg.lineStyle(3, 0xffd43b, 0.9);
+    sg.strokeRoundedRect(-84, -38, 168, 76, 14);
+    const st = this.add
+      .text(0, 0, `${this.rankEmoji} ${this.rankName}`, {
+        fontFamily: FONT, fontSize: '25px', color: '#fff3bf', fontStyle: 'bold', resolution: 2
       })
       .setOrigin(0.5);
+    stamp.add([sg, st]);
+    this.tweens.add({ targets: stamp, angle: 1.5, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    this.add
+      .text(718, 182, '本局官阶', { fontFamily: FONT, fontSize: '11px', color: '#a9c7e8', resolution: 2 })
+      .setOrigin(0.5)
+      .setDepth(22);
+
+    if (this.isRecord && this.timeMs > 0) {
+      const badge = this.add
+        .text(GAME_WIDTH / 2, 30, '🎉 新纪录!', {
+          fontFamily: FONT, fontSize: '26px', color: '#ffe066', fontStyle: 'bold',
+          resolution: 2, stroke: '#c2255c', strokeThickness: 5
+        })
+        .setOrigin(0.5)
+        .setDepth(30)
+        .setScale(0.4);
+      this.tweens.add({ targets: badge, scale: 1.08, duration: 380, ease: 'Back.out', yoyo: true, repeat: 1, hold: 300 });
+    }
+
+    // 数据格
+    const stats: [string, string, string][] = [
+      ['翻越障碍', `${this.dodged}`, '#ffffff'],
+      ['本局银币', `+${this.coins}`, '#ffd43b'],
+      ['最高连击', `×${this.combo}`, '#ffa94d'],
+      ['擦身而过', `${this.nearMisses}`, '#8ce99a']
+    ];
+    stats.forEach(([label, value, color], i) => {
+      const x = 150 + i * 142;
+      const g = this.add.graphics().setDepth(21);
+      g.fillStyle(0xffffff, 0.055);
+      g.fillRoundedRect(x, 220, 128, 62, 12);
+      g.lineStyle(1, 0xffffff, 0.1);
+      g.strokeRoundedRect(x, 220, 128, 62, 12);
+      this.add
+        .text(x + 12, 230, label, { fontFamily: FONT, fontSize: '11px', color: '#9db8d8', resolution: 2 })
+        .setDepth(22);
+      this.add
+        .text(x + 12, 248, value, { fontFamily: FONT, fontSize: '23px', color, fontStyle: 'bold', resolution: 2 })
+        .setDepth(22);
+    });
+
+    // 本局考核
+    this.add
+      .text(150, 300, this.missionDone ? '✅' : '📋', { fontSize: '18px', resolution: 2 })
+      .setDepth(22);
+    this.add
+      .text(176, 301, this.missionTitle ? `本局考核「${this.missionTitle}」${this.missionDone ? `完成 +${this.missionReward}🪙` : '未完成'}` : '本局考核已完成', {
+        fontFamily: FONT, fontSize: '14px', color: this.missionDone ? '#8ce99a' : '#cfe3ff', fontStyle: 'bold', resolution: 2
+      })
+      .setDepth(22);
+    if (this.overdrives > 0) {
+      this.add
+        .text(150, 326, `⚡ 高光时刻 ×${this.overdrives} · 芸芸众生,唯你高光`, {
+          fontFamily: FONT, fontSize: '12px', color: '#d0bfff', resolution: 2
+        })
+        .setDepth(22);
+    } else {
+      this.add
+        .text(150, 326, '⚡ 擦身、连翻、银币都能攒气势,满槽自动进入高光时刻', {
+          fontFamily: FONT, fontSize: '12px', color: '#93b5d6', resolution: 2
+        })
+        .setDepth(22);
+    }
+
+    // 每日挑战
+    if (this.daily) {
+      const reward = this.dailyReward > 0 ? ` · +${this.dailyReward}🪙` : '';
+      const best = this.dailyBestMs > 0 ? ` · 今日最佳 ${(this.dailyBestMs / 1000).toFixed(1)}s` : '';
+      this.add
+        .text(150, 350, `🧧 今日挑战${this.dailyModifier ? ` · ${this.dailyModifier}` : ''}${best}${reward}`, {
+          fontFamily: FONT, fontSize: '13px', color: '#ffe066', fontStyle: 'bold', resolution: 2
+        })
+        .setDepth(22);
+      if (this.dailyRecord && !this.dailyFirst) {
+        this.add
+          .text(700, 350, '🏅 今日新纪录', { fontFamily: FONT, fontSize: '12px', color: '#8ce99a', resolution: 2 })
+          .setOrigin(1, 0)
+          .setDepth(22);
+      }
+    }
+
+    // 新成就
+    if (this.newAch.length > 0) {
+      this.add
+        .text(150, 374, `🏆 新成就:${this.newAch.slice(0, 3).join('、')}${this.newAch.length > 3 ? ` 等${this.newAch.length}项` : ''}`, {
+          fontFamily: FONT, fontSize: '12px', color: '#7dffa8', resolution: 2
+        })
+        .setDepth(22);
+    }
+
+    // 按钮
+    const replay = makeHeroButton(this, 300, 438, 224, 54, '再来一局', () => this.replay(), { icon: '▶', fontSize: 23 });
+    replay.g.setDepth(24);
+    replay.text.setDepth(25);
+    replay.hit.setDepth(26);
+
+    const cardLabel = isWx() ? '📤 分享成绩' : '🖼 保存战绩卡';
+    const cardBtn = makeButton(this, 550, 438, 188, 46, cardLabel, () => this.shareOrSave(), 16);
+    cardBtn.rect.setDepth(24);
+    cardBtn.text.setDepth(25);
+
+    const homeBtn = makeButton(this, 740, 438, 140, 46, '🏠 主菜单', () => this.scene.start('Title'), 15);
+    homeBtn.rect.setDepth(24);
+    homeBtn.text.setDepth(25);
 
     this.add
-      .text(GAME_WIDTH / 2, centerY - 24, `${timeText}  |  ${bestText}`, {
-        fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '20px', resolution: 2, color: '#ffffff', ...outline
+      .text(GAME_WIDTH / 2, 476, this.daily ? '空格再来一局(保持今日挑战) · ESC 回主菜单' : '空格再来一局 · ESC 回主菜单', {
+        fontFamily: FONT, fontSize: '9px', color: '#7f9cbd', resolution: 2
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(22);
 
     this.add
-      .text(GAME_WIDTH / 2, centerY + 16, `本局翻越:${dodged} 个障碍   银币 +${coins}`, {
-        fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '18px', resolution: 2, color: '#ffe066', ...outline
+      .text(GAME_WIDTH - 14, GAME_HEIGHT - 8, 'nmjdzmy 反弹工作室', {
+        fontFamily: FONT, fontSize: '10px', color: '#dce8f5', stroke: '#10233d', strokeThickness: 2
       })
-      .setOrigin(0.5);
+      .setOrigin(1, 1)
+      .setDepth(30)
+      .setAlpha(0.7);
 
-    this.add
-      .text(GAME_WIDTH / 2, centerY + 52, `当前称号:${getTitle(p.totalDodged)}   累计翻越:${p.totalDodged}   🪙 ${p.coins}`, {
-        fontFamily: "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif", fontSize: '16px', resolution: 2, color: '#ffffff', ...outline
-      })
-      .setOrigin(0.5);
+    this.input.keyboard?.once('keydown-SPACE', () => this.replay());
+    this.input.keyboard?.once('keydown-ESC', () => this.scene.start('Title'));
+    this.cameras.main.fadeIn(240, 8, 18, 34);
+  }
 
-    makeButton(this, GAME_WIDTH / 2, centerY + 116, 240, 56, '▶ 再来一局', () => this.scene.start('Game'), 22);
-    makeButton(this, GAME_WIDTH / 2, centerY + 170, 180, 40, '🏠 主菜单', () => this.scene.start('Title'), 16);
+  private replay() {
+    if (this.leaving) return;
+    this.leaving = true;
+    playSfx(this, 'click', 0.4);
+    this.cameras.main.fadeOut(180, 8, 18, 34);
+    this.time.delayedCall(190, () => this.scene.start('Game', { daily: this.daily }));
+  }
 
-    this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('Game'));
+  private shareOrSave() {
+    const text = this.daily
+      ? `我在《王博晋升之路》今日挑战撑过 ${(this.timeMs / 1000).toFixed(1)} 秒,官阶 ${this.rankName},来比比?`
+      : `我在《王博晋升之路》撑过 ${(this.timeMs / 1000).toFixed(1)} 秒,官阶 ${this.rankName},翻越 ${this.dodged} 个障碍,你能超过我吗?`;
+    if (isWx()) {
+      wxShare(text);
+      return;
+    }
+    try {
+      const canvas = buildShareCard(this, {
+        timeMs: this.timeMs,
+        dodged: this.dodged,
+        coins: this.coins,
+        combo: this.combo,
+        nearMisses: this.nearMisses,
+        rankName: this.rankName,
+        bestMs: this.bestMs,
+        playerTexture: this.playerTexture,
+        daily: this.daily
+      });
+      const ok = downloadCanvas(canvas, `王博晋升之路-${(this.timeMs / 1000).toFixed(1)}s.png`);
+      showToast(this, GAME_WIDTH / 2, 138, ok ? '🖼 战绩卡已保存,发群里炫耀吧!' : '保存失败,请截图分享', ok ? '#8ce99a' : '#ff8787');
+      if (ok) playSfx(this, 'record', 0.35);
+    } catch {
+      showToast(this, GAME_WIDTH / 2, 138, '保存失败,请截图分享', '#ff8787');
+    }
+  }
+
+  private buildBackdrop() {
+    const bg = this.add.graphics().setDepth(-20);
+    bg.fillGradientStyle(0x07142a, 0x07142a, 0x1d3557, 0x3b2340, 1);
+    bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+    this.add.image(790, 84, 'sun').setScale(1.15).setDepth(-18).setAlpha(0.75);
+    this.add.image(240, 118, 'moon').setScale(0.7).setDepth(-18).setAlpha(0.35);
+
+    const mountains = this.add.tileSprite(0, GROUND_TOP - 196, GAME_WIDTH, 190, 'bg-mountains').setOrigin(0, 0).setDepth(-15).setAlpha(0.72);
+    const far = this.add.tileSprite(0, GROUND_TOP - 168, GAME_WIDTH, 190, 'bg-city-far').setOrigin(0, 0).setDepth(-13).setAlpha(0.8);
+    const near = this.add.tileSprite(0, GROUND_TOP - 152, GAME_WIDTH, 200, 'bg-city-near').setOrigin(0, 0).setDepth(-11).setAlpha(0.9);
+    mountains.tilePositionX = 40;
+    far.tilePositionX = 100;
+    near.tilePositionX = 170;
+
+    this.add.rectangle(0, GROUND_TOP, GAME_WIDTH, GAME_HEIGHT - GROUND_TOP, 0x1d3557, 0.8).setOrigin(0).setDepth(-6);
+    this.add.rectangle(0, GROUND_TOP, GAME_WIDTH, 2, 0xffd43b, 0.45).setOrigin(0).setDepth(-5);
+
+    for (let i = 0; i < 18; i++) {
+      const s = this.add
+        .image(Phaser.Math.Between(20, 940), Phaser.Math.Between(40, 470), 'spark')
+        .setScale(Phaser.Math.FloatBetween(0.15, 0.45))
+        .setAlpha(Phaser.Math.FloatBetween(0.12, 0.45))
+        .setDepth(-4);
+      this.tweens.add({
+        targets: s,
+        y: s.y - Phaser.Math.Between(16, 50),
+        alpha: 0,
+        duration: Phaser.Math.Between(2400, 4800),
+        delay: Phaser.Math.Between(0, 1600),
+        repeat: -1,
+        ease: 'Sine.inOut'
+      });
+    }
+
+    this.add.image(0, 0, 'vignette').setOrigin(0).setDepth(10).setAlpha(0.85);
   }
 }
