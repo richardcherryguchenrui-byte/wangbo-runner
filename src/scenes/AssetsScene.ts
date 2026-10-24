@@ -115,6 +115,9 @@ export default class AssetsScene extends Phaser.Scene {
   private visitorUsed = false;
   /** 地上散落的黑金:产业每次进账会掉一点,走过去就捡起来 */
   private drops: { img: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image; amount: number }[] = [];
+  private tvText?: Phaser.GameObjects.Text;
+  private newsIndex = 0;
+  private dangerVignette?: Phaser.GameObjects.Graphics;
 
   constructor() {
     super('Assets');
@@ -160,6 +163,7 @@ export default class AssetsScene extends Phaser.Scene {
     this.maybeAudit(p);
     this.time.delayedCall(2200, () => this.maybeVisitor());
     this.time.addEvent({ delay: 7600, loop: true, callback: () => this.spawnDrop() });
+    this.time.addEvent({ delay: 13000, loop: true, callback: () => this.guestChatter() });
   }
 
   // ============================================================
@@ -254,6 +258,20 @@ export default class AssetsScene extends Phaser.Scene {
     this.add.text(343, 230, '为民服务', {
       fontFamily: FONT, fontSize: '17px', color: '#ffe8a3', fontStyle: 'bold', resolution: 2
     }).setOrigin(0.5).setDepth(-17).setAngle(-4);
+
+    // 客厅电视:滚动播本市新闻(有梗也提示风险)
+    g.fillStyle(0x11181f, 1);
+    g.fillRoundedRect(852, 148, 100, 64, 5);
+    g.fillStyle(0x0a1622, 1);
+    g.fillRoundedRect(857, 153, 90, 54, 3);
+    g.fillStyle(0xff5c5c, 0.85);
+    g.fillRect(857, 153, 90, 4);
+    this.tvText = this.add.text(902, 176, '', {
+      fontFamily: FONT, fontSize: '9px', color: '#e2e8f0', align: 'center',
+      wordWrap: { width: 82 }, resolution: 2
+    }).setOrigin(0.5).setDepth(-16);
+    this.time.addEvent({ delay: 6200, loop: true, callback: () => this.rotateNews() });
+    this.rotateNews();
 
     // 红头文件(装框挂墙)
     g.fillStyle(0x2a3448, 1);
@@ -634,6 +652,7 @@ export default class AssetsScene extends Phaser.Scene {
     }
     this.playerShadow.x = this.player.x;
     this.collectDrops();
+    this.updateDanger();
     if (moving && !this.runAnim) {
       this.runAnim = true;
       if (this.anims.exists('home-run')) this.player.play('home-run');
@@ -841,6 +860,52 @@ export default class AssetsScene extends Phaser.Scene {
   // ============================================================
   // 离线 / 审查 / 引导 / 名人堂 / 分享
   // ============================================================
+
+  private rotateNews() {
+    if (!this.tvText) return;
+    const risk = netRiskWithWind(this.holdings, this.wind);
+    if (risk >= 70) {
+      this.tvText.setColor('#ff8787');
+      this.tvText.setText('本市新闻\n' + newsFor(true, Math.random()));
+      return;
+    }
+    const lines = [
+      '新闻联播\n本市经济持续向好',
+      '新闻联播\n又有干部「主动投案」',
+      '新闻联播\n巡视组明日进驻本市',
+      '新闻联播\n重点项目集中开工'
+    ];
+    this.tvText.setColor('#e2e8f0');
+    this.tvText.setText(lines[this.newsIndex % lines.length]);
+    this.newsIndex += 1;
+  }
+
+  /** 客人偶尔自己嘀咕一句,让屋子有点人味 */
+  private guestChatter() {
+    if (this.overlayOpenCount() > 0) return;
+    const guests = this.interactables.filter(it => it.kind === 'network' && (this.holdings.network[it.id] ?? 0) > 0);
+    if (guests.length === 0) return;
+    const it = guests[Phaser.Math.Between(0, guests.length - 1)];
+    const lines = ['这事儿我给您办了', '最近风声紧,少见面', '材料我都备齐了', '上面有人问了句', '钱的事别提,走账就行'];
+    this.sayAbove(it, lines[Phaser.Math.Between(0, lines.length - 1)]);
+  }
+
+  /** 风险爆表时画面边缘泛红,提醒该洗白了 */
+  private updateDanger() {
+    const risk = netRiskWithWind(this.holdings, this.wind);
+    if (!this.dangerVignette) {
+      const g = this.add.graphics().setDepth(90);
+      g.fillStyle(0xff2b2b, 0.5);
+      g.fillRect(0, 0, GAME_WIDTH, 8);
+      g.fillRect(0, GAME_HEIGHT - 8, GAME_WIDTH, 8);
+      g.fillRect(0, 0, 8, GAME_HEIGHT);
+      g.fillRect(GAME_WIDTH - 8, 0, 8, GAME_HEIGHT);
+      g.setAlpha(0);
+      this.dangerVignette = g;
+    }
+    const target = risk >= 80 ? 0.16 + Math.sin(this.time.now / 420) * 0.07 : 0;
+    this.dangerVignette.setAlpha(target);
+  }
 
   // ---- 地上的钱:走动就能捡,主动玩比干等着赚得快 ----
   private moneyPerDrop(): number {

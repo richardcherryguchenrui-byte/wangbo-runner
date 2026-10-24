@@ -1,7 +1,8 @@
 // 贪官养成系统:贪污资产 + 人脉关系 + 纪检委审查
 //
-// 循环:跑酷/横版赚银币 → 建造资产(随时间产出银币) → 资产越高风险越高
-//       → 用人脉压低风险、用银币洗白 → 躲过纪检委审查,资产继续生钱
+// 循环:跑酷/横版赚银币 → 用银币置办产业 → 产业随时间产出黑金(赃款)
+//       → 用黑金升级产业/打点/洗白(洗白能把一部分赃款洗成明面银币)
+//       → 风险被压住,产业继续生钱;人脉能压低风险、挡审查
 //
 // 本模块不依赖 Phaser,方便单元测试与平衡性调整。
 
@@ -13,7 +14,7 @@ export interface AssetDef {
   baseCost: number;
   /** 每多一级造价乘以该系数 */
   costMul: number;
-  /** 每级每分钟产出银币 */
+  /** 每级每分钟产出黑金(赃款) */
   incomePerMin: number;
   /** 每级累积的「被查风险」 */
   risk: number;
@@ -166,7 +167,7 @@ export interface AuditResult {
   passed: boolean;
   /** 被没收的资产 id */
   seizedAssetId: string | null;
-  /** 被罚款的银币 */
+  /** 被罚款的黑金 */
   fine: number;
   message: string;
 }

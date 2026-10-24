@@ -571,7 +571,7 @@ export function buildAssetShareCard(scene: Phaser.Scene, d: AssetShareData): HTM
   ctx.fillText(d.valueText, W / 2, 470);
   ctx.fillStyle = 'rgba(220,235,255,0.7)';
   ctx.font = `28px ${FONT}`;
-  ctx.fillText('家产总值(银币)', W / 2, 516);
+  ctx.fillText('家产总值 · 都在这儿了', W / 2, 516);
 
   // 风向
   ctx.fillStyle = 'rgba(200,220,245,0.65)';
@@ -580,7 +580,7 @@ export function buildAssetShareCard(scene: Phaser.Scene, d: AssetShareData): HTM
 
   // 数据三宫格
   const cells: [string, string][] = [
-    [`${d.incomePerMin}`, '银币/分'],
+    [`${d.incomePerMin}`, '黑金/分'],
     [`${d.risk}`, '被查风险'],
     [`${d.auditsSurvived}`, '躲过审查']
   ];
