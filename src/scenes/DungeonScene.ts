@@ -7,6 +7,7 @@ import { startBgm, playSfx } from '../systems/audio';
 import { showToast, FONT } from '../systems/ui';
 import { explode, poof, dust, shake, redFlash, confettiBurst, impactBurst } from '../systems/effects';
 import { buildDungeonTextures } from '../systems/dungeonArt';
+import { buildHatTexture } from '../systems/hatArt';
 import { loadControls } from '../systems/controls';
 import {
   DG_TILE,
@@ -217,6 +218,7 @@ export default class DungeonScene extends Phaser.Scene {
     this.jumpHeld = false;
 
     buildDungeonTextures(this);
+    buildHatTexture(this);
     this.buildBackdrop();
     this.buildPlatforms();
     this.buildPlayer();

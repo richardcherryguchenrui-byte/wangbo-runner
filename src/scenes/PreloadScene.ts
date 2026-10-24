@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { hasCustomHead, rebuildCustomTextures } from '../systems/customhead';
 import { buildArtTextures } from '../systems/art';
+import { buildHatTexture } from '../systems/hatArt';
 
 export default class PreloadScene extends Phaser.Scene {
   constructor() { super('Preload'); }
@@ -75,6 +76,7 @@ export default class PreloadScene extends Phaser.Scene {
     this.makeSkyline();
     // 视差城市、日月、暗角、银币与道具图标
     buildArtTextures(this);
+    buildHatTexture(this);
 
     // 程序化纹理全部创建完之后再设置过滤:
     // 照片/AI 素材与 UI 图标用线性过滤保持平滑;像素风小件保持最近邻。

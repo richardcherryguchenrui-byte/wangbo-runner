@@ -777,7 +777,7 @@ export default class GameScene extends Phaser.Scene {
       missionBar: this.add.graphics().setDepth(82)
     };
 
-    this.heartIcon = this.add.image(32, 31, 'ui-heart').setScale(0.62).setDepth(81);
+    this.heartIcon = this.add.image(32, 31, 'dg-hat').setDisplaySize(26, 18).setDepth(81);
     this.add.image(136, 31, 'coin').setScale(0.46).setDepth(81);
     this.rankIcon = this.add.image(35, 56, 'ui-rank').setScale(0.5).setDepth(81);
 
@@ -1174,7 +1174,7 @@ export default class GameScene extends Phaser.Scene {
       {
         iconKey: 'ui-rank',
         title: '官阶 & 考核',
-        body: '每翻越一定数量自动升官,单局最高到「厅长」\n左侧是本局考核,完成立刻发银币\n生命归零,本局结束'
+        body: '每翻越一定数量自动升官,单局最高到「厅长」\n左侧是本局考核,完成立刻发银币\n乌纱帽掉光,本局结束'
       }
     ];
     const step = steps[this.tutorialStep];
@@ -2141,7 +2141,7 @@ export default class GameScene extends Phaser.Scene {
     impactBurst(this, this.player.x + 20, this.player.y - 24);
     shake(this, 0.012, 210);
     wxVibrate('medium');
-    this.floatText(this.player.x, this.player.y - 60, '-1 生命', '#ff8787');
+    this.floatText(this.player.x, this.player.y - 60, '-1 顶乌纱帽', '#ff8787');
     // 80ms 顿帧:命中瞬间世界静止,再恢复,打击更实
     this.hitFreezeUntil = this.time.now + 85;
     this.physics.pause();
@@ -2780,7 +2780,7 @@ export default class GameScene extends Phaser.Scene {
     this.enterInvulnerable(1800);
     playSfx(this, 'unlock', 0.5);
     wxVibrate('medium');
-    showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '原地复活!再撑一轮', '#ffe066', 'ui-heart');
+    showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '原地复活!帽子又戴上了', '#ffe066', 'dg-hat');
   }
 
   private endRun(cleared = false) {
