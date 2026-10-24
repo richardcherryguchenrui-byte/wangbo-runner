@@ -4,6 +4,7 @@ import { loadAudioSettings, saveAudioSettings, soundMult, startBgm, stopBgm } fr
 import { makeButton, showToast, FONT } from '../systems/ui';
 import { buildMenuBackdrop, buildMenuHeader, addMenuCard, addMenuFooter, addSectionTitle } from '../systems/menu';
 import { exportSaveText, importSaveText, copyToClipboard, readFromClipboard, resetAllSaves } from '../systems/savebackup';
+import { loadControls, saveControls } from '../systems/controls';
 
 const LEVELS = ['低', '中', '高'] as const;
 const BAR_X = 330; // 音量条左端
@@ -17,9 +18,14 @@ export default class SettingsScene extends Phaser.Scene {
   private muteIcon!: Phaser.GameObjects.Image;
   private muteTrack!: Phaser.GameObjects.Graphics;
   private muteKnob!: Phaser.GameObjects.Arc;
+  private padLabel!: Phaser.GameObjects.Text;
+  private padIcon!: Phaser.GameObjects.Image;
+  private padTrack!: Phaser.GameObjects.Graphics;
+  private padKnob!: Phaser.GameObjects.Arc;
   private segGraphics: Phaser.GameObjects.Graphics[] = [];
   private dragging = false;
   private settings = loadAudioSettings();
+  private controls = loadControls();
   private confirmReset = false;
 
   constructor() { super('Settings'); }
@@ -81,7 +87,7 @@ export default class SettingsScene extends Phaser.Scene {
       this.setLevel(Math.floor(rel / SEG_W));
     });
     this.knob.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      const rel = Phaser.Math.Clamp(pointer.x - BAR_X, 0, SEG_W * 3 - 1);
+      const rel = Phaser.Math.Clamp(pointer.worldX - BAR_X, 0, SEG_W * 3 - 1);
       this.setLevel(Math.floor(rel / SEG_W));
     });
 
@@ -90,24 +96,42 @@ export default class SettingsScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(22);
 
-    // ---- 静音 ----
-    addSectionTitle(this, 230, 276, '声音开关', '#ffe066', 20, 'ui-bell');
+    // ---- 开关:声音 / 虚拟按键 ----
+    addSectionTitle(this, 230, 276, '开关与操作', '#ffe066', 20, 'ui-gear');
     addMenuCard(this, 220, 288, 520, 52, { depth: 21 });
+
     this.muteIcon = this.add
-      .image(252, 314, 'ui-speaker')
+      .image(250, 314, 'ui-speaker')
       .setDisplaySize(20, 20)
       .setDepth(23);
     this.muteLabel = this.add
-      .text(270, 314, '', { fontFamily: FONT, fontSize: '14px', color: '#ffffff', fontStyle: 'bold', resolution: 2 })
+      .text(268, 314, '声音', { fontFamily: FONT, fontSize: '14px', color: '#ffffff', fontStyle: 'bold', resolution: 2 })
       .setOrigin(0, 0.5)
       .setDepth(23);
     this.muteTrack = this.add.graphics().setDepth(22);
     this.muteKnob = this.add.circle(0, 314, 11, 0xffffff).setDepth(23);
     const muteHit = this.add
-      .rectangle(GAME_WIDTH / 2 - 20, 314, 500, 52, 0xffffff, 0.001)
+      .rectangle(360, 314, 244, 52, 0xffffff, 0.001)
       .setInteractive({ useHandCursor: true })
       .setDepth(24);
     muteHit.on('pointerdown', () => this.toggleMute());
+
+    this.padIcon = this.add
+      .image(508, 314, 'ui-person')
+      .setDisplaySize(20, 20)
+      .setDepth(23);
+    this.padLabel = this.add
+      .text(526, 314, '虚拟按键', { fontFamily: FONT, fontSize: '14px', color: '#ffffff', fontStyle: 'bold', resolution: 2 })
+      .setOrigin(0, 0.5)
+      .setDepth(23);
+    this.padTrack = this.add.graphics().setDepth(22);
+    this.padKnob = this.add.circle(0, 314, 11, 0xffffff).setDepth(23);
+    const padHit = this.add
+      .rectangle(622, 314, 244, 52, 0xffffff, 0.001)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(24);
+    padHit.on('pointerdown', () => this.togglePad());
+
     this.refreshLabels();
 
     // ---- 存档备份 ----
@@ -138,6 +162,20 @@ export default class SettingsScene extends Phaser.Scene {
     if (this.settings.mute) stopBgm(this);
     else startBgm(this);
     showToast(this, GAME_WIDTH / 2, 504, this.settings.mute ? '已静音' : '声音已开启', '#ffe066', this.settings.mute ? 'ui-mute' : 'ui-speaker');
+  }
+
+  private togglePad() {
+    this.controls.virtualButtons = !this.controls.virtualButtons;
+    saveControls(this.controls);
+    this.refreshLabels();
+    showToast(
+      this,
+      GAME_WIDTH / 2,
+      504,
+      this.controls.virtualButtons ? '已开启虚拟按键:左下铲 · 右下跳' : '已关闭虚拟按键:点屏跳跃 · 下滑滑铲',
+      '#ffe066',
+      this.controls.virtualButtons ? 'ui-person' : 'ui-close'
+    );
   }
 
   private doExport() {
@@ -208,15 +246,29 @@ export default class SettingsScene extends Phaser.Scene {
     });
 
     this.muteIcon.setTexture(this.settings.mute ? 'ui-mute' : 'ui-speaker');
-    this.muteLabel.setText(this.settings.mute ? '已静音 · 点击开启声音' : '声音开启 · 点击静音');
-    const trackX = 660;
-    const trackY = 314;
-    this.muteTrack.clear();
-    this.muteTrack.fillStyle(this.settings.mute ? 0x3a4a5e : 0x2b8a3e, 0.95);
-    this.muteTrack.fillRoundedRect(trackX - 32, trackY - 14, 64, 28, 14);
-    this.muteTrack.lineStyle(1.4, 0xffffff, 0.24);
-    this.muteTrack.strokeRoundedRect(trackX - 32, trackY - 14, 64, 28, 14);
-    this.muteKnob.setPosition(trackX + (this.settings.mute ? -16 : 16), trackY);
-    this.muteKnob.setFillStyle(this.settings.mute ? 0x9db8d8 : 0xffffff);
+    this.muteLabel.setText(this.settings.mute ? '声音·关' : '声音·开');
+    this.muteLabel.setColor(this.settings.mute ? '#9db8d8' : '#ffffff');
+    this.muteIcon.setAlpha(this.settings.mute ? 0.6 : 1);
+    this.drawSwitch(this.muteTrack, this.muteKnob, 440, 314, !this.settings.mute);
+
+    this.padIcon.setAlpha(this.controls.virtualButtons ? 1 : 0.55);
+    this.padLabel.setColor(this.controls.virtualButtons ? '#ffffff' : '#9db8d8');
+    this.drawSwitch(this.padTrack, this.padKnob, 700, 314, this.controls.virtualButtons);
+  }
+
+  private drawSwitch(
+    track: Phaser.GameObjects.Graphics,
+    knob: Phaser.GameObjects.Arc,
+    x: number,
+    y: number,
+    on: boolean
+  ) {
+    track.clear();
+    track.fillStyle(on ? 0x2b8a3e : 0x3a4a5e, 0.95);
+    track.fillRoundedRect(x - 32, y - 14, 64, 28, 14);
+    track.lineStyle(1.4, 0xffffff, 0.24);
+    track.strokeRoundedRect(x - 32, y - 14, 64, 28, 14);
+    knob.setPosition(x + (on ? 16 : -16), y);
+    knob.setFillStyle(on ? 0xffffff : 0x9db8d8);
   }
 }

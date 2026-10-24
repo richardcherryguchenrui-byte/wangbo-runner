@@ -96,6 +96,7 @@ import {
 } from '../systems/missions';
 import { generatePattern, FLYER_Y, type RunPattern } from '../systems/patterns';
 import { tightSlideIndex } from '../systems/slideJudge';
+import { loadControls, type ControlSettings } from '../systems/controls';
 import {
   getDailyChallenge,
   recordDailyRun,
@@ -234,6 +235,11 @@ export default class GameScene extends Phaser.Scene {
   private slideQueued = false;
   private slideId = 0; // 本次滑铲编号:完美滑铲只认「起滑瞬间卡点」的那一次
 
+  // ---- 虚拟按键(触屏) ----
+  private controls: ControlSettings = { virtualButtons: false };
+  private padJumpBounds: Bounds = { x: 0, y: 0, w: 0, h: 0 };
+  private padSlideBounds: Bounds = { x: 0, y: 0, w: 0, h: 0 };
+
   // ---- 气势 / 高光 ----
   private hype = 0;
   private overdriveActive = false;
@@ -317,6 +323,7 @@ export default class GameScene extends Phaser.Scene {
 
     // 场景重启复用实例:所有局内字段必须完整重置
     this.resetRunState();
+    this.controls = loadControls();
     this.physics.resume();
     this.physics.world.gravity.y = GRAVITY_Y;
     this.tweens.resumeAll();
@@ -331,6 +338,7 @@ export default class GameScene extends Phaser.Scene {
     this.buildHud();
     this.buildButtons();
     this.buildInput();
+    this.buildTouchPad();
     this.setupLifecycle();
 
     this.mission = pickRunMission(this.progress, this.rng);
@@ -706,7 +714,7 @@ export default class GameScene extends Phaser.Scene {
 
     // 开局操作提示(几秒后淡出):带深色药丸底,避免和背景地标混在一起
     const hintText = this.add
-      .text(0, 0, '点击/空格跳跃 · ↓ 滑铲', {
+      .text(0, 0, this.controls.virtualButtons ? '左下滑铲 · 右下跳跃' : '点击/空格跳跃 · ↓ 滑铲', {
         fontFamily: FONT, fontSize: '15px', color: '#ffffff', resolution: 2,
         stroke: '#08131f', strokeThickness: 4
       })
@@ -769,10 +777,11 @@ export default class GameScene extends Phaser.Scene {
     this.pauseBtn = this.makeHudButton(GAME_WIDTH - 38, 26, 52, 34, '', () => this.togglePause(), 0x10233d, 'ui-pause');
     this.pauseBounds = { x: GAME_WIDTH - 38, y: 26, w: 52, h: 34 };
 
+    const actionX = this.hudActionX();
     if (hasPistol(this.progress)) {
       this.bulletsLeft = bulletsPerRun(this.progress);
       this.fireBtn = this.makeHudButton(
-        GAME_WIDTH - 82,
+        actionX,
         GROUND_TOP - 30,
         136,
         42,
@@ -781,15 +790,108 @@ export default class GameScene extends Phaser.Scene {
         0x18324f,
         'ui-bullet'
       );
-      this.fireBounds = { x: GAME_WIDTH - 82, y: GROUND_TOP - 30, w: 136, h: 42 };
+      this.fireBounds = { x: actionX, y: GROUND_TOP - 30, w: 136, h: 42 };
     }
 
     if (this.bribeCarried > 0) this.makeShieldBtn();
   }
 
+  // 开了虚拟按键时,射击/贿月往左让位,避免和右下角跳跃键叠在一起
+  private hudActionX(): number {
+    return this.controls.virtualButtons ? GAME_WIDTH - 252 : GAME_WIDTH - 82;
+  }
+
+  // ============================================================
+  // 虚拟按键(左下铲 / 右下跳)
+  // ============================================================
+
+  private buildTouchPad() {
+    this.padJumpBounds = { x: 0, y: 0, w: 0, h: 0 };
+    this.padSlideBounds = { x: 0, y: 0, w: 0, h: 0 };
+    if (!this.controls.virtualButtons) return;
+
+    const r = 46;
+    const y = GROUND_TOP - 58;
+    // 左撇子也能用:铲在左、跳在右,和大多数横版手游一致
+    this.makePadButton(92, y, r, 0x74c0fc, 'down', '滑铲', false);
+    this.makePadButton(GAME_WIDTH - 92, y, r, 0xffd43b, 'up', '跳跃', true);
+  }
+
+  private makePadButton(
+    x: number,
+    y: number,
+    r: number,
+    accent: number,
+    dir: 'up' | 'down',
+    label: string,
+    isJump: boolean
+  ) {
+    const base = this.add.graphics().setDepth(90);
+    const glyph = this.add.graphics().setDepth(91);
+    this.add
+      .text(x, y + r + 11, label, {
+        fontFamily: FONT, fontSize: '13px', color: '#ffffff', fontStyle: 'bold',
+        resolution: 2, stroke: '#08131f', strokeThickness: 4
+      })
+      .setOrigin(0.5)
+      .setDepth(91);
+
+    const drawBase = (pressed: boolean) => {
+      base.clear();
+      base.fillStyle(accent, pressed ? 0.3 : 0.15);
+      base.fillCircle(x, y, r + 7);
+      base.fillStyle(0x08131f, pressed ? 0.74 : 0.46);
+      base.fillCircle(x, y, r);
+      base.lineStyle(2.6, accent, pressed ? 1 : 0.78);
+      base.strokeCircle(x, y, r);
+    };
+    const drawGlyph = (pressed: boolean) => {
+      glyph.clear();
+      glyph.fillStyle(accent, pressed ? 1 : 0.92);
+      const s = r * 0.36;
+      if (dir === 'up') glyph.fillTriangle(x - s, y + s * 0.55, x + s, y + s * 0.55, x, y - s * 0.9);
+      else glyph.fillTriangle(x - s, y - s * 0.55, x + s, y - s * 0.55, x, y + s * 0.9);
+    };
+    drawBase(false);
+    drawGlyph(false);
+
+    const hitR = r + 8;
+    const hit = this.add.circle(x, y, hitR, 0xffffff, 0.001).setDepth(92);
+    // 用圆形命中区,手指按偏一点也能触发
+    hit.setInteractive(new Phaser.Geom.Circle(hitR, hitR, hitR), Phaser.Geom.Circle.Contains);
+
+    const press = () => {
+      if (this.paused || this.dead || this.tutorialStep >= 0) return;
+      drawBase(true);
+      drawGlyph(true);
+      playSfx(this, 'click', 0.22);
+      if (isJump) this.onJumpInput();
+      else this.trySlide();
+    };
+    const release = () => {
+      drawBase(false);
+      drawGlyph(false);
+      if (isJump) this.onJumpRelease();
+    };
+    hit.on('pointerdown', press);
+    hit.on('pointerup', release);
+    hit.on('pointerout', release);
+
+    const bounds = { x, y, w: hitR * 2, h: hitR * 2 };
+    if (isJump) this.padJumpBounds = bounds;
+    else this.padSlideBounds = bounds;
+  }
+
+  private hitTouchPad(x: number, y: number): boolean {
+    if (!this.controls.virtualButtons) return false;
+    const inside = (b: Bounds) => !!b.w && Math.abs(x - b.x) <= b.w / 2 + 4 && Math.abs(y - b.y) <= b.h / 2 + 4;
+    return inside(this.padJumpBounds) || inside(this.padSlideBounds);
+  }
+
   private makeShieldBtn() {
+    const actionX = this.hudActionX();
     this.shieldBtn = this.makeHudButton(
-      GAME_WIDTH - 82,
+      actionX,
       GROUND_TOP - 84,
       136,
       42,
@@ -798,7 +900,7 @@ export default class GameScene extends Phaser.Scene {
       0x3a2b12,
       'ui-moon'
     );
-    this.shieldBounds = { x: GAME_WIDTH - 82, y: GROUND_TOP - 84, w: 136, h: 42 };
+    this.shieldBounds = { x: actionX, y: GROUND_TOP - 84, w: 136, h: 42 };
   }
 
   private updateBulletsHud() {
@@ -860,14 +962,19 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer) {
-    this.pointerStartX = pointer.x;
-    this.pointerStartY = pointer.y;
+    // 相机放大后 pointer.x/y 是画布像素,统一换算成 960×540 的世界坐标再判定
+    const x = pointer.worldX;
+    const y = pointer.worldY;
+    this.pointerStartX = x;
+    this.pointerStartY = y;
     this.pointerStartAt = this.time.now;
     this.swipeTriggered = false;
     if (this.paused || this.dead || this.tutorialStep >= 0) return;
-    if (this.hitUI(pointer.x, pointer.y)) return;
+    if (this.hitUI(x, y) || this.hitTouchPad(x, y)) return;
+    // 开了虚拟按键,动作只走左下/右下按钮;点屏不再触发,避免和按钮重复抵消
+    if (this.controls.virtualButtons) return;
     // 屏幕下半区点按 = 滑铲,其余区域 = 跳跃
-    if (pointer.y > GAME_HEIGHT - 100) {
+    if (y > GAME_HEIGHT - 100) {
       this.trySlide();
       return;
     }
@@ -876,7 +983,8 @@ export default class GameScene extends Phaser.Scene {
 
   private onPointerMove(pointer: Phaser.Input.Pointer) {
     if (!pointer.isDown || this.paused || this.dead || this.tutorialStep >= 0 || this.swipeTriggered) return;
-    const dy = pointer.y - this.pointerStartY;
+    if (this.controls.virtualButtons) return;
+    const dy = pointer.worldY - this.pointerStartY;
     const dt = this.time.now - this.pointerStartAt;
     if (dy > 42 && dt < 420) {
       this.swipeTriggered = true;
@@ -948,12 +1056,16 @@ export default class GameScene extends Phaser.Scene {
       {
         iconKey: 'ui-arrow-up',
         title: '跳跃',
-        body: '点击屏幕 / 空格键跳跃\n长按跳得更高,松手就是小跳\n存活 30 秒后解锁二段跳'
+        body: this.controls.virtualButtons
+          ? '点右下「跳跃」键\n按得越久跳得越高,松手就是小跳\n存活 30 秒后解锁二段跳'
+          : '点击屏幕 / 空格键跳跃\n长按跳得更高,松手就是小跳\n存活 30 秒后解锁二段跳'
       },
       {
         iconKey: 'ui-arrow-down',
         title: '滑铲',
-        body: '按 ↓ / S,或在屏幕下半部点按、向下滑动\n低空飞来的美女必须滑铲钻过去\n贴到脸前才起滑 = 完美滑铲,额外银币 + 气势'
+        body: this.controls.virtualButtons
+          ? '点左下「滑铲」键钻过低空美女\n贴到脸前才起滑 = 完美滑铲\n提前滑下去只是普通翻越'
+          : '按 ↓ / S,或在屏幕下半部点按、向下滑动\n低空飞来的美女必须滑铲钻过去\n贴到脸前才起滑 = 完美滑铲,额外银币 + 气势'
       },
       {
         iconKey: 'mi-combo',
@@ -1149,7 +1261,7 @@ export default class GameScene extends Phaser.Scene {
               dailyModifierIcon(this.challenge.modifier.id)
             );
           } else {
-            showToast(this, GAME_WIDTH / 2, 210, '点击/空格跳跃 · ↓/S 滑铲 · J 射击', '#ffe066', 'ui-tips');
+            showToast(this, GAME_WIDTH / 2, 210, this.controls.virtualButtons ? '左下滑铲 · 右下跳跃 · 右上暂停' : '点击/空格跳跃 · ↓/S 滑铲 · J 射击', '#ffe066', 'ui-tips');
           }
         },
         302,
@@ -1758,7 +1870,7 @@ export default class GameScene extends Phaser.Scene {
     if (this.time.now - this.lastFlyerWarnAt < 500) return;
     this.lastFlyerWarnAt = this.time.now;
     const label = this.add
-      .text(0, 14, '低空来袭 · 下滑滑铲', {
+      .text(0, 14, this.controls.virtualButtons ? '低空来袭 · 点左下铲' : '低空来袭 · 下滑滑铲', {
         fontFamily: FONT, fontSize: '14px', color: '#ff8787', fontStyle: 'bold',
         resolution: 2, stroke: '#08131f', strokeThickness: 4
       })

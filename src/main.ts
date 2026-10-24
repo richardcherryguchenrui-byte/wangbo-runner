@@ -10,19 +10,24 @@ import TitleScene from './scenes/TitleScene';
 import ShopScene from './scenes/ShopScene';
 import GameScene from './scenes/GameScene';
 import ResultScene from './scenes/ResultScene';
-import { GAME_WIDTH, GAME_HEIGHT, BACKGROUND_COLOR, GRAVITY_Y } from './config/constants';
+import { GAME_WIDTH, GAME_HEIGHT, BACKGROUND_COLOR, GRAVITY_Y, RENDER_SCALE } from './config/constants';
 
 // 微信小游戏环境(适配层会设置 __WX_GAME__):用 Canvas 渲染器、不依赖 DOM
 const isWxGame = typeof window !== 'undefined' && !!(window as any).__WX_GAME__;
 
+// 小游戏是纯 CPU 的 Canvas 渲染,倍率保持 1,避免掉帧
+const renderScale = isWxGame ? 1 : RENDER_SCALE;
+
 const game = new Phaser.Game({
   type: isWxGame ? Phaser.CANVAS : Phaser.AUTO,
   parent: isWxGame ? undefined : 'app',
-  width: GAME_WIDTH,
-  height: GAME_HEIGHT,
+  // 画布后备缓冲按倍率放大(逻辑坐标仍由各场景相机负责映射回 960×540)
+  width: GAME_WIDTH * renderScale,
+  height: GAME_HEIGHT * renderScale,
   backgroundColor: BACKGROUND_COLOR,
-  pixelArt: true,
-  render: { pixelArt: true, antialias: false, roundPixels: true },
+  // 高清化:关掉像素风,开启抗锯齿与平滑缩放,不做整数像素对齐
+  pixelArt: false,
+  render: { pixelArt: false, antialias: true, antialiasGL: true, roundPixels: false },
   physics: {
     default: 'arcade',
     arcade: {
@@ -32,11 +37,32 @@ const game = new Phaser.Game({
   },
   scale: {
     mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-    zoom: 2 // 画布 2x 渲染,文字与画面高清
+    autoCenter: Phaser.Scale.CENTER_BOTH
+    // 不再用 zoom:Phaser 的 zoom 只放大 CSS 显示尺寸,画面依旧被拉伸而发糊
   },
   scene: [BootScene, PreloadScene, SplashScene, TitleScene, ShopScene, GuShopScene, SettingsScene, CustomCharScene, QuestScene, GameScene, ResultScene]
 });
+
+// 每个场景的相机放大 renderScale 倍,让 960×540 的逻辑坐标铺满高分辨率画布。
+// 注意:相机缩放以中心为锚点,不补偿滚动量画面会偏到右下角,
+// 所以同时把滚动量往回推 (GAME_WIDTH×(倍率-1)/2),让世界原点正好落在画布左上角。
+const applyRenderScale = (scene: Phaser.Scene) => {
+  const cam = scene.cameras.main;
+  cam.setZoom(renderScale);
+  cam.setScroll(
+    -(GAME_WIDTH * (renderScale - 1)) / 2,
+    -(GAME_HEIGHT * (renderScale - 1)) / 2
+  );
+};
+
+if (renderScale !== 1) {
+  game.events.on('ready', () => {
+    game.scene.scenes.forEach(scene => {
+      scene.events.on('create', () => applyRenderScale(scene));
+      if (scene.sys.isActive()) applyRenderScale(scene);
+    });
+  });
+}
 
 export default game;
 

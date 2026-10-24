@@ -179,22 +179,27 @@ export default class CustomCharScene extends Phaser.Scene {
     this.drawSelection();
 
     // 拖动:框内移动,右下角手柄缩放
+    // 相机放大后 pointer.x/y 是画布像素,这里一律用世界坐标
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       const s = this.sel;
-      const inBox = p.x >= s.x && p.x <= s.x + s.size && p.y >= s.y && p.y <= s.y + s.size;
-      const inHandle = Math.abs(p.x - (s.x + s.size)) <= 18 && Math.abs(p.y - (s.y + s.size)) <= 18;
+      const px = p.worldX;
+      const py = p.worldY;
+      const inBox = px >= s.x && px <= s.x + s.size && py >= s.y && py <= s.y + s.size;
+      const inHandle = Math.abs(px - (s.x + s.size)) <= 18 && Math.abs(py - (s.y + s.size)) <= 18;
       if (inHandle) { this.resizing = true; this.dragging = false; }
-      else if (inBox) { this.dragging = true; this.resizing = false; this.dragOffset = { x: p.x - s.x, y: p.y - s.y }; }
+      else if (inBox) { this.dragging = true; this.resizing = false; this.dragOffset = { x: px - s.x, y: py - s.y }; }
     });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      const px = p.worldX;
+      const py = p.worldY;
       if (this.resizing) {
         const b = this.imgBounds;
-        this.sel.size = Phaser.Math.Clamp(Math.max(p.x - this.sel.x, p.y - this.sel.y), 60, Math.min(b.x + b.w - this.sel.x, b.y + b.h - this.sel.y));
+        this.sel.size = Phaser.Math.Clamp(Math.max(px - this.sel.x, py - this.sel.y), 60, Math.min(b.x + b.w - this.sel.x, b.y + b.h - this.sel.y));
         this.drawSelection();
       } else if (this.dragging && this.dragOffset) {
         const b = this.imgBounds;
-        this.sel.x = Phaser.Math.Clamp(p.x - this.dragOffset.x, b.x, b.x + b.w - this.sel.size);
-        this.sel.y = Phaser.Math.Clamp(p.y - this.dragOffset.y, b.y, b.y + b.h - this.sel.size);
+        this.sel.x = Phaser.Math.Clamp(px - this.dragOffset.x, b.x, b.x + b.w - this.sel.size);
+        this.sel.y = Phaser.Math.Clamp(py - this.dragOffset.y, b.y, b.y + b.h - this.sel.size);
         this.drawSelection();
       }
     });

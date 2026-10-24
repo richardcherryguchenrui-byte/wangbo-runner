@@ -4,6 +4,7 @@ import { loadProgress, saveProgress, getTitle, TITLE_MILESTONES } from '../syste
 import { makeHeroButton, showToast, FONT, addPanel } from '../systems/ui';
 import { startBgm, playSfx } from '../systems/audio';
 import { ensureSkinTextures, playerFrameKey } from '../systems/skins';
+import { loadControls } from '../systems/controls';
 import { checkIn } from '../systems/daily';
 import { hasCustomHead } from '../systems/customhead';
 import { RUN_RANKS } from '../systems/ranks';
@@ -319,7 +320,8 @@ export default class TitleScene extends Phaser.Scene {
     });
 
     // 底部提示
-    this.add.text(px + pw / 2, 449, '空格开始 · D 每日挑战 · ↓ 滑铲', {
+    const pad = loadControls().virtualButtons;
+    this.add.text(px + pw / 2, 449, pad ? '点开始游戏 · D 每日挑战' : '空格开始 · D 每日挑战 · ↓ 滑铲', {
       fontFamily: FONT, fontSize: '11px', color: '#cfe3ff'
     }).setOrigin(0.5).setDepth(10).setAlpha(0.92);
   }

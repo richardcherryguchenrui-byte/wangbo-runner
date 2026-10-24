@@ -6,6 +6,14 @@ export const GAME_WIDTH = 960;
 export const GAME_HEIGHT = 540;
 export const BACKGROUND_COLOR = 0x5ec8f8; // sky blue
 
+// ---- 渲染分辨率 ----
+// 画布后备缓冲 = 逻辑分辨率 × RENDER_SCALE,每个场景的相机同步放大同样倍数。
+// 逻辑坐标仍然是 960×540,所以所有布局代码不用动;
+// 但真正参与绘制的像素翻倍(960×540 → 1920×1080),
+// 不再是「960×540 硬拉到 2 倍」那种马赛克感。
+// 文本的 resolution: 2 正好匹配这个倍率,调大倍率要同步调整文字,否则会发糊。
+export const RENDER_SCALE = 2;
+
 // 地面:24px 厚的沙地(足够厚,高速下落不会穿透)
 export const GROUND_HEIGHT = 24;
 export const GROUND_TOP = GAME_HEIGHT - GROUND_HEIGHT;
