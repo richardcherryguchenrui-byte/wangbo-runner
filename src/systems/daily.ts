@@ -14,7 +14,9 @@ export const DAILY_TASKS: DailyTask[] = [
   { id: 'dodge', name: '翻越障碍', target: 30, reward: 20, unit: '个', get: d => d.dodged },
   { id: 'survive', name: '单局存活', target: 45, reward: 25, unit: '秒', get: d => Math.floor(d.surviveMs / 1000) },
   { id: 'kill', name: '击毁障碍', target: 5, reward: 20, unit: '个', get: d => d.kills },
-  { id: 'pickup', name: '拾取道具', target: 3, reward: 15, unit: '个', get: d => d.picked }
+  { id: 'pickup', name: '拾取道具', target: 3, reward: 15, unit: '个', get: d => d.picked },
+  { id: 'build', name: '添置产业', target: 2, reward: 25, unit: '次', get: d => d.assetBuys ?? 0 },
+  { id: 'audit', name: '摆平一次审查', target: 1, reward: 30, unit: '次', get: d => d.audits ?? 0 }
 ];
 
 // 全部完成的额外奖励
@@ -37,7 +39,7 @@ export function yesterdayStr(): string {
 export function getDaily(p: Progress): DailyState {
   const today = todayStr();
   if (!p.daily || p.daily.date !== today) {
-    p.daily = { date: today, dodged: 0, surviveMs: 0, kills: 0, picked: 0, claimed: false };
+    p.daily = { date: today, dodged: 0, surviveMs: 0, kills: 0, picked: 0, claimed: false, assetBuys: 0, audits: 0 };
   }
   return p.daily;
 }
@@ -79,4 +81,17 @@ export function checkIn(p: Progress): { signed: boolean; streak: number; coins: 
   const coins = 20 + (p.loginStreak > 0 && p.loginStreak % 7 === 0 ? 100 : 0);
   p.coins += coins;
   return { signed: true, streak: p.loginStreak, coins };
+}
+
+
+/** 家产系统调用:记一次建设(买资产或结交人脉) */
+export function noteAssetBuild(p: Progress, count = 1) {
+  const d = getDaily(p);
+  d.assetBuys = (d.assetBuys ?? 0) + count;
+}
+
+/** 家产系统调用:记一次摆平的审查 */
+export function noteAuditHandled(p: Progress, count = 1) {
+  const d = getDaily(p);
+  d.audits = (d.audits ?? 0) + count;
 }

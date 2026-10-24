@@ -12,6 +12,10 @@ export interface DailyState {
   kills: number;     // 当日累计击毁
   picked: number;    // 当日累计拾取道具
   claimed: boolean;  // 当日奖励是否已领取
+  /** 当日家产建设次数(含人脉) */
+  assetBuys?: number;
+  /** 当日躲过/摆平的纪检委审查次数 */
+  audits?: number;
 }
 
 export interface Progress {

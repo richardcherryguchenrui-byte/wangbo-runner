@@ -35,6 +35,7 @@ import {
 import { buildAssetShareCard, downloadCanvas } from '../systems/sharecard';
 import { isWx, wxShare } from '../systems/wxapi';
 import { collectOfflineIncome } from '../systems/offline';
+import { noteAssetBuild, noteAuditHandled } from '../systems/daily';
 
 const ASSET_ICONS: Record<string, string> = {
   purse: 'as-purse', villa: 'as-villa', shell: 'as-shell',
@@ -63,6 +64,9 @@ export default class AssetsScene extends Phaser.Scene {
   private windEndsAt = 0;
   private savedSurvived = 0;
   private savedSeized = 0;
+  /** 待写入每日任务的增量(建设次数 / 摆平审查次数) */
+  private pendingBuilds = 0;
+  private pendingAudits = 0;
   private incomeText?: Phaser.GameObjects.Text;
   private protectText?: Phaser.GameObjects.Text;
 
@@ -167,6 +171,7 @@ export default class AssetsScene extends Phaser.Scene {
       if (this.coins >= bribeCost) {
         this.coins -= bribeCost;
         this.statSurvived += 1;
+        this.pendingAudits += 1;
         playSfx(this, 'coin', 0.45);
         showToast(this, GAME_WIDTH / 2, 470, `打点出去了 ${bribeCost} 银币 · 这次没人再提`, '#8ce99a', 'ui-check');
       } else {
@@ -212,10 +217,12 @@ export default class AssetsScene extends Phaser.Scene {
     const r = resolveAudit(this.holdings, this.coins, roll, shieldLeft);
     if (r.shielded) {
       this.statSurvived += 1;
+      this.pendingAudits += 1;
       showToast(this, GAME_WIDTH / 2, 470, `巡视组的熟人咳嗽了一声 · ${r.message}`, '#8ce99a', 'ui-siren');
       playSfx(this, 'shield', 0.5);
     } else if (r.passed) {
       this.statSurvived += 1;
+      noteAuditHandled(p);
       showToast(this, GAME_WIDTH / 2, 470, `查了一圈 · ${r.message}`, '#ffe066', 'ui-siren');
       this.showNewsTicker(newsFor(false, Math.random()), false);
     } else {
@@ -547,6 +554,7 @@ export default class AssetsScene extends Phaser.Scene {
     }
     this.coins -= cost;
     this.holdings.assets[id] = cur + 1;
+    this.pendingBuilds += 1;
     playSfx(this, cur === 0 ? 'unlock' : 'coin', 0.45);
     if (cur === 0) {
       confettiBurst(this, GAME_WIDTH / 2, 150, 16);
@@ -567,6 +575,7 @@ export default class AssetsScene extends Phaser.Scene {
     }
     this.coins -= cost;
     this.holdings.network[id] = cur + 1;
+    this.pendingBuilds += 1;
     playSfx(this, 'unlock', 0.4);
     showToast(this, GAME_WIDTH / 2, 470, `和「${n.name}」吃上了饭`, '#b197fc', 'ui-person');
     this.persist();
@@ -600,6 +609,8 @@ export default class AssetsScene extends Phaser.Scene {
     p.lastAccrualAt = Date.now();
     p.auditsSurvived = (p.auditsSurvived ?? 0) + this.statSurvived;
     p.assetsSeized = (p.assetsSeized ?? 0) + this.statSeized;
+    if (this.pendingBuilds > 0) { noteAssetBuild(p, this.pendingBuilds); this.pendingBuilds = 0; }
+    if (this.pendingAudits > 0) { noteAuditHandled(p, this.pendingAudits); this.pendingAudits = 0; }
     this.savedSurvived = p.auditsSurvived;
     this.savedSeized = p.assetsSeized;
     this.statSurvived = 0;

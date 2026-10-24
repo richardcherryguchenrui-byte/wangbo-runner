@@ -8,7 +8,7 @@ import {
 import { ACHIEVEMENTS, claimNewAchievements } from '../src/systems/achievements';
 import {
   getDaily, updateDailyFromRun, claimDailyReward, checkIn, dailyAllDone,
-  DAILY_TASKS
+  DAILY_TASKS, noteAssetBuild, noteAuditHandled
 } from '../src/systems/daily';
 import { exportSaveText, importSaveText, resetAllSaves } from '../src/systems/savebackup';
 import { RUN_RANKS, rankAt, rankProgress } from '../src/systems/ranks';
@@ -206,6 +206,9 @@ describe('每日任务与签到', () => {
     vi.setSystemTime(new Date('2026-08-26T10:00:00'));
     const p = makeProgress();
     updateDailyFromRun(p, { dodged: 30, surviveMs: 45000, kills: 5, picked: 3 });
+    // 新增的养成分支也要满足
+    noteAssetBuild(p, 2);
+    noteAuditHandled(p, 1);
     expect(dailyAllDone(getDaily(p))).toBe(true);
     const total = DAILY_TASKS.reduce((s, t) => s + t.reward, 0) + 40;
     expect(claimDailyReward(p)).toBe(total);
