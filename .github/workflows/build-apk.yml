@@ -16,12 +16,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: 安装依赖并构建网页资源
         run: |
-          npm ci
+          # 不用 npm ci:锁文件缺 Linux 平台可选依赖(esbuild 0.28.2),会直接报错
+          npm install --no-audit --no-fund
           npm run build
           npx cap sync android
 
