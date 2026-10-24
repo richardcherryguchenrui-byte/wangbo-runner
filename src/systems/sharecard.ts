@@ -486,3 +486,160 @@ function wrapText(
   }
   if (line) ctx.fillText(line, cx, cursorY);
 }
+
+
+// ============================================================
+// 家产战绩卡:晒家产、晒称号、晒躲过几次审查
+// ============================================================
+
+export interface AssetShareData {
+  valueText: string;
+  titleName: string;
+  titleColor: string;
+  incomePerMin: number;
+  risk: number;
+  auditsSurvived: number;
+  assetsSeized: number;
+  windName: string;
+  windDesc: string;
+  topAssets: { name: string; level: number }[];
+}
+
+export function buildAssetShareCard(scene: Phaser.Scene, d: AssetShareData): HTMLCanvasElement {
+  const W = 1080, H = 1440;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext('2d');
+  if (!ctx) return c;
+
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#12060a');
+  bg.addColorStop(0.5, '#2a1020');
+  bg.addColorStop(1, '#3a2410');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // 放射光
+  ctx.save();
+  ctx.translate(W / 2, 380);
+  for (let i = 0; i < 20; i++) {
+    ctx.rotate((Math.PI * 2) / 20);
+    const g = ctx.createLinearGradient(0, 0, 0, -720);
+    g.addColorStop(0, 'rgba(255,212,59,0.10)');
+    g.addColorStop(1, 'rgba(255,212,59,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-26, 0);
+    ctx.lineTo(0, -720);
+    ctx.lineTo(26, 0);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // 金色漂浮点
+  for (let i = 0; i < 50; i++) {
+    const x = pseudo(i * 5.3 + 3) * W;
+    const y = pseudo(i * 2.7 + 11) * H;
+    const r = 1 + pseudo(i * 1.3 + 5) * 3;
+    ctx.fillStyle = `rgba(255,220,140,${0.08 + pseudo(i * 3.1) * 0.32})`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffd43b';
+  ctx.font = `bold 34px ${FONT}`;
+  ctx.fillText('我的家产', 70, 110);
+  ctx.fillStyle = 'rgba(220,235,255,0.6)';
+  ctx.font = `22px ${FONT}`;
+  ctx.fillText(`王博晋升之路 · 贪官养成 · v${GAME_VERSION}`, 70, 152);
+
+  // 称号
+  ctx.textAlign = 'center';
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,212,59,0.5)';
+  ctx.shadowBlur = 36;
+  ctx.fillStyle = d.titleColor;
+  ctx.font = `bold 96px ${FONT}`;
+  ctx.fillText(d.titleName, W / 2, 320);
+  ctx.restore();
+
+  // 家产总值
+  ctx.fillStyle = '#ffe066';
+  ctx.font = `bold 128px ${FONT}`;
+  ctx.fillText(d.valueText, W / 2, 470);
+  ctx.fillStyle = 'rgba(220,235,255,0.7)';
+  ctx.font = `28px ${FONT}`;
+  ctx.fillText('家产总值(银币)', W / 2, 516);
+
+  // 风向
+  ctx.fillStyle = 'rgba(200,220,245,0.65)';
+  ctx.font = `24px ${FONT}`;
+  ctx.fillText(`当前风向 · ${d.windName}(${d.windDesc})`, W / 2, 566);
+
+  // 数据三宫格
+  const cells: [string, string][] = [
+    [`${d.incomePerMin}`, '银币/分'],
+    [`${d.risk}`, '被查风险'],
+    [`${d.auditsSurvived}`, '躲过审查']
+  ];
+  const gridY = 620;
+  cells.forEach(([v, label], i) => {
+    const bw = 300;
+    const gap = 30;
+    const bx = 60 + i * (bw + gap);
+    ctx.fillStyle = 'rgba(8,20,38,0.62)';
+    roundRect(ctx, bx, gridY, bw, 140, 22);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 2;
+    roundRect(ctx, bx, gridY, bw, 140, 22);
+    ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffe066';
+    ctx.font = `bold 54px ${FONT}`;
+    ctx.fillText(v, bx + bw / 2, gridY + 74);
+    ctx.fillStyle = 'rgba(200,220,245,0.75)';
+    ctx.font = `22px ${FONT}`;
+    ctx.fillText(label, bx + bw / 2, gridY + 116);
+  });
+
+  // 主要资产
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(255,212,59,0.85)';
+  ctx.font = `bold 26px ${FONT}`;
+  ctx.fillText('名下产业', 70, 830);
+  d.topAssets.slice(0, 4).forEach((a, i) => {
+    const y = 890 + i * 74;
+    ctx.fillStyle = 'rgba(8,20,38,0.55)';
+    roundRect(ctx, 60, y - 42, W - 120, 62, 14);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold 28px ${FONT}`;
+    ctx.fillText(a.name, 90, y);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#ffe066';
+    ctx.font = `bold 28px ${FONT}`;
+    ctx.fillText(`Lv.${a.level}`, W - 90, y);
+    ctx.textAlign = 'left';
+  });
+
+  // 挑战语
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffe066';
+  ctx.font = `bold 32px ${FONT}`;
+  ctx.fillText(`被没收过 ${d.assetsSeized} 次,还站着`, W / 2, 1230);
+  ctx.fillStyle = 'rgba(210,230,255,0.6)';
+  ctx.font = `22px ${FONT}`;
+  ctx.fillText('敢不敢跟我比家产?', W / 2, 1272);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(60, 1300, 960, 2);
+  ctx.fillStyle = 'rgba(255,212,59,0.8)';
+  ctx.font = `bold 22px ${FONT}`;
+  ctx.fillText('nmjdzmy 反弹工作室', W / 2, 1350);
+
+  void scene;
+  return c;
+}

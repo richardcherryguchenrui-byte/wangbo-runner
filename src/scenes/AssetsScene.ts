@@ -29,9 +29,12 @@ import {
   totalAssetValue,
   formatValue,
   newsFor,
+  incomePerMin as rawIncome,
   type WindDef,
   type Holdings
 } from '../systems/assets';
+import { buildAssetShareCard, downloadCanvas } from '../systems/sharecard';
+import { isWx, wxShare } from '../systems/wxapi';
 
 const ASSET_ICONS: Record<string, string> = {
   purse: 'coin', villa: 'bg-hotel', shell: 'ui-shop',
@@ -58,6 +61,8 @@ export default class AssetsScene extends Phaser.Scene {
   private statSeized = 0;
   private wind!: WindDef;
   private windEndsAt = 0;
+  private savedSurvived = 0;
+  private savedSeized = 0;
   private incomeText?: Phaser.GameObjects.Text;
   private protectText?: Phaser.GameObjects.Text;
 
@@ -74,6 +79,8 @@ export default class AssetsScene extends Phaser.Scene {
       laundered: p.laundered ?? 0
     };
     this.coins = p.coins;
+    this.savedSurvived = p.auditsSurvived ?? 0;
+    this.savedSeized = p.assetsSeized ?? 0;
     this.rowRefs = [];
 
     buildMenuBackdrop(this, { mood: 'night' });
@@ -91,6 +98,7 @@ export default class AssetsScene extends Phaser.Scene {
     this.drawRiskPanel();
     addMenuFooter(this, '资产越肥风险越高 · 洗白能压风险,人脉能保命');
     this.refreshAll();
+    this.drawShareButton();
     this.maybeAudit(p);
   }
 
@@ -231,6 +239,60 @@ export default class AssetsScene extends Phaser.Scene {
     }
     void risk;
     this.time.delayedCall(600, () => this.scene.restart());
+  }
+
+  // 晒家产:生成竖版战绩卡
+  private drawShareButton() {
+    const x = GAME_WIDTH - 96;
+    const y = 74;
+    const g = this.add.graphics().setDepth(24);
+    g.fillStyle(0x1d3350, 0.95);
+    g.fillRoundedRect(x - 62, y - 14, 124, 30, 15);
+    g.lineStyle(1.4, 0x74c0fc, 0.5);
+    g.strokeRoundedRect(x - 62, y - 14, 124, 30, 15);
+    this.add.image(x - 42, y + 1, 'ui-share').setDisplaySize(14, 14).setDepth(25);
+    this.add.text(x - 28, y + 1, '晒家产', {
+      fontFamily: FONT, fontSize: '13px', color: '#cfe3ff', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0, 0.5).setDepth(25);
+    const hit = this.add.rectangle(x, y + 1, 124, 30, 0xffffff, 0.001)
+      .setDepth(26)
+      .setInteractive({ useHandCursor: true });
+    hit.on('pointerdown', () => this.shareAssets());
+    void g;
+  }
+
+  private shareAssets() {
+    const value = totalAssetValue(this.holdings);
+    const title = assetTitle(value);
+    const text = `我的家产 ${formatValue(value)} 银币,头衔「${title.name}」`
+      + `,躲过 ${this.savedSurvived} 次审查。敢不敢跟我比?《王博晋升之路》`;
+    if (isWx()) {
+      wxShare(text);
+      return;
+    }
+    try {
+      const topAssets = ASSETS
+        .map(a => ({ name: a.name, level: this.holdings.assets[a.id] ?? 0 }))
+        .filter(a => a.level > 0)
+        .sort((a, b) => b.level - a.level);
+      const canvas = buildAssetShareCard(this, {
+        valueText: formatValue(value),
+        titleName: title.name,
+        titleColor: title.color,
+        incomePerMin: rawIncome(this.holdings),
+        risk: netRisk(this.holdings),
+        auditsSurvived: this.savedSurvived,
+        assetsSeized: this.savedSeized,
+        windName: this.wind.name,
+        windDesc: this.wind.desc,
+        topAssets: topAssets.length > 0 ? topAssets : [{ name: '还没有产业', level: 0 }]
+      });
+      const ok = downloadCanvas(canvas, `我的家产-${formatValue(value)}.png`);
+      showToast(this, GAME_WIDTH / 2, 470, ok ? '家产卡已保存,发群里吧!' : '保存失败,截图也行', ok ? '#8ce99a' : '#ff8787', 'ui-image');
+      if (ok) playSfx(this, 'record', 0.35);
+    } catch {
+      showToast(this, GAME_WIDTH / 2, 470, '保存失败,截图也行', '#ff8787');
+    }
   }
 
   // 顶部风向横幅:每 20 分钟变一次,收益/风险跟着变
@@ -498,6 +560,8 @@ export default class AssetsScene extends Phaser.Scene {
     p.lastAccrualAt = Date.now();
     p.auditsSurvived = (p.auditsSurvived ?? 0) + this.statSurvived;
     p.assetsSeized = (p.assetsSeized ?? 0) + this.statSeized;
+    this.savedSurvived = p.auditsSurvived;
+    this.savedSeized = p.assetsSeized;
     this.statSurvived = 0;
     this.statSeized = 0;
     saveProgress(p);
