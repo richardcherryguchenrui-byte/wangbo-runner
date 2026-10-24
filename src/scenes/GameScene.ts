@@ -342,7 +342,14 @@ export default class GameScene extends Phaser.Scene {
     this.dailySpeedMul = this.daily ? this.challenge?.modifier.speedMul ?? 1 : 1;
     this.dailyCoinMul = this.daily ? this.challenge?.modifier.coinMul ?? 1 : 1;
     const livesDelta = this.daily ? this.challenge?.modifier.livesDelta ?? 0 : 0;
-    this.totalLives = Math.max(1, 2 + this.progress.extraLives + livesDelta);
+    // 宽大处理:在留置室交代成功后攒下的额度,本局换成额外乌纱帽
+    const redeemed = Math.max(0, Math.min(3, this.progress.redeemBonus ?? 0));
+    if (redeemed > 0 && this.level) {
+      this.progress.redeemBonus = 0;
+      saveProgress(this.progress);
+    }
+    const redeemLives = this.level ? redeemed : 0;
+    this.totalLives = Math.max(1, 2 + this.progress.extraLives + livesDelta + redeemLives);
     this.bribeCarried = Math.min(this.progress.bribeMoon, bribeCarryLimit(this.progress));
 
     // 场景重启复用实例:所有局内字段必须完整重置
@@ -1119,8 +1126,11 @@ export default class GameScene extends Phaser.Scene {
     const title = this.level
       ? this.level.name
       : this.daily && this.challenge ? `今日挑战 · ${this.challenge.modifier.name}` : '开跑!';
+    const baseLives = 2 + (this.progress.extraLives ?? 0);
+    const extraHats = this.level ? Math.max(0, this.totalLives - baseLives) : 0;
     const sub = this.level
       ? `活到 ${Math.round(this.level.durationMs / 1000)} 秒 · ${this.level.flavor}`
+        + (extraHats > 0 ? `  ·  宽大处理 +${extraHats} 顶乌纱帽` : '')
       : this.daily && this.challenge ? this.challenge.modifier.desc : '一路高升,冲上厅长!';
     const c = this.add.container(GAME_WIDTH / 2, 214).setDepth(70).setAlpha(0).setScale(0.6);
     const t1 = this.add

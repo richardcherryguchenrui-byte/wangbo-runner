@@ -21,10 +21,10 @@ import {
   type LevelDef
 } from '../systems/levels';
 
-const ROW_Y0 = 108;
-const ROW_H = 60;
+const ROW_Y0 = 104;
+const ROW_H = 56;
 const CHIP_W = 196;
-const CHIP_H = 50;
+const CHIP_H = 46;
 const CHIP_X = [432, 640, 848];
 
 export default class CampaignScene extends Phaser.Scene {
@@ -118,17 +118,38 @@ export default class CampaignScene extends Phaser.Scene {
       ?? LEVELS[0];
     const allCleared = LEVELS.every(l => (stars[l.id] ?? 0) > 0);
 
-    makeHeroButton(this, GAME_WIDTH / 2, 486, 300, 50, allCleared ? '再刷一遍' : '继续闯关', () => {
+    makeHeroButton(this, GAME_WIDTH / 2, 464, 300, 50, allCleared ? '再刷一遍' : '继续闯关', () => {
       playSfx(this, 'click', 0.4);
       this.startLevel(resume.id);
     }, { iconKey: 'ui-play', iconSize: 20, fontSize: 22, depth: 24 });
 
     this.add
-      .text(GAME_WIDTH / 2 + 172, 486, resume.name, {
+      .text(GAME_WIDTH / 2 + 172, 464, resume.name, {
         fontFamily: FONT, fontSize: '13px', color: '#93b5d6', resolution: 2
       })
       .setOrigin(0, 0.5)
       .setDepth(24);
+
+    // 主动交代:去留置室争取宽大处理(落马时结算页也会进这里)
+    {
+      const y = 500;
+      const link = this.add
+        .text(GAME_WIDTH / 2, y, '主动交代(留置室)· 换一顶乌纱帽', {
+          fontFamily: FONT, fontSize: '11px', color: '#9db8d8', resolution: 2
+        })
+        .setOrigin(0.5)
+        .setDepth(24);
+      const hit = this.add
+        .rectangle(GAME_WIDTH / 2, y, 300, 20, 0xffffff, 0.001)
+        .setDepth(25)
+        .setInteractive({ useHandCursor: true });
+      hit.on('pointerover', () => link.setColor('#ffe066'));
+      hit.on('pointerout', () => link.setColor('#9db8d8'));
+      hit.on('pointerdown', () => {
+        playSfx(this, 'click', 0.4);
+        this.scene.start('Dungeon', { returnLevelId: resume.id });
+      });
+    }
 
     // 页脚:优先提示终局目标,再提示下一个里程碑 —— 始终给玩家一个「下一步」
     if (isCampaignFinished(stars)) {

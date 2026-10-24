@@ -648,9 +648,15 @@ export default class ResultScene extends Phaser.Scene {
         this.scene.start('Title');
       }, { iconKey: 'ui-home', iconSize: 20, fontSize: 20, depth: 22 });
     } else {
-      makeButton(this, 240, btnY, 130, 46, '关卡列表', goCampaign, 13, { depth: 22, iconKey: 'ui-clipboard', iconSize: 14 });
-      makeButton(this, 400, btnY, 130, 46, '分享', goShare, 13, { depth: 22, iconKey: 'ui-share', iconSize: 14 });
-      makeHeroButton(this, 620, btnY, 200, 50, '再试一次', goReplay, { iconKey: 'ui-restart', iconSize: 20, fontSize: 20, depth: 22 });
+      // 落马了:去留置室交代,争取宽大处理,再回这一关
+      makeButton(this, 196, btnY, 118, 46, '关卡列表', goCampaign, 13, { depth: 22, iconKey: 'ui-clipboard', iconSize: 14 });
+      makeButton(this, 326, btnY, 118, 46, '重来', goReplay, 13, { depth: 22, iconKey: 'ui-restart', iconSize: 14 });
+      makeButton(this, 456, btnY, 118, 46, '分享', goShare, 13, { depth: 22, iconKey: 'ui-share', iconSize: 14 });
+      makeHeroButton(this, 654, btnY, 190, 50, '去交代', () => {
+        if (this.leaving) return;
+        this.leaving = true;
+        this.scene.start('Dungeon', { returnLevelId: this.levelId });
+      }, { iconKey: 'ui-person', iconSize: 20, fontSize: 19, depth: 22 });
     }
 
     this.add

@@ -49,11 +49,11 @@ export interface ParsedDungeon {
   chests: DGPoint[];
   /** 茅台:临时攻击力提升 */
   wines: DGPoint[];
-  /** 购物卡:回满法力 */
+  /** 购物卡:回人脉(本作的「法力」就是人脉) */
   cards: DGPoint[];
   /** 检查点:死亡后从这里重来 */
   checkpoints: DGPoint[];
-  /** 房产证:本局生命上限 +1 */
+  /** 房产证:本局乌纱帽(生命)上限 +1 */
   deeds: DGPoint[];
   boss: DGPoint | null;
   goal: DGPoint | null;
@@ -515,7 +515,7 @@ export const DG_CHARGER_DASH_MS = 420;
 
 export const DG_WINE_BUFF_MS = 12000;     // 茅台:12 秒攻击力 +1
 export const DG_WINE_DAMAGE_BONUS = 1;
-export const DG_CARD_MP = 55;             // 购物卡:回 55 法力
+export const DG_CARD_MP = 55;             // 购物卡:回 55 人脉
 export const DG_CHEST_COINS = 12;
 
 /** 连击强化:连得越多砍得越疼 */
@@ -531,7 +531,7 @@ export function playerMeleeDamage(combo: number, wineActive: boolean, base = DG_
 }
 
 
-/** 房产证:本局生命上限 +1(可叠加) */
+/** 房产证:本局乌纱帽上限 +1(可叠加) */
 export const DG_DEED_MAX_HP = 1;
-/** 生命上限的硬上限,防止堆到满屏心 */
+/** 乌纱帽上限的硬上限,防止堆到满屏 */
 export const DG_MAX_HP_CAP = 9;

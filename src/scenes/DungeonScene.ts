@@ -67,6 +67,8 @@ import {
 
 interface DGData {
   levelId?: string;
+  /** 交代模式:从主线关卡落马进来,交代成功后回这一关 */
+  returnLevelId?: string;
 }
 
 type EnemyKind = 'walker' | 'thrower' | 'charger' | 'boss';
@@ -92,6 +94,8 @@ const PLAYER_BODY_H = 116;
 
 export default class DungeonScene extends Phaser.Scene {
   private levelId = DUNGEON_LEVELS[0].id;
+  /** 交代模式的目标关卡(为空则是自由挑战) */
+  private returnLevelId?: string;
   private level!: DungeonLevelDef;
   private parsed!: ParsedDungeon;
 
@@ -104,7 +108,7 @@ export default class DungeonScene extends Phaser.Scene {
   private goalSprite?: Phaser.GameObjects.Image;
 
   private hp = DG_PLAYER_MAX_HP;
-  /** 本局生命上限(房产证可加) */
+  /** 本局乌纱帽上限(房产证可加) */
   private maxHp = DG_PLAYER_MAX_HP;
   private mp = DG_PLAYER_MAX_MP;
   private reportReadyAt = 0;
@@ -149,6 +153,7 @@ export default class DungeonScene extends Phaser.Scene {
   private hudHint!: Phaser.GameObjects.Text;
 
   private over = false;
+  private leaving = false;
   private cleared = false;
   private touchButtons: { obj: Phaser.GameObjects.GameObject; bounds: DGRect }[] = [];
   /** HUD / 触屏按钮层:每帧贴到相机视口左上角(zoom 放大后 scrollFactor=0 不可靠) */
@@ -161,6 +166,7 @@ export default class DungeonScene extends Phaser.Scene {
   }
 
   init(data: DGData) {
+    this.returnLevelId = data?.returnLevelId;
     const wanted = data?.levelId ?? '';
     const p = loadProgress();
     this.levelId = dungeonLevelById(wanted) && isDungeonUnlocked(wanted, p.dungeonCleared ?? {})
@@ -171,6 +177,7 @@ export default class DungeonScene extends Phaser.Scene {
   create() {
     this.over = false;
     this.cleared = false;
+    this.leaving = false;
     this.level = dungeonLevelById(this.levelId) ?? DUNGEON_LEVELS[0];
     this.parsed = parseDungeon(this.level.map);
 
@@ -225,9 +232,9 @@ export default class DungeonScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, this.parsed.widthPx, this.parsed.heightPx);
     startBgm(this);
 
-    this.hudLevelText.setText(`${this.level.name}`);
+    this.hudLevelText.setText(this.returnLevelId ? `${this.level.name} · 交代问题` : this.level.name);
     this.time.delayedCall(120, () => {
-      showToast(this, GAME_WIDTH / 2, 92, this.level.subtitle, '#cfe3ff', 'ui-tips');
+      showToast(this, GAME_WIDTH / 2, 190, this.level.subtitle, '#cfe3ff', 'ui-tips');
     });
   }
 
@@ -401,7 +408,7 @@ export default class DungeonScene extends Phaser.Scene {
       this.refreshHeartHud();
       playSfx(this, 'hype', 0.4);
       poof(this, heart.x, heart.y, 6);
-      showToast(this, GAME_WIDTH / 2, 120, '补一格血', '#8ce99a', 'ui-heart');
+      showToast(this, GAME_WIDTH / 2, 120, '补一顶乌纱帽', '#8ce99a', 'ui-heart');
     });
 
     // 出口
@@ -492,7 +499,7 @@ export default class DungeonScene extends Phaser.Scene {
       this.refreshMpHud();
       playSfx(this, 'coin', 0.4);
       poof(this, img.x, img.y, 6);
-      this.floatText(img.x, img.y - 20, `购物卡 法力 +${DG_CARD_MP}`, '#74c0fc');
+      this.floatText(img.x, img.y - 20, `购物卡 · 人脉 +${DG_CARD_MP}`, '#74c0fc');
     }));
 
     this.parsed.deeds.forEach(d => mk('dg-deed', d.x, d.y, [44, 34], 5, img => {
@@ -506,8 +513,8 @@ export default class DungeonScene extends Phaser.Scene {
       this.refreshHeartHud();
       playSfx(this, 'unlock', 0.5);
       poof(this, img.x, img.y, 10);
-      this.floatText(img.x, img.y - 20, '房产证到手 · 生命上限 +1', '#ff8787');
-      showToast(this, GAME_WIDTH / 2, 150, '房产证到手:本局生命上限 +1', '#ff8787', 'ui-heart');
+      this.floatText(img.x, img.y - 20, '房产证到手 · 乌纱帽 +1', '#ff8787');
+      showToast(this, GAME_WIDTH / 2, 150, '房产证到手:本局乌纱帽 +1', '#ff8787', 'ui-heart');
     }));
 
     this.parsed.checkpoints.forEach((c, i) => mk('dg-flag', c.x, c.y, [36, 56], 0, img => {
@@ -515,7 +522,7 @@ export default class DungeonScene extends Phaser.Scene {
       this.respawnAt = { x: c.x, y: c.y };
       img.setTint(0x8ce99a);
       playSfx(this, 'unlock', 0.4);
-      showToast(this, GAME_WIDTH / 2, 150, '插旗了 · 死了从这里重来', '#8ce99a', 'ui-check');
+      showToast(this, GAME_WIDTH / 2, 190, '打点好了 · 死了从这儿接着来', '#8ce99a', 'ui-check');
       void i;
     }));
   }
@@ -610,7 +617,7 @@ export default class DungeonScene extends Phaser.Scene {
 
     // 预留到上限的心位,房产证加血时逐颗点亮
     for (let i = 0; i < DG_MAX_HP_CAP; i++) {
-      const h = this.add.image(44 + i * 26, 40, 'ui-heart').setDisplaySize(22, 22);
+      const h = this.add.image(44 + i * 27, 40, 'dg-hat').setDisplaySize(28, 19);
       this.hudHearts.push(h);
     }
 
@@ -666,7 +673,10 @@ export default class DungeonScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '10px', color: '#8ba9c7', resolution: 2
     }).setOrigin(0, 0.5);
 
-    this.ui.add([hudBg, ...this.hudHearts, coinIcon, this.hudCoinText, this.hudLevelText, hintBg, this.hudHint]);
+    const mpLabel = this.add
+      .text(34, 50, '人脉', { fontFamily: FONT, fontSize: '9px', color: '#9db8d8', resolution: 2 })
+      .setOrigin(0, 1);
+    this.ui.add([hudBg, ...this.hudHearts, coinIcon, this.hudCoinText, this.hudLevelText, hintBg, this.hudHint, mpLabel]);
     this.ui.add(this.hudMpBar);
     this.hudSkillIcons.forEach(sk => this.ui.add([sk.icon, sk.mask, sk.key]));
     this.ui.add(skillHintText);
@@ -701,7 +711,7 @@ export default class DungeonScene extends Phaser.Scene {
   private refreshMpHud() {
     if (!this.hudMpBar) return;
     const x = 30;
-    const y = 58;
+    const y = 52;
     const w = 160;
     const h = 8;
     this.hudMpBar.clear();
@@ -974,7 +984,7 @@ export default class DungeonScene extends Phaser.Scene {
   private pressReport() {
     if (this.over) return;
     if (!canUseSkill(this.mp, this.time.now, this.reportReadyAt, DG_SKILL_REPORT.cost)) {
-      if (this.mp < DG_SKILL_REPORT.cost) showToast(this, GAME_WIDTH / 2, 130, '法力不够 · 先去揍几个', '#b197fc', 'ui-bolt');
+      if (this.mp < DG_SKILL_REPORT.cost) showToast(this, GAME_WIDTH / 2, 130, '人脉不够 · 先去认识几个人', '#b197fc', 'ui-bolt');
       return;
     }
     this.mp -= DG_SKILL_REPORT.cost;
@@ -1023,7 +1033,7 @@ export default class DungeonScene extends Phaser.Scene {
   private pressShield() {
     if (this.over) return;
     if (!canUseSkill(this.mp, this.time.now, this.shieldReadyAt, DG_SKILL_SHIELD.cost)) {
-      if (this.mp < DG_SKILL_SHIELD.cost) showToast(this, GAME_WIDTH / 2, 130, '法力不够 · 先去揍几个', '#b197fc', 'ui-bolt');
+      if (this.mp < DG_SKILL_SHIELD.cost) showToast(this, GAME_WIDTH / 2, 130, '人脉不够 · 先去认识几个人', '#b197fc', 'ui-bolt');
       return;
     }
     this.mp -= DG_SKILL_SHIELD.cost;
@@ -1111,7 +1121,7 @@ export default class DungeonScene extends Phaser.Scene {
     this.invulnUntil = this.time.now + 1600;
     this.mpHudSafeRefresh();
     this.enemyLetters.getChildren().slice().forEach(o => o.destroy());
-    showToast(this, GAME_WIDTH / 2, 150, '从红旗继续 · 再来', '#8ce99a', 'ui-check');
+    showToast(this, GAME_WIDTH / 2, 190, '打点处接着来 · 组织上还没定论', '#8ce99a', 'ui-check');
   }
 
   private mpHudSafeRefresh() {
@@ -1131,6 +1141,10 @@ export default class DungeonScene extends Phaser.Scene {
     p.dungeonCleared[this.levelId] = (p.dungeonCleared[this.levelId] ?? 0) + 1;
     p.coins += this.runCoins;
     p.totalRuns += 1;
+    if (this.returnLevelId) {
+      // 交代成功:记一笔「宽大处理」,下次回到主线那关多一顶乌纱帽
+      p.redeemBonus = Math.min(3, (p.redeemBonus ?? 0) + 1);
+    }
     saveProgress(p);
 
     this.showOverlay(true);
@@ -1152,20 +1166,68 @@ export default class DungeonScene extends Phaser.Scene {
     panel.lineStyle(2, win ? 0xffd43b : 0xff8787, 0.5);
     panel.strokeRoundedRect(GAME_WIDTH / 2 - 260, 120, 520, 300, 24);
 
+    const redeem = !!this.returnLevelId;
     add(this.add
-      .text(GAME_WIDTH / 2, 168, win ? '闯过去了!' : '被按住了…', {
+      .text(GAME_WIDTH / 2, 168, redeem
+        ? (win ? '交代清楚了' : '还没交代明白')
+        : (win ? '闯过去了!' : '被按住了…'), {
         fontFamily: FONT, fontSize: '38px', color: win ? '#ffe066' : '#ff8787',
         fontStyle: 'bold', resolution: 2, stroke: '#08131f', strokeThickness: 6
       })
       .setOrigin(0.5));
 
-    add(this.add
-      .text(GAME_WIDTH / 2, 212, win
-        ? `${this.level.name} · 拾到银币 ${this.runCoins}`
-        : this.level.subtitle, {
-        fontFamily: FONT, fontSize: '14px', color: '#cfe3ff', resolution: 2
-      })
-      .setOrigin(0.5));
+    if (!redeem) {
+      add(this.add
+        .text(GAME_WIDTH / 2, 212, win
+          ? `${this.level.name} · 拾到银币 ${this.runCoins}`
+          : this.level.subtitle, {
+          fontFamily: FONT, fontSize: '14px', color: '#cfe3ff', resolution: 2
+        })
+        .setOrigin(0.5));
+    }
+
+    // 交代模式:成功后回主线那关;失败就地再交代
+    if (this.returnLevelId) {
+      const back = () => {
+        if (this.leaving) return;
+        this.leaving = true;
+        this.scene.start('Game', { levelId: this.returnLevelId });
+      };
+      const again = () => this.scene.restart({ levelId: this.levelId, returnLevelId: this.returnLevelId });
+      add(this.add
+        .text(GAME_WIDTH / 2, 212, win
+          ? `交代清楚 · 争取到宽大处理 · 银币 ${this.runCoins}`
+          : '没交代明白,还得再谈一次', {
+          fontFamily: FONT, fontSize: '14px', color: win ? '#8ce99a' : '#cfe3ff', resolution: 2
+        })
+        .setOrigin(0.5));
+      const btns = win
+        ? [{ label: '回那一关', primary: true, x: GAME_WIDTH / 2 + 130, fn: back },
+           { label: '再交代一次', x: GAME_WIDTH / 2 - 130, fn: again }]
+        : [{ label: '再谈一次', primary: true, x: GAME_WIDTH / 2 + 130, fn: again },
+           { label: '回主菜单', x: GAME_WIDTH / 2 - 130, fn: () => this.leave() }];
+      btns.forEach(b => {
+        const w = 200; const h = 48; const y = 340;
+        const g = add(this.add.graphics());
+        const fill = b.primary ? 0xffb703 : 0x16324f;
+        g.fillStyle(fill, 0.95);
+        g.fillRoundedRect(b.x - w / 2, y - h / 2, w, h, h / 2);
+        g.lineStyle(2, b.primary ? 0xffecb3 : 0xffffff, b.primary ? 0.9 : 0.2);
+        g.strokeRoundedRect(b.x - w / 2, y - h / 2, w, h, h / 2);
+        add(this.add.text(b.x, y, b.label, {
+          fontFamily: FONT, fontSize: '18px', color: b.primary ? '#3a2400' : '#cfe3ff',
+          fontStyle: 'bold', resolution: 2
+        }).setOrigin(0.5));
+        const hit = add(this.add.rectangle(b.x, y, w, h, 0xffffff, 0.001).setInteractive({ useHandCursor: true }));
+        hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); b.fn(); });
+      });
+      add(this.add
+        .text(GAME_WIDTH / 2, 392, win ? '宽大处理已记账:回到主线那关会多一顶乌纱帽' : '交代不彻底,组织上不会放你走', {
+          fontFamily: FONT, fontSize: '11px', color: '#8ba9c7', resolution: 2
+        })
+        .setOrigin(0.5));
+      return;
+    }
 
     const nextId = win ? nextDungeonId(this.levelId) : null;
     const buttons: { label: string; primary?: boolean; x: number; fn: () => void }[] = [];
@@ -1176,7 +1238,7 @@ export default class DungeonScene extends Phaser.Scene {
       buttons.push({ label: '再走一遍', primary: true, x: GAME_WIDTH / 2 + 130, fn: () => this.scene.restart({ levelId: this.levelId }) });
       buttons.push({ label: '返回', x: GAME_WIDTH / 2 - 130, fn: () => this.leave() });
     } else if (this.respawnAt) {
-      buttons.push({ label: '从红旗继续', primary: true, x: GAME_WIDTH / 2 + 130, fn: () => this.respawnAtCheckpoint() });
+      buttons.push({ label: '从打点处继续', primary: true, x: GAME_WIDTH / 2 + 130, fn: () => this.respawnAtCheckpoint() });
       buttons.push({ label: '重头再来', x: GAME_WIDTH / 2 - 130, fn: () => this.scene.restart({ levelId: this.levelId }) });
     } else {
       buttons.push({ label: '再来一次', primary: true, x: GAME_WIDTH / 2 + 130, fn: () => this.scene.restart({ levelId: this.levelId }) });
@@ -1209,7 +1271,7 @@ export default class DungeonScene extends Phaser.Scene {
     });
 
     add(this.add
-      .text(GAME_WIDTH / 2, 392, '提示:冲刺可以穿过攻击,落地再跳能触发二段跳', {
+      .text(GAME_WIDTH / 2, 392, '提示:冲刺可以躲开攻击,落地再跳能触发二段跳', {
         fontFamily: FONT, fontSize: '11px', color: '#8ba9c7', resolution: 2
       })
       .setOrigin(0.5));

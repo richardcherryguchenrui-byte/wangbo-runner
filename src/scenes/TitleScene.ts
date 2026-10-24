@@ -271,95 +271,107 @@ export default class TitleScene extends Phaser.Scene {
     const panel = addPanel(this, px, 84, pw, 384, { fill: 0x0b1b31, fillAlpha: 0.72, stroke: 0xffffff, strokeAlpha: 0.14, radius: 22 });
     panel.setDepth(9);
 
-    this.add.text(px + pw / 2, 108, '目标:一路高升', {
-      fontFamily: FONT, fontSize: '14px', color: '#a9c7e8', fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(10);
+    // ===== 右侧面板:纵向分区,每块各占一行,互不遮挡 =====
+    // 1) 标题行
+    this.add.text(px + 20, 100, '目标:一路高升', {
+      fontFamily: FONT, fontSize: '13px', color: '#a9c7e8', fontStyle: 'bold'
+    }).setOrigin(0, 0.5).setDepth(10);
 
-    // 主入口:闯关模式(贪官隐喻的十八关主线)
-    const clearedCount = LEVELS.filter(l => (p.levelStars[l.id] ?? 0) > 0).length;
-    const starSum = totalStars(p.levelStars);
-    makeHeroButton(this, px + pw / 2, 150, 276, 60, '闯关模式', () => {
+    // 2) 主按钮:闯关模式
+    makeHeroButton(this, px + pw / 2, 148, 268, 58, '继续闯关', () => {
       playSfx(this, 'click', 0.45);
       this.scene.start('Campaign');
-    }, { iconKey: 'ui-play', iconSize: 22, fontSize: 25 });
+    }, { iconKey: 'ui-play', iconSize: 22, fontSize: 24 });
 
-    this.add.text(px + pw / 2, 186, `官场现形记 · 已通关 ${clearedCount}/${LEVELS.length} 关 · ★${starSum}`, {
-      fontFamily: FONT, fontSize: '11px', color: '#ffe066'
-    }).setOrigin(0.5).setDepth(10).setAlpha(0.95);
-
-    // 两个次级入口:无尽模式 / 留置室(横版闯关)
+    // 3) 仕途进度条(独立一行,带底板,不会再被按钮压住)
     {
-      const bw = (pw - 44) / 2;
-      const by = 200;
-      const h = 34;
-      const entries: { icon: string; label: string; x: number; fn: () => void }[] = [
-        { icon: 'ui-clock', label: '无尽模式', x: px + 18, fn: () => this.startGame(false) },
-        { icon: 'ui-person', label: '留置室', x: px + 18 + bw + 8, fn: () => this.scene.start('Dungeon') }
-      ];
-      entries.forEach(e => {
-        const bg = this.add.graphics().setDepth(10);
-        bg.fillStyle(0x16324f, 0.85);
-        bg.fillRoundedRect(e.x, by, bw, h, 10);
-        bg.lineStyle(1.2, 0xffffff, 0.12);
-        bg.strokeRoundedRect(e.x, by, bw, h, 10);
-        this.add.image(e.x + 18, by + h / 2, e.icon).setDisplaySize(14, 14).setDepth(11);
-        this.add
-          .text(e.x + 32, by + h / 2, e.label, { fontFamily: FONT, fontSize: '13px', color: '#cfe3ff', fontStyle: 'bold' })
-          .setOrigin(0, 0.5)
-          .setDepth(11);
-        const hit = this.add
-          .rectangle(e.x + bw / 2, by + h / 2, bw, h, 0xffffff, 0.001)
-          .setDepth(12)
-          .setInteractive({ useHandCursor: true });
-        hit.on('pointerdown', () => { playSfx(this, 'click', 0.4); e.fn(); });
-      });
+      const clearedCount = LEVELS.filter(l => (p.levelStars[l.id] ?? 0) > 0).length;
+      const starSum = totalStars(p.levelStars);
+      const rowY = 188;
+      const rowH = 30;
+      const g = this.add.graphics().setDepth(10);
+      g.fillStyle(0x0a1728, 0.9);
+      g.fillRoundedRect(px + 16, rowY, pw - 32, rowH, 10);
+      g.lineStyle(1, 0xffd43b, 0.28);
+      g.strokeRoundedRect(px + 16, rowY, pw - 32, rowH, 10);
+      // 进度条本体
+      const barW = 86;
+      const ratio = LEVELS.length > 0 ? clearedCount / LEVELS.length : 0;
+      g.fillStyle(0x1d3350, 1);
+      g.fillRoundedRect(px + pw - 16 - barW, rowY + rowH / 2 - 3, barW, 6, 3);
+      g.fillStyle(0xffd43b, 0.95);
+      g.fillRoundedRect(px + pw - 16 - barW, rowY + rowH / 2 - 3, Math.max(4, barW * ratio), 6, 3);
+      this.add.image(px + 32, rowY + rowH / 2, 'pendant-star').setDisplaySize(15, 15).setDepth(11).setTint(0xffd43b);
+      this.add.text(px + 46, rowY + rowH / 2, `官场现形记 ${clearedCount}/${LEVELS.length} 关 · ★${starSum}`, {
+        fontFamily: FONT, fontSize: '12px', color: '#ffe066', fontStyle: 'bold'
+      }).setOrigin(0, 0.5).setDepth(11);
     }
 
-    // 每日挑战卡
-    const dy = 240;
+    // 4) 每日挑战卡
+    const dy = 228;
     const dcBg = this.add.graphics().setDepth(10);
     dcBg.fillStyle(0x2a1b4a, 0.9);
-    dcBg.fillRoundedRect(px + 18, dy, pw - 36, 66, 14);
+    dcBg.fillRoundedRect(px + 16, dy, pw - 32, 62, 12);
     dcBg.lineStyle(1.5, 0xc9a7ff, 0.5);
-    dcBg.strokeRoundedRect(px + 18, dy, pw - 36, 66, 14);
-    this.add.image(px + 41, dy + 31, dailyModifierIcon(dc.modifier.id)).setDisplaySize(22, 22).setDepth(11);
-    this.add.text(px + 58, dy + 12, `今日挑战 · ${dc.modifier.name}`, {
-      fontFamily: FONT, fontSize: '16px', color: '#ffe066', fontStyle: 'bold'
+    dcBg.strokeRoundedRect(px + 16, dy, pw - 32, 62, 12);
+    this.add.image(px + 38, dy + 30, dailyModifierIcon(dc.modifier.id)).setDisplaySize(20, 20).setDepth(11);
+    this.add.text(px + 54, dy + 10, `今日挑战 · ${dc.modifier.name}`, {
+      fontFamily: FONT, fontSize: '15px', color: '#ffe066', fontStyle: 'bold'
     }).setDepth(11);
-    this.add.text(px + 58, dy + 36, `${dc.modifier.desc}${dc.state.bestMs ? `  ·  最佳 ${(dc.state.bestMs / 1000).toFixed(1)}s` : '  ·  首次完成 +40 银币'}`, {
+    this.add.text(px + 54, dy + 34, `${dc.modifier.desc}`, {
       fontFamily: FONT, fontSize: '11px', color: '#d8c7ff'
     }).setDepth(11);
-    const dcHit = this.add.rectangle(px + pw / 2, dy + 33, pw - 36, 66, 0xffffff, 0.001).setDepth(12).setInteractive({ useHandCursor: true });
+    const dcHit = this.add.rectangle(px + pw / 2, dy + 31, pw - 32, 62, 0xffffff, 0.001).setDepth(12).setInteractive({ useHandCursor: true });
     dcHit.on('pointerdown', () => { playSfx(this, 'click', 0.4); this.startGame(true); });
 
-    // 次级按钮四宫格
+    // 5) 次级入口四宫格
     const items: { icon: string; label: string; sub: string; onClick: () => void }[] = [
       { icon: 'ui-shop', label: '晋升商店', sub: '皮肤 · 手枪', onClick: () => this.scene.start('Shop') },
       { icon: 'ui-clipboard', label: '任务成就', sub: '签到 · 排行', onClick: () => this.scene.start('Quest') },
-      { icon: 'ui-palette', label: '自定义人物', sub: '换上你的脸', onClick: () => this.scene.start('CustomChar') },
+      { icon: 'ui-palette', label: '自定义', sub: '换上你的脸', onClick: () => this.scene.start('CustomChar') },
       { icon: 'ui-gear', label: '设置', sub: '声音 · 存档', onClick: () => this.scene.start('Settings') }
     ];
     items.forEach((it, i) => {
-      const bx = px + 18 + (i % 2) * ((pw - 44) / 2 + 8);
-      const by = 306 + Math.floor(i / 2) * 66;
-      const bw = (pw - 44) / 2;
+      const gap = 8;
+      const bw = (pw - 32 - gap) / 2;
+      const bh = 54;
+      const bx = px + 16 + (i % 2) * (bw + gap);
+      const by = 298 + Math.floor(i / 2) * (bh + gap);
       const bg = this.add.graphics().setDepth(10);
       bg.fillStyle(0x16324f, 0.85);
-      bg.fillRoundedRect(bx, by, bw, 58, 12);
+      bg.fillRoundedRect(bx, by, bw, bh, 11);
       bg.lineStyle(1.2, 0xffffff, 0.12);
-      bg.strokeRoundedRect(bx, by, bw, 58, 12);
-      this.add.image(bx + 20, by + 19, it.icon).setDisplaySize(17, 17).setDepth(11);
-      this.add.text(bx + 34, by + 10, it.label, { fontFamily: FONT, fontSize: '14px', color: '#ffffff', fontStyle: 'bold' }).setDepth(11);
-      this.add.text(bx + 34, by + 33, it.sub, { fontFamily: FONT, fontSize: '10px', color: '#93b5d6' }).setDepth(11);
-      const hit = this.add.rectangle(bx + bw / 2, by + 29, bw, 58, 0xffffff, 0.001).setDepth(12).setInteractive({ useHandCursor: true });
+      bg.strokeRoundedRect(bx, by, bw, bh, 11);
+      this.add.image(bx + 19, by + 18, it.icon).setDisplaySize(16, 16).setDepth(11);
+      this.add.text(bx + 32, by + 9, it.label, { fontFamily: FONT, fontSize: '13px', color: '#ffffff', fontStyle: 'bold' }).setDepth(11);
+      this.add.text(bx + 32, by + 30, it.sub, { fontFamily: FONT, fontSize: '10px', color: '#93b5d6' }).setDepth(11);
+      const hit = this.add.rectangle(bx + bw / 2, by + bh / 2, bw, bh, 0xffffff, 0.001).setDepth(12).setInteractive({ useHandCursor: true });
       hit.on('pointerover', () => bg.setAlpha(0.95));
       hit.on('pointerout', () => bg.setAlpha(1));
       hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); it.onClick(); });
     });
 
+    // 6) 底部小字入口:无尽模式(老玩法,弱化处理)
+    {
+      const y = 428;
+      const link = this.add
+        .text(px + pw / 2, y, '无尽模式 · 能撑多久算多久', {
+          fontFamily: FONT, fontSize: '11px', color: '#7f9cbb'
+        })
+        .setOrigin(0.5)
+        .setDepth(11);
+      const hit = this.add
+        .rectangle(px + pw / 2, y, pw - 60, 22, 0xffffff, 0.001)
+        .setDepth(12)
+        .setInteractive({ useHandCursor: true });
+      hit.on('pointerover', () => link.setColor('#cfe3ff'));
+      hit.on('pointerout', () => link.setColor('#7f9cbb'));
+      hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); this.startGame(false); });
+    }
+
     // 底部提示
     const pad = loadControls().virtualButtons;
-    this.add.text(px + pw / 2, 449, pad ? '点闯关模式开始 · D 每日挑战' : '空格进无尽模式 · D 每日挑战 · ↓ 滑铲', {
+    this.add.text(px + pw / 2, 452, pad ? '点「继续闯关」开始 · D 每日挑战' : '空格进无尽模式 · D 每日挑战 · ↓ 滑铲', {
       fontFamily: FONT, fontSize: '11px', color: '#cfe3ff'
     }).setOrigin(0.5).setDepth(10).setAlpha(0.92);
   }
