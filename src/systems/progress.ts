@@ -53,6 +53,14 @@ export interface Progress {
   dungeonCleared: Record<string, number>; // 留置室横版关卡通关次数(关卡 id → 次数)
   /** 宽大处理额度:在留置室交代成功后攒下,下一局主线关卡多给几顶乌纱帽 */
   redeemBonus: number;
+  // ---- 贪官养成 ----
+  assets: Record<string, number>;   // 贪污资产等级(资产 id → 等级)
+  network: Record<string, number>;  // 人脉等级(人脉 id → 等级)
+  laundered: number;                // 洗白累计抵掉的风险
+  lastAccrualAt: number;            // 上次收益结算时间戳(离线收益用)
+  lastAuditAt: number;              // 上次纪检委审查时间戳
+  auditsSurvived: number;           // 累计躲过的审查次数
+  assetsSeized: number;             // 累计被没收的资产次数
 }
 
 const KEY = 'wangboProgress';
@@ -85,7 +93,9 @@ function defaults(): Progress {
     pistolLevel: 0, bribeCarryLevel: 0,
     tutorialDone: false,
     bestRankIndex: 0, missionsDone: 0, overdrives: 0, nearMisses: 0, dailyPlays: 0,
-    levelStars: {}, levelClears: 0, perfectSlides: 0, starMilestones: [], dungeonCleared: {}, redeemBonus: 0
+    levelStars: {}, levelClears: 0, perfectSlides: 0, starMilestones: [], dungeonCleared: {}, redeemBonus: 0,
+    assets: {}, network: {}, laundered: 0,
+    lastAccrualAt: 0, lastAuditAt: 0, auditsSurvived: 0, assetsSeized: 0
   };
 }
 

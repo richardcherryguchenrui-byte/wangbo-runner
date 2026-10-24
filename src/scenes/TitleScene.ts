@@ -324,50 +324,34 @@ export default class TitleScene extends Phaser.Scene {
     const dcHit = this.add.rectangle(px + pw / 2, dy + 31, pw - 32, 62, 0xffffff, 0.001).setDepth(12).setInteractive({ useHandCursor: true });
     dcHit.on('pointerdown', () => { playSfx(this, 'click', 0.4); this.startGame(true); });
 
-    // 5) 次级入口四宫格
+    // 5) 次级入口:3 行 × 2 列
     const items: { icon: string; label: string; sub: string; onClick: () => void }[] = [
       { icon: 'ui-shop', label: '晋升商店', sub: '皮肤 · 手枪', onClick: () => this.scene.start('Shop') },
+      { icon: 'coin', label: '家产人脉', sub: '盖房 · 养关系', onClick: () => this.scene.start('Assets') },
       { icon: 'ui-clipboard', label: '任务成就', sub: '签到 · 排行', onClick: () => this.scene.start('Quest') },
       { icon: 'ui-palette', label: '自定义', sub: '换上你的脸', onClick: () => this.scene.start('CustomChar') },
+      { icon: 'ui-clock', label: '无尽模式', sub: '能撑多久', onClick: () => this.startGame(false) },
       { icon: 'ui-gear', label: '设置', sub: '声音 · 存档', onClick: () => this.scene.start('Settings') }
     ];
     items.forEach((it, i) => {
-      const gap = 8;
+      const gap = 7;
       const bw = (pw - 32 - gap) / 2;
-      const bh = 54;
+      const bh = 44;
       const bx = px + 16 + (i % 2) * (bw + gap);
-      const by = 298 + Math.floor(i / 2) * (bh + gap);
+      const by = 288 + Math.floor(i / 2) * (bh + gap);
       const bg = this.add.graphics().setDepth(10);
       bg.fillStyle(0x16324f, 0.85);
-      bg.fillRoundedRect(bx, by, bw, bh, 11);
+      bg.fillRoundedRect(bx, by, bw, bh, 10);
       bg.lineStyle(1.2, 0xffffff, 0.12);
-      bg.strokeRoundedRect(bx, by, bw, bh, 11);
-      this.add.image(bx + 19, by + 18, it.icon).setDisplaySize(16, 16).setDepth(11);
-      this.add.text(bx + 32, by + 9, it.label, { fontFamily: FONT, fontSize: '13px', color: '#ffffff', fontStyle: 'bold' }).setDepth(11);
-      this.add.text(bx + 32, by + 30, it.sub, { fontFamily: FONT, fontSize: '10px', color: '#93b5d6' }).setDepth(11);
+      bg.strokeRoundedRect(bx, by, bw, bh, 10);
+      this.add.image(bx + 17, by + bh / 2, it.icon).setDisplaySize(15, 15).setDepth(11);
+      this.add.text(bx + 30, by + 6, it.label, { fontFamily: FONT, fontSize: '12px', color: '#ffffff', fontStyle: 'bold' }).setDepth(11);
+      this.add.text(bx + 30, by + 24, it.sub, { fontFamily: FONT, fontSize: '9px', color: '#93b5d6' }).setDepth(11);
       const hit = this.add.rectangle(bx + bw / 2, by + bh / 2, bw, bh, 0xffffff, 0.001).setDepth(12).setInteractive({ useHandCursor: true });
       hit.on('pointerover', () => bg.setAlpha(0.95));
       hit.on('pointerout', () => bg.setAlpha(1));
       hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); it.onClick(); });
     });
-
-    // 6) 底部小字入口:无尽模式(老玩法,弱化处理)
-    {
-      const y = 428;
-      const link = this.add
-        .text(px + pw / 2, y, '无尽模式 · 能撑多久算多久', {
-          fontFamily: FONT, fontSize: '11px', color: '#7f9cbb'
-        })
-        .setOrigin(0.5)
-        .setDepth(11);
-      const hit = this.add
-        .rectangle(px + pw / 2, y, pw - 60, 22, 0xffffff, 0.001)
-        .setDepth(12)
-        .setInteractive({ useHandCursor: true });
-      hit.on('pointerover', () => link.setColor('#cfe3ff'));
-      hit.on('pointerout', () => link.setColor('#7f9cbb'));
-      hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); this.startGame(false); });
-    }
 
     // 底部提示
     const pad = loadControls().virtualButtons;

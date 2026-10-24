@@ -19,6 +19,11 @@ import {
 import { generatePattern, stageFor, FLYER_Y } from '../src/systems/patterns';
 import { isPerfectSlideTiming, tightSlideIndex } from '../src/systems/slideJudge';
 import {
+  ASSETS, NETWORK, nextCost, incomePerMin, rawRisk, protection, netRisk, auditShield,
+  accrueOffline, resolveAudit, launderCost, launderEffect, MAX_OFFLINE_MS,
+  type Holdings
+} from '../src/systems/assets';
+import {
   DUNGEON_LEVELS, DG_LEGEND, DG_TILE, parseDungeon, isDungeonUnlocked, nextDungeonId,
   attackBox, boxesOverlap, canDash, DG_PLAYER_MAX_HP, DG_PLAYER_SPEED, DG_PLAYER_JUMP,
   DG_DOUBLE_JUMP_RATIO, DG_BOSS_HP, DG_ATTACK_DAMAGE, DG_DASH_MS, DG_DASH_COOLDOWN_MS,
@@ -1055,5 +1060,112 @@ describe('横版:房产证与新关卡', () => {
   it('房产证上限与硬上限合理', () => {
     expect(DG_DEED_MAX_HP).toBe(1);
     expect(DG_MAX_HP_CAP).toBeGreaterThan(DG_PLAYER_MAX_HP);
+  });
+});
+
+// 贪官养成:资产 / 人脉 / 审查
+describe('贪官养成系统', () => {
+  const empty: Holdings = { assets: {}, network: {}, laundered: 0 };
+
+  it('造价随等级递增,满级后返回 null', () => {
+    const a = ASSETS[0];
+    expect(nextCost(a, 0)).toBe(a.baseCost);
+    expect(nextCost(a, 1)!).toBeGreaterThan(nextCost(a, 0)!);
+    expect(nextCost(a, a.maxLevel)).toBe(null);
+  });
+
+  it('收益随资产等级线性增长,人脉提供百分比加成', () => {
+    expect(incomePerMin(empty)).toBe(0);
+    const onePurple = { assets: { purse: 3 }, network: {}, laundered: 0 };
+    expect(incomePerMin(onePurple)).toBe(ASSETS[0].incomePerMin * 3);
+    // 秘书小王每级 +8% 收益
+    const withSecretary = { assets: { purse: 3 }, network: { secretary: 1 }, laundered: 0 };
+    expect(incomePerMin(withSecretary)).toBeGreaterThan(incomePerMin(onePurple));
+  });
+
+  it('风险 = 资产风险 - 人脉保护 - 洗白,且夹在 0~100', () => {
+    const rich = { assets: { purse: 2, villa: 2 }, network: {}, laundered: 0 };
+    expect(rawRisk(rich)).toBe(ASSETS[0].risk * 2 + ASSETS[1].risk * 2);
+    expect(netRisk(rich)).toBe(rawRisk(rich));
+    const guarded = { ...rich, network: { mentor: 2, accountant: 1 } };
+    expect(netRisk(guarded)).toBe(Math.max(0, rawRisk(rich) - protection(guarded)));
+    // 洗白会再把风险压下去
+    expect(netRisk({ ...rich, laundered: 5 })).toBe(rawRisk(rich) - 5);
+    // 保护足够多时不会出现负风险
+    expect(netRisk({ assets: { purse: 1 }, network: { mentor: 5, accountant: 5 }, laundered: 0 })).toBe(0);
+  });
+
+  it('离线收益按时长结算,超过 12 小时按上限', () => {
+    const h = { assets: { purse: 5 }, network: {}, laundered: 0 };
+    const perMin = incomePerMin(h);
+    expect(accrueOffline(h, 60000).coins).toBe(perMin);
+    expect(accrueOffline(h, 0).coins).toBe(0);
+    const capped = accrueOffline(h, MAX_OFFLINE_MS * 3);
+    expect(capped.capped).toBe(true);
+    expect(capped.coins).toBe(Math.floor((perMin * MAX_OFFLINE_MS) / 60000));
+  });
+
+  it('没有资产就不会被审查', () => {
+    const r = resolveAudit(empty, 100, 0, 0);
+    expect(r.triggered).toBe(false);
+    expect(r.message.length).toBeGreaterThan(0);
+  });
+
+  it('风险越高越容易被查,roll 大则蒙混过关', () => {
+    const h = { assets: { estate: 2 }, network: {}, laundered: 0 };  // 44 风险
+    const caught = resolveAudit(h, 1000, 0, 0);
+    expect(caught.triggered).toBe(true);
+    expect(caught.passed).toBe(false);
+    expect(caught.seizedAssetId).toBe('estate');
+    expect(caught.fine).toBeGreaterThan(0);
+    const escaped = resolveAudit(h, 1000, 0.99, 0);
+    expect(escaped.triggered).toBe(false);
+    expect(escaped.passed).toBe(true);
+  });
+
+  it('有审查豁免时不会丢资产', () => {
+    const h = { assets: { estate: 2 }, network: { inspector: 1 }, laundered: 0 };
+    const r = resolveAudit(h, 1000, 0, auditShield(h));
+    expect(r.triggered).toBe(true);
+    expect(r.shielded).toBe(true);
+    expect(r.seizedAssetId).toBe(null);
+  });
+
+  it('没收的是价值最高的一项资产', () => {
+    const h = { assets: { purse: 8, mine: 1 }, network: {}, laundered: 0 };
+    const r = resolveAudit(h, 500, 0, 0);
+    expect(r.seizedAssetId).toBe('mine');
+    expect(r.fine).toBeLessThanOrEqual(500);
+  });
+
+  it('洗白成本与效果合理', () => {
+    const h = { assets: { estate: 3 }, network: {}, laundered: 0 };
+    expect(launderCost(h)).toBeGreaterThan(0);
+    const eff = launderEffect(h);
+    expect(eff).toBeGreaterThan(0);
+    expect(eff).toBeLessThan(netRisk(h));
+    expect(launderEffect(empty)).toBe(0);
+  });
+
+  it('资产与人脉数据自洽', () => {
+    const assetIds = new Set<string>();
+    ASSETS.forEach(a => {
+      expect(assetIds.has(a.id)).toBe(false);
+      assetIds.add(a.id);
+      expect(a.baseCost).toBeGreaterThan(0);
+      expect(a.costMul).toBeGreaterThan(1);
+      expect(a.incomePerMin).toBeGreaterThan(0);
+      expect(a.risk).toBeGreaterThan(0);
+      expect(a.maxLevel).toBeGreaterThan(0);
+    });
+    // 越贵的资产风险越高、收益越高
+    for (let i = 1; i < ASSETS.length; i++) {
+      expect(ASSETS[i].risk).toBeGreaterThan(ASSETS[i - 1].risk);
+      expect(ASSETS[i].incomePerMin).toBeGreaterThan(ASSETS[i - 1].incomePerMin);
+    }
+    NETWORK.forEach(n => {
+      expect(n.baseCost).toBeGreaterThan(0);
+      expect(n.protection + n.incomeBonus + n.auditShield).toBeGreaterThan(0);
+    });
   });
 });
