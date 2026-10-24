@@ -428,9 +428,25 @@ export default class AssetsScene extends Phaser.Scene {
         g.fillStyle(0xffd43b, 0.1);
         g.fillEllipse(x, FURNITURE_BASE - 6, 82, 30);
       }
-      const icon = this.add.image(x, FURNITURE_BASE, ASSET_ICONS[a.id] ?? 'coin')
+      // 产业落地成家具:底下垫一件柜子/台面,等级高一点的柜子带金边
+      if (level > 0) {
+        const cab = this.add.graphics().setDepth(7);
+        const cw = 66;
+        const ch = 20;
+        const cx0 = x - cw / 2;
+        const cy0 = FURNITURE_BASE - ch + 2;
+        cab.fillStyle(level >= 5 ? 0x4a3418 : 0x3a2a16, 1);
+        cab.fillRoundedRect(cx0, cy0, cw, ch, 4);
+        cab.fillStyle(level >= 5 ? 0x6b4a1c : 0x4e3a1e, 1);
+        cab.fillRoundedRect(cx0 + 2, cy0 + 2, cw - 4, ch - 8, 3);
+        cab.lineStyle(1.2, level >= 5 ? 0xffd43b : 0x22303f, level >= 5 ? 0.7 : 0.5);
+        cab.strokeRoundedRect(cx0, cy0, cw, ch, 4);
+        cab.fillStyle(level >= 5 ? 0xffd43b : 0x22303f, 0.9);
+        cab.fillCircle(x, cy0 + ch / 2 - 1, 2.2);
+      }
+      const icon = this.add.image(x, FURNITURE_BASE - (level > 0 ? 6 : 0), ASSET_ICONS[a.id] ?? 'coin')
         .setOrigin(0.5, 1)
-        .setDisplaySize(level > 0 ? 54 : 30, level > 0 ? 54 : 30)
+        .setDisplaySize(level > 0 ? 52 : 30, level > 0 ? 52 : 30)
         .setDepth(6)
         .setAlpha(level > 0 ? 1 : 0.3);
       const name = this.add.text(x, FURNITURE_BASE + 6, '', {
