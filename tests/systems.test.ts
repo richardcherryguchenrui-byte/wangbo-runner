@@ -24,7 +24,7 @@ import {
   DG_DOUBLE_JUMP_RATIO, DG_BOSS_HP, DG_ATTACK_DAMAGE, DG_DASH_MS, DG_DASH_COOLDOWN_MS,
   DG_ATTACK_MS, DG_ATTACK_COOLDOWN_MS, DG_ATTACK_RANGE,
   DG_THROWER_HP, DG_CHARGER_HP, DG_WINE_DAMAGE_BONUS, DG_CARD_MP, DG_CHEST_COINS,
-  comboDamageBonus, playerMeleeDamage,
+  comboDamageBonus, playerMeleeDamage, DG_DEED_MAX_HP, DG_MAX_HP_CAP,
   DG_PLAYER_MAX_MP, DG_MP_REGEN_PER_SEC, DG_MP_ON_KILL, DG_INVULN_MS,
   DG_SKILL_REPORT, DG_SKILL_SHIELD,
   canUseSkill, regenMp, skillCooldownRatio, inRadius
@@ -896,7 +896,8 @@ describe('留置室横版闯关 · 地图解析', () => {
     expect(isDungeonUnlocked('d2', { d1: 1 })).toBe(true);
     expect(nextDungeonId('d1')).toBe('d2');
     expect(nextDungeonId('d2')).toBe('d3');
-    expect(nextDungeonId('d3')).toBe(null);
+    expect(nextDungeonId('d4')).toBe('d5');
+    expect(nextDungeonId('d5')).toBe(null);
   });
 
   it('攻击盒朝向正确,命中判定是矩形相交', () => {
@@ -959,11 +960,12 @@ describe('留置室技能与 MP', () => {
   });
 
   it('三关按顺序解锁,最终关有 BOSS', () => {
-    expect(DUNGEON_LEVELS.map(l => l.id)).toEqual(['d1', 'd2', 'd3']);
+    expect(DUNGEON_LEVELS.map(l => l.id)).toEqual(['d1', 'd2', 'd3', 'd4', 'd5']);
     expect(isDungeonUnlocked('d2', {})).toBe(false);
     expect(isDungeonUnlocked('d2', { d1: 1 })).toBe(true);
     expect(isDungeonUnlocked('d3', { d1: 1, d2: 1 })).toBe(true);
-    expect(parseDungeon(DUNGEON_LEVELS[2].map).boss).not.toBe(null);
+    const last = DUNGEON_LEVELS[DUNGEON_LEVELS.length - 1];
+    expect(parseDungeon(last.map).boss).not.toBe(null);
     expect(parseDungeon(DUNGEON_LEVELS[1].map).boss).toBe(null);
   });
 
@@ -1014,5 +1016,44 @@ describe('横版深加工:新实体与连击', () => {
     expect(DG_CARD_MP).toBeGreaterThan(0);
     expect(DG_CHEST_COINS).toBeGreaterThan(0);
     expect(DG_WINE_DAMAGE_BONUS).toBeGreaterThan(0);
+  });
+});
+
+
+// 房产证与关卡扩充
+describe('横版:房产证与新关卡', () => {
+  it('房产证出现在关卡里,解析正常', () => {
+    const all = DUNGEON_LEVELS.map(l => parseDungeon(l.map));
+    expect(all.some(p => p.deeds.length > 0)).toBe(true);
+  });
+
+  it('共 5 关,逐层解锁,最终关有 BOSS', () => {
+    expect(DUNGEON_LEVELS.length).toBe(5);
+    const ids = DUNGEON_LEVELS.map(l => l.id);
+    expect(isDungeonUnlocked(ids[0], {})).toBe(true);
+    for (let i = 1; i < ids.length; i++) {
+      const cleared: Record<string, number> = {};
+      for (let j = 0; j < i; j++) cleared[ids[j]] = 1;
+      expect(isDungeonUnlocked(ids[i], cleared)).toBe(true);
+      // 缺上一关就应该锁着
+      delete cleared[ids[i - 1]];
+      expect(isDungeonUnlocked(ids[i], cleared)).toBe(false);
+    }
+    const lastParsed = parseDungeon(DUNGEON_LEVELS[4].map);
+    expect(lastParsed.boss).not.toBe(null);
+  });
+
+  it('每关都有独立标语,楼梯间是竖长关卡,天台有风', () => {
+    const subtitles = new Set(DUNGEON_LEVELS.map(l => l.subtitle));
+    expect(subtitles.size).toBe(DUNGEON_LEVELS.length);
+    const stair = parseDungeon(DUNGEON_LEVELS[2].map);
+    expect(stair.heightPx).toBeGreaterThan(stair.widthPx * 0.4);   // 竖长
+    expect(DUNGEON_LEVELS[3].windX).toBeLessThan(0);              // 天台往左吹
+    expect(DUNGEON_LEVELS[0].windX).toBeUndefined();
+  });
+
+  it('房产证上限与硬上限合理', () => {
+    expect(DG_DEED_MAX_HP).toBe(1);
+    expect(DG_MAX_HP_CAP).toBeGreaterThan(DG_PLAYER_MAX_HP);
   });
 });

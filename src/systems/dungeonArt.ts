@@ -509,6 +509,42 @@ export function buildDungeonTextures(scene: Phaser.Scene) {
     ctx.stroke();
   });
 
+
+  // ---- 房产证:红皮本子,拿到生命上限 +1 ----
+  tex(scene, 'dg-deed', 44, 34, (ctx) => {
+    // 封皮
+    const g = ctx.createLinearGradient(0, 0, 0, 34);
+    g.addColorStop(0, '#c92a2a');
+    g.addColorStop(1, '#8a1414');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = '#4a0808';
+    ctx.lineWidth = 2;
+    rrect(ctx, 3, 4, 38, 26, 3);
+    ctx.fill();
+    ctx.stroke();
+    // 内页边缘
+    ctx.fillStyle = '#f5f0e2';
+    ctx.fillRect(6, 28, 32, 3);
+    // 国徽感圆章
+    ctx.fillStyle = '#ffd43b';
+    ctx.beginPath();
+    ctx.arc(14, 17, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#8a1414';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('房', 14, 17);
+    // 文字
+    ctx.fillStyle = '#ffe066';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('房产证', 22, 15);
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '7px sans-serif';
+    ctx.fillText('不动产权证', 22, 24);
+  });
+
   // ---- 平台边缘高光条 ----
   tex(scene, 'dg-edge', 8, 8, (ctx) => {
     ctx.fillStyle = 'rgba(150,220,255,0.55)';

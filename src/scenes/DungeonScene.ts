@@ -28,6 +28,8 @@ import {
   DG_BOSS_TOUCH_DAMAGE,
   DG_PLAYER_MAX_MP,
   DG_MP_ON_KILL,
+  DG_DEED_MAX_HP,
+  DG_MAX_HP_CAP,
   DG_THROWER_HP,
   DG_THROWER_RANGE,
   DG_THROWER_COOLDOWN_MS,
@@ -102,6 +104,8 @@ export default class DungeonScene extends Phaser.Scene {
   private goalSprite?: Phaser.GameObjects.Image;
 
   private hp = DG_PLAYER_MAX_HP;
+  /** 本局生命上限(房产证可加) */
+  private maxHp = DG_PLAYER_MAX_HP;
   private mp = DG_PLAYER_MAX_MP;
   private reportReadyAt = 0;
   private shieldReadyAt = 0;
@@ -171,6 +175,7 @@ export default class DungeonScene extends Phaser.Scene {
     this.parsed = parseDungeon(this.level.map);
 
     this.hp = DG_PLAYER_MAX_HP;
+    this.maxHp = DG_PLAYER_MAX_HP;
     this.mp = DG_PLAYER_MAX_MP;
     this.reportReadyAt = 0;
     this.shieldReadyAt = 0;
@@ -181,6 +186,12 @@ export default class DungeonScene extends Phaser.Scene {
     this.respawnAt = null;
     this.hitstopUntil = 0;
     this.hudSkillIcons = [];
+    // BOSS 血条/出口是可选的:从有 BOSS 的关卡切到没 BOSS 的关卡时,
+    // 这些字段会残留上一次已销毁的对象,必须显式清空,否则对已销毁对象
+    // 调用 clear() 会抛异常,场景会卡在 CREATING 状态再也起不来。
+    this.hudBossBar = undefined;
+    this.hudBossLabel = undefined;
+    this.goalSprite = undefined;
     this.hudCombo = undefined;
     this.runCoins = 0;
     this.jumpsUsed = 0;
@@ -386,7 +397,7 @@ export default class DungeonScene extends Phaser.Scene {
       const heart = obj as Phaser.Physics.Arcade.Image;
       if (!heart.active) return;
       heart.destroy();
-      this.hp = Math.min(DG_PLAYER_MAX_HP, this.hp + 1);
+      this.hp = Math.min(this.maxHp, this.hp + 1);
       this.refreshHeartHud();
       playSfx(this, 'hype', 0.4);
       poof(this, heart.x, heart.y, 6);
@@ -482,6 +493,21 @@ export default class DungeonScene extends Phaser.Scene {
       playSfx(this, 'coin', 0.4);
       poof(this, img.x, img.y, 6);
       this.floatText(img.x, img.y - 20, `购物卡 法力 +${DG_CARD_MP}`, '#74c0fc');
+    }));
+
+    this.parsed.deeds.forEach(d => mk('dg-deed', d.x, d.y, [44, 34], 5, img => {
+      img.destroy();
+      if (this.maxHp < DG_MAX_HP_CAP) {
+        this.maxHp = Math.min(DG_MAX_HP_CAP, this.maxHp + DG_DEED_MAX_HP);
+        this.hp = Math.min(this.maxHp, this.hp + DG_DEED_MAX_HP);
+      } else {
+        this.hp = Math.min(this.maxHp, this.hp + 1);
+      }
+      this.refreshHeartHud();
+      playSfx(this, 'unlock', 0.5);
+      poof(this, img.x, img.y, 10);
+      this.floatText(img.x, img.y - 20, '房产证到手 · 生命上限 +1', '#ff8787');
+      showToast(this, GAME_WIDTH / 2, 150, '房产证到手:本局生命上限 +1', '#ff8787', 'ui-heart');
     }));
 
     this.parsed.checkpoints.forEach((c, i) => mk('dg-flag', c.x, c.y, [36, 56], 0, img => {
@@ -582,8 +608,9 @@ export default class DungeonScene extends Phaser.Scene {
     hudBg.lineStyle(1.5, 0xffffff, 0.12);
     hudBg.strokeRoundedRect(16, 14, 300, 52, 14);
 
-    for (let i = 0; i < DG_PLAYER_MAX_HP; i++) {
-      const h = this.add.image(44 + i * 30, 40, 'ui-heart').setDisplaySize(22, 22);
+    // 预留到上限的心位,房产证加血时逐颗点亮
+    for (let i = 0; i < DG_MAX_HP_CAP; i++) {
+      const h = this.add.image(44 + i * 26, 40, 'ui-heart').setDisplaySize(22, 22);
       this.hudHearts.push(h);
     }
 
@@ -664,6 +691,8 @@ export default class DungeonScene extends Phaser.Scene {
 
   private refreshHeartHud() {
     this.hudHearts.forEach((h, i) => {
+      const exists = i < this.maxHp;
+      h.setVisible(exists);
       h.setAlpha(i < this.hp ? 1 : 0.22);
       h.setTint(i < this.hp ? 0xffffff : 0x44546a);
     });
@@ -1074,7 +1103,7 @@ export default class DungeonScene extends Phaser.Scene {
     this.over = false;
     this.uiTop.removeAll(true);
     this.physics.resume();
-    this.hp = DG_PLAYER_MAX_HP;
+    this.hp = this.maxHp;
     this.refreshHeartHud();
     this.player.clearTint();
     this.player.setPosition(this.respawnAt.x, this.respawnAt.y - 64);
@@ -1236,16 +1265,18 @@ export default class DungeonScene extends Phaser.Scene {
       }
     } else {
       body.setAllowGravity(true);
+      // 天台的风:直接把速度整体偏移,逆风跑得慢、站着会被吹走
+      const wind = this.level.windX ?? 0;
       if (left && !right) {
-        body.setVelocityX(-DG_PLAYER_SPEED);
+        body.setVelocityX(-DG_PLAYER_SPEED + wind);
         this.facing = -1;
         this.player.setFlipX(true);
       } else if (right && !left) {
-        body.setVelocityX(DG_PLAYER_SPEED);
+        body.setVelocityX(DG_PLAYER_SPEED + wind);
         this.facing = 1;
         this.player.setFlipX(false);
       } else {
-        body.setVelocityX(0);
+        body.setVelocityX(wind);
       }
     }
 

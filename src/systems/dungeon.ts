@@ -53,6 +53,8 @@ export interface ParsedDungeon {
   cards: DGPoint[];
   /** 检查点:死亡后从这里重来 */
   checkpoints: DGPoint[];
+  /** 房产证:本局生命上限 +1 */
+  deeds: DGPoint[];
   boss: DGPoint | null;
   goal: DGPoint | null;
   /** 玩家出生点:脚底锚点(y 为地面像素 y) */
@@ -66,6 +68,8 @@ export interface DungeonLevelDef {
   theme: DungeonTheme;
   /** 小兵血量 */
   enemyHp: number;
+  /** 水平风力(px/s):负数往左吹,天台关卡的特色机制 */
+  windX?: number;
   map: string[];
 }
 
@@ -116,6 +120,46 @@ const LEVEL_ARCHIVE_MAP = [
   '##########################.XX.################.XX.######################'
 ];
 
+const LEVEL_STAIR_MAP = [
+  '############################################',
+  '....................V...................G...',
+  '................###########.......#########.',
+  '............................................',
+  '........m...........k.......................',
+  '....###########.............................',
+  '............................................',
+  '...............r.***........................',
+  '............###########.....................',
+  '............................................',
+  '......................***...e...............',
+  '....................###########.............',
+  '............................................',
+  '............***c............................',
+  '..........###########.......................',
+  '............................................',
+  '...****.....................................',
+  '..#########.................................',
+  '............................................',
+  '....P...e...........S.........h.....XX......',
+  '############################################',
+  '############################################'
+];
+const LEVEL_ROOF_MAP = [
+  '################################################################################',
+  '................................................................................',
+  '................................................................................',
+  '................................................................................',
+  '................................................................................',
+  '..............................................................V..***............',
+  '............................................................######..............',
+  '...............................***..............................................',
+  '..............................#####.............................................',
+  '................................................................................',
+  '...P....e.......m.**e.....S.......e.....k...c...e...h.........e.........c....G..',
+  '###########...###########...###########...###########...###########...##########',
+  '###########...###########...###########...###########...###########...##########'
+];
+
 export const DUNGEON_LEVELS: DungeonLevelDef[] = [
   {
     id: 'd1',
@@ -135,6 +179,23 @@ export const DUNGEON_LEVELS: DungeonLevelDef[] = [
   },
   {
     id: 'd3',
+    name: '楼梯间',
+    subtitle: '一层一层往上爬,每一层都有人在等你',
+    theme: 'archive',
+    enemyHp: 3,
+    map: LEVEL_STAIR_MAP
+  },
+  {
+    id: 'd4',
+    name: '天台',
+    subtitle: '风很大,话说得越大越站不稳',
+    theme: 'detention',
+    enemyHp: 3,
+    windX: -80,
+    map: LEVEL_ROOF_MAP
+  },
+  {
+    id: 'd5',
     name: '留置室深处',
     subtitle: '档案搬完了,人也走不掉了',
     theme: 'detention',
@@ -162,7 +223,7 @@ export function isDungeonUnlocked(id: string, cleared: Record<string, number>): 
 }
 
 /** 地图里出现过的字符集合(用于数据自检) */
-export const DG_LEGEND = '#.*PerBchXGCSmk';
+export const DG_LEGEND = '#.*PerBchXGCSmkV';
 
 /**
  * 解析 ASCII 地图。
@@ -181,6 +242,7 @@ export function parseDungeon(map: string[]): ParsedDungeon {
   const wines: DGPoint[] = [];
   const cards: DGPoint[] = [];
   const checkpoints: DGPoint[] = [];
+  const deeds: DGPoint[] = [];
   const coins: DGPoint[] = [];
   const hearts: DGPoint[] = [];
   let boss: DGPoint | null = null;
@@ -288,6 +350,9 @@ export function parseDungeon(map: string[]): ParsedDungeon {
         case 'S':
           checkpoints.push({ x: footX, y: footY });
           break;
+        case 'V':
+          deeds.push({ x: footX, y: footY });
+          break;
         default:
           break;
       }
@@ -308,6 +373,7 @@ export function parseDungeon(map: string[]): ParsedDungeon {
     wines,
     cards,
     checkpoints,
+    deeds,
     boss,
     goal,
     playerStart
@@ -463,3 +529,9 @@ export function comboDamageBonus(combo: number): number {
 export function playerMeleeDamage(combo: number, wineActive: boolean, base = DG_ATTACK_DAMAGE): number {
   return base + comboDamageBonus(combo) + (wineActive ? DG_WINE_DAMAGE_BONUS : 0);
 }
+
+
+/** 房产证:本局生命上限 +1(可叠加) */
+export const DG_DEED_MAX_HP = 1;
+/** 生命上限的硬上限,防止堆到满屏心 */
+export const DG_MAX_HP_CAP = 9;
