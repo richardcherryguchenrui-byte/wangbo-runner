@@ -25,7 +25,7 @@ import {
   accrueOffline, resolveAudit, launderCost, launderEffect, MAX_OFFLINE_MS,
   assetPerks, totalAssetValue, ASSET_PERK_TEXT, EMPTY_PERKS,
   WINDS, WIND_WINDOW_MS, currentWind, incomePerMinWithWind, netRiskWithWind,
-  ASSET_TITLES, assetTitle, newsFor,
+  ASSET_TITLES, assetTitle, newsFor, RIVALS, assetLeaderboard, nextRival,
   type Holdings
 } from '../src/systems/assets';
 import {
@@ -1395,6 +1395,55 @@ describe('下一步提示', () => {
       expect(r).not.toBe(null);
       expect(r!.text.length).toBeGreaterThan(3);
       expect(['Assets', 'Campaign', 'Quest']).toContain(r!.scene);
+    });
+  });
+});
+
+// 官场名人堂
+describe('官场名人堂', () => {
+  it('玩家被正确插进名次表,名次从 1 开始连续', () => {
+    const rows = assetLeaderboard({ assets: { estate: 2 }, network: {}, laundered: 0 });
+    expect(rows.length).toBe(RIVALS.length + 1);
+    expect(rows.filter(r => r.isPlayer).length).toBe(1);
+    rows.forEach((r, i) => expect(r.rank).toBe(i + 1));
+    // 按家产从高到低
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i - 1].value).toBeGreaterThanOrEqual(rows[i].value);
+    }
+  });
+
+  it('一穷二白时排最后', () => {
+    const rows = assetLeaderboard({ assets: {}, network: {}, laundered: 0 });
+    const me = rows.find(r => r.isPlayer)!;
+    expect(me.rank).toBe(rows.length);
+  });
+
+  it('超过所有人后排第一', () => {
+    // 全满级约 20.8 万,刚好能超过榜首(20 万)
+    const rows = assetLeaderboard({ assets: { purse: 8, villa: 8, shell: 8, mine: 8, offshore: 6, estate: 6 }, network: {}, laundered: 0 });
+    const me = rows.find(r => r.isPlayer)!;
+    expect(me.rank).toBe(1);
+  });
+
+  it('给出「下一个要超过的对手」与差额', () => {
+    const h: Holdings = { assets: { purse: 2 }, network: {}, laundered: 0 };
+    const r = nextRival(h);
+    expect(r.ahead).not.toBe(null);
+    expect(r.gap).toBeGreaterThan(0);
+    expect(r.ahead!.value).toBeGreaterThan(totalAssetValue(h));
+    // 已经登顶时没有对手
+    const top = nextRival({ assets: { purse: 8, villa: 8, shell: 8, mine: 8, offshore: 6, estate: 6 }, network: {}, laundered: 0 });
+    expect(top.ahead).toBe(null);
+    expect(top.gap).toBe(0);
+  });
+
+  it('对手名单按家产升序且都有评语', () => {
+    for (let i = 1; i < RIVALS.length; i++) {
+      expect(RIVALS[i].value).toBeGreaterThan(RIVALS[i - 1].value);
+    }
+    RIVALS.forEach(r => {
+      expect(r.name.length).toBeGreaterThan(1);
+      expect(r.taunt.length).toBeGreaterThan(3);
     });
   });
 });

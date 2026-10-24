@@ -29,6 +29,8 @@ import {
   formatValue,
   newsFor,
   incomePerMin as rawIncome,
+  assetLeaderboard,
+  nextRival,
   type WindDef,
   type Holdings
 } from '../systems/assets';
@@ -103,6 +105,7 @@ export default class AssetsScene extends Phaser.Scene {
     addMenuFooter(this, '资产越肥风险越高 · 洗白能压风险,人脉能保命');
     this.refreshAll();
     this.drawShareButton();
+    this.drawHallButton();
     this.maybeShowIntro(p);
     this.maybeAudit(p);
   }
@@ -285,6 +288,83 @@ export default class AssetsScene extends Phaser.Scene {
     const hit = this.add.rectangle(GAME_WIDTH / 2, btnY, 200, 44, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
     layer.add(hit);
     hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); layer.destroy(true); });
+  }
+
+  // 官场名人堂:固定对手榜,给玩家一个「下一个超过谁」的目标
+  private drawHallButton() {
+    const x = GAME_WIDTH - 96;
+    const y = GAME_HEIGHT - 26;
+    const g = this.add.graphics().setDepth(24);
+    g.fillStyle(0x2d2350, 0.95);
+    g.fillRoundedRect(x - 62, y - 14, 124, 30, 15);
+    g.lineStyle(1.4, 0xb197fc, 0.5);
+    g.strokeRoundedRect(x - 62, y - 14, 124, 30, 15);
+    this.add.image(x - 42, y + 1, 'ui-rank').setDisplaySize(14, 14).setDepth(25);
+    this.add.text(x - 28, y + 1, '名人堂', {
+      fontFamily: FONT, fontSize: '13px', color: '#cfe3ff', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0, 0.5).setDepth(25);
+    const hit = this.add.rectangle(x, y + 1, 124, 30, 0xffffff, 0.001)
+      .setDepth(26)
+      .setInteractive({ useHandCursor: true });
+    hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); this.showHall(); });
+    void g;
+  }
+
+  private showHall() {
+    const rows = assetLeaderboard(this.holdings);
+    const nr = nextRival(this.holdings);
+    const layer = this.add.container(0, 0).setDepth(135);
+    layer.add(this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x02060c, 0.86).setInteractive());
+    const panel = this.add.graphics();
+    panel.fillStyle(0x120b22, 0.98);
+    panel.fillRoundedRect(GAME_WIDTH / 2 - 300, 56, 600, 440, 22);
+    panel.lineStyle(2, 0xb197fc, 0.5);
+    panel.strokeRoundedRect(GAME_WIDTH / 2 - 300, 56, 600, 440, 22);
+    layer.add(panel);
+    layer.add(this.add.text(GAME_WIDTH / 2, 88, '官场名人堂', {
+      fontFamily: FONT, fontSize: '26px', color: '#b197fc', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0.5));
+    layer.add(this.add.text(GAME_WIDTH / 2, 116, nr.ahead
+      ? `下一个要超过:${nr.ahead.name} · 还差 ${formatValue(nr.gap)}`
+      : '你已经在这条街上最有钱了', {
+      fontFamily: FONT, fontSize: '12px', color: '#cfe3ff', resolution: 2
+    }).setOrigin(0.5));
+
+    rows.slice(0, 8).forEach((r, i) => {
+      const y = 154 + i * 38;
+      const g = this.add.graphics();
+      g.fillStyle(r.isPlayer ? 0x3a2b12 : 0x0d1a2b, r.isPlayer ? 0.95 : 0.7);
+      g.fillRoundedRect(GAME_WIDTH / 2 - 270, y - 16, 540, 34, 9);
+      if (r.isPlayer) {
+        g.lineStyle(1.4, 0xffd43b, 0.7);
+        g.strokeRoundedRect(GAME_WIDTH / 2 - 270, y - 16, 540, 34, 9);
+      }
+      layer.add(g);
+      layer.add(this.add.text(GAME_WIDTH / 2 - 252, y, `${r.rank}`, {
+        fontFamily: FONT, fontSize: '14px', color: r.rank <= 3 ? '#ffd43b' : '#93b5d6', fontStyle: 'bold', resolution: 2
+      }).setOrigin(0, 0.5));
+      layer.add(this.add.text(GAME_WIDTH / 2 - 232, y, r.name, {
+        fontFamily: FONT, fontSize: '13px', color: r.isPlayer ? '#ffe066' : '#ffffff', fontStyle: 'bold', resolution: 2
+      }).setOrigin(0, 0.5));
+      layer.add(this.add.text(GAME_WIDTH / 2 + 20, y, r.taunt, {
+        fontFamily: FONT, fontSize: '10px', color: '#8ba9c7', resolution: 2
+      }).setOrigin(0, 0.5));
+      layer.add(this.add.text(GAME_WIDTH / 2 + 258, y, formatValue(r.value), {
+        fontFamily: FONT, fontSize: '13px', color: r.isPlayer ? '#ffe066' : '#cfe3ff', fontStyle: 'bold', resolution: 2
+      }).setOrigin(1, 0.5));
+    });
+
+    const by = 468;
+    const g2 = this.add.graphics();
+    g2.fillStyle(0x16324f, 0.95);
+    g2.fillRoundedRect(GAME_WIDTH / 2 - 80, by - 18, 160, 36, 18);
+    layer.add(g2);
+    layer.add(this.add.text(GAME_WIDTH / 2, by, '知道了', {
+      fontFamily: FONT, fontSize: '16px', color: '#cfe3ff', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0.5));
+    const hit = this.add.rectangle(GAME_WIDTH / 2, by, 160, 36, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
+    layer.add(hit);
+    hit.on('pointerdown', () => { playSfx(this, 'click', 0.3); layer.destroy(true); });
   }
 
   // 晒家产:生成竖版战绩卡

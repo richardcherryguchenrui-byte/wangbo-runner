@@ -109,10 +109,15 @@ export function resumeBgm(scene: Phaser.Scene) {
 }
 
 // 播放音效(自动应用音量设置,静音时跳过)
-export function playSfx(scene: Phaser.Scene, key: string, baseVolume = 0.5) {
+export function playSfx(scene: Phaser.Scene, key: string, baseVolume = 0.5, rate = 1) {
   const mult = soundMult();
   if (mult <= 0) return;
-  try { scene.sound.play(key, { volume: baseVolume * mult }); } catch {}
+  try {
+    // rate 用来做音调变化:连击越高音越亮,打击感更爽
+    const cfg: Phaser.Types.Sound.SoundConfig = { volume: baseVolume * mult };
+    if (rate !== 1) cfg.rate = Math.max(0.5, Math.min(3, rate));
+    scene.sound.play(key, cfg);
+  } catch {}
 }
 
 

@@ -374,3 +374,54 @@ export function newsFor(seized: boolean, seed: number): string {
   const i = Math.abs(Math.floor(seed * 7919)) % pool.length;
   return pool[i];
 }
+
+
+// ============================================================
+// 官场名人堂:没有后端也能有竞争感 —— 一组固定「对手」按家产总值排位
+// ============================================================
+
+export interface Rival {
+  name: string;
+  value: number;
+  /** 一句评语,越靠后越狂 */
+  taunt: string;
+}
+
+export const RIVALS: Rival[] = [
+  { name: '街道办的小杨', value: 1500, taunt: '刚学会收第一条烟' },
+  { name: '隔壁老王', value: 6000, taunt: '三套房,两辆车,一个情妇' },
+  { name: '祁厅长的司机', value: 18000, taunt: '开车的人知道的事最多' },
+  { name: '开发区的赵总', value: 45000, taunt: '一个标就是七位数' },
+  { name: '省城来的李公子', value: 90000, taunt: '他爸的名字印在红头文件上' },
+  { name: '高小琴的钢琴老师', value: 150000, taunt: '山水庄园的账,她最清楚' },
+  { name: '传说中的「老领导」', value: 200000, taunt: '没人见过他,但所有人都听他的' }
+];
+
+export interface LeaderRow {
+  name: string;
+  value: number;
+  taunt: string;
+  isPlayer: boolean;
+  rank: number;
+}
+
+/** 把玩家插进对手榜里,返回排好序的名次表 */
+export function assetLeaderboard(h: Holdings, playerName = '我'): LeaderRow[] {
+  const mine = totalAssetValue(h);
+  const rows: LeaderRow[] = RIVALS.map(r => ({
+    name: r.name, value: r.value, taunt: r.taunt, isPlayer: false, rank: 0
+  }));
+  rows.push({ name: playerName, value: mine, taunt: mine > 0 ? '你的家产' : '还没有产业', isPlayer: true, rank: 0 });
+  rows.sort((a, b) => b.value - a.value);
+  rows.forEach((r, i) => { r.rank = i + 1; });
+  return rows;
+}
+
+/** 玩家名次与「下一个要超过的对手」 */
+export function nextRival(h: Holdings): { rank: number; ahead: Rival | null; gap: number } {
+  const mine = totalAssetValue(h);
+  const ahead = RIVALS.filter(r => r.value > mine).sort((a, b) => a.value - b.value)[0] ?? null;
+  const rows = assetLeaderboard(h);
+  const me = rows.find(r => r.isPlayer)!;
+  return { rank: me.rank, ahead, gap: ahead ? ahead.value - mine : 0 };
+}

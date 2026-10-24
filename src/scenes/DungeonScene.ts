@@ -538,17 +538,20 @@ export default class DungeonScene extends Phaser.Scene {
     }));
   }
 
-  // 伤害飘字
-  private floatText(x: number, y: number, msg: string, color: string) {
+  // 伤害飘字:重击更大更弹
+  private floatText(x: number, y: number, msg: string, color: string, big = false) {
     const t = this.add
       .text(x, y, msg, {
-        fontFamily: FONT, fontSize: '15px', color, fontStyle: 'bold',
-        resolution: 2, stroke: '#08131f', strokeThickness: 4
+        fontFamily: FONT, fontSize: big ? '19px' : '15px', color, fontStyle: 'bold',
+        resolution: 2, stroke: '#08131f', strokeThickness: big ? 5 : 4
       })
       .setOrigin(0.5)
-      .setDepth(30);
+      .setDepth(30)
+      .setScale(big ? 0.5 : 0.8);
+    this.tweens.add({ targets: t, scale: 1, duration: big ? 160 : 110, ease: 'Back.out' });
     this.tweens.add({
-      targets: t, y: y - 42, alpha: 0, duration: 720, ease: 'Quad.out',
+      targets: t, y: y - (big ? 54 : 42), alpha: 0, duration: big ? 820 : 720,
+      delay: 60, ease: 'Quad.out',
       onComplete: () => t.destroy()
     });
   }
@@ -947,8 +950,12 @@ export default class DungeonScene extends Phaser.Scene {
     this.floatText(
       u.sprite.x, u.sprite.y - 26,
       heavy ? `${amount}!` : `${amount}`,
-      heavy ? '#ffa94d' : '#ffffff'
+      heavy ? '#ffa94d' : '#ffffff',
+      heavy
     );
+    // 音调随连击升高,重击更低沉,层次立刻不一样
+    const pitch = Math.min(1.9, 1 + this.combo * 0.035) + (heavy ? -0.18 : 0);
+    playSfx(this, 'near', heavy ? 0.42 : 0.3, pitch);
     const s = u.sprite;
     s.setTintFill(0xffffff);
     this.time.delayedCall(70, () => { if (s.active) s.clearTint(); });
@@ -978,7 +985,13 @@ export default class DungeonScene extends Phaser.Scene {
     const y = s.y;
     s.destroy();
     explode(this, x, y - 16);
-    playSfx(this, u.isBoss ? 'gameover' : 'wave_clear', 0.4);
+    if (u.isBoss) {
+      playSfx(this, 'gameover', 0.55);
+      this.time.delayedCall(120, () => playSfx(this, 'promote', 0.4));
+    } else {
+      playSfx(this, 'wave_clear', 0.34, 1 + Math.min(0.6, this.combo * 0.02));
+      this.time.delayedCall(60, () => playSfx(this, 'coin', 0.18, 1.4));
+    }
     if (u.isBoss) {
       shake(this, 0.02, 420);
       confettiBurst(this, x, y - 40, 40);
@@ -1085,7 +1098,7 @@ export default class DungeonScene extends Phaser.Scene {
     if (this.over || this.time.now < this.dashReadyAt) return;
     this.dashReadyAt = this.time.now + DG_DASH_COOLDOWN_MS;
     this.dashingUntil = this.time.now + DG_DASH_MS;
-    playSfx(this, 'jump', 0.3);
+    playSfx(this, 'jump', 0.32, 1.15);
     const ghost = this.add
       .image(this.player.x, this.player.y, 'dg-ghost')
       .setDepth(9)
