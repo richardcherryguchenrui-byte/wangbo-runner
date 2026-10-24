@@ -341,12 +341,13 @@ export interface AssetTitle {
   minValue: number;
 }
 
+// 门槛按当前资产表的上限(全满级约 20.8 万)设计,保证每一档都够得着
 export const ASSET_TITLES: AssetTitle[] = [
   { name: '白手套', color: '#ced4da', minValue: 0 },
-  { name: '操盘手', color: '#8ce99a', minValue: 10000 },
-  { name: '幕后老板', color: '#74c0fc', minValue: 100000 },
-  { name: '一方诸侯', color: '#b197fc', minValue: 1000000 },
-  { name: '隐形富豪', color: '#ffd43b', minValue: 10000000 }
+  { name: '操盘手', color: '#8ce99a', minValue: 3000 },
+  { name: '幕后老板', color: '#74c0fc', minValue: 15000 },
+  { name: '一方诸侯', color: '#b197fc', minValue: 60000 },
+  { name: '隐形富豪', color: '#ffd43b', minValue: 150000 }
 ];
 
 export function assetTitle(value: number): AssetTitle {

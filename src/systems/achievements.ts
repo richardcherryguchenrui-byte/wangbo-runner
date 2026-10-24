@@ -1,6 +1,20 @@
 // 成就系统:基于存档统计字段判定,领取时发放银币奖励
 // 判定是纯函数,方便单元测试;展示在「任务·成就」面板
 import type { Progress } from './progress';
+import { totalAssetValue, NETWORK } from './assets';
+
+/** 存档里的家产总值 */
+function assetValueOf(p: Progress): number {
+  return totalAssetValue({
+    assets: p.assets ?? {}, network: p.network ?? {}, laundered: p.laundered ?? 0
+  });
+}
+
+/** 人脉总等级 */
+function networkLevels(p: Progress): number {
+  const n = p.network ?? {};
+  return NETWORK.reduce((sum, def) => sum + (n[def.id] ?? 0), 0);
+}
 
 export interface AchievementDef {
   id: string;
@@ -26,7 +40,14 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'qitongwei', name: '拜入祁门', desc: '解锁祁同伟皮肤', reward: 50, check: p => p.skin === 'qitongwei' || p.owned.includes('skin-qitongwei') },
   { id: 'full-lives', name: '命硬', desc: '初始生命升级到满级', reward: 100, check: p => p.extraLives >= 3 },
   { id: 'magnate', name: '大收藏家', desc: '集齐全部挂件', reward: 120, check: p =>
-    ['star', 'briefcase', 'crown', 'medal', 'scale', 'trophy'].every(id => p.owned.includes('pendant-' + id)) }
+    ['star', 'briefcase', 'crown', 'medal', 'scale', 'trophy'].every(id => p.owned.includes('pendant-' + id)) },
+  // ---- 贪污资产与审查 ----
+  { id: 'first-asset', name: '第一个抽屉', desc: '建起第一项家产', reward: 40, check: p => assetValueOf(p) > 0 },
+  { id: 'asset-10k', name: '白手套起步', desc: '家产总值达到 1 万', reward: 120, check: p => assetValueOf(p) >= 10000 },
+  { id: 'asset-1m', name: '一方诸侯', desc: '家产总值达到 15 万', reward: 400, check: p => assetValueOf(p) >= 150000 },
+  { id: 'network-10', name: '关系户', desc: '人脉总等级达到 10', reward: 150, check: p => networkLevels(p) >= 10 },
+  { id: 'audit-5', name: '蒙混过关', desc: '累计躲过 5 次审查', reward: 200, check: p => (p.auditsSurvived ?? 0) >= 5 },
+  { id: 'seized-3', name: '家破人亡', desc: '被没收 3 次资产', reward: 60, check: p => (p.assetsSeized ?? 0) >= 3 }
 ];
 
 // 检测并领取新成就:返回新获得的成就,同时写入存档并发放奖励

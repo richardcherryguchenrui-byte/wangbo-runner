@@ -1252,10 +1252,10 @@ describe('风向、称号与新闻', () => {
 
   it('家产称号随总值升级', () => {
     expect(assetTitle(0).name).toBe('白手套');
-    expect(assetTitle(9999).name).toBe('白手套');
-    expect(assetTitle(10000).name).toBe('操盘手');
-    expect(assetTitle(1_000_000).name).toBe('一方诸侯');
-    expect(assetTitle(99_999_999).name).toBe('隐形富豪');
+    expect(assetTitle(2999).name).toBe('白手套');
+    expect(assetTitle(3000).name).toBe('操盘手');
+    expect(assetTitle(60000).name).toBe('一方诸侯');
+    expect(assetTitle(207_000).name).toBe('隐形富豪');
     ASSET_TITLES.forEach(t => expect(t.color).toMatch(/^#[0-9a-f]{6}$/i));
   });
 
@@ -1265,5 +1265,66 @@ describe('风向、称号与新闻', () => {
       expect(newsFor(false, seed).length).toBeGreaterThan(6);
     }
     expect(newsFor(true, 0.3)).not.toBe(newsFor(false, 0.3));
+  });
+});
+
+// 资产相关成就
+describe('贪官养成成就', () => {
+  const base = () => {
+    const p = JSON.parse(JSON.stringify({
+      coins: 0, totalDodged: 0, owned: [], pendant: '', extraLives: 0, skin: '',
+      bribeMoon: 0, saveVersion: 2, bestTimeMs: 0, bestDodged: 0, bestCombo: 0,
+      totalRuns: 0, totalTimeMs: 0, totalKills: 0, totalPickups: 0, totalSpent: 0,
+      inspectionsSurvived: 0, achievements: [], daily: null, lastLoginDate: '',
+      loginStreak: 0, pistolLevel: 0, bribeCarryLevel: 0, tutorialDone: false,
+      bestRankIndex: 0, missionsDone: 0, overdrives: 0, nearMisses: 0, dailyPlays: 0,
+      levelStars: {}, levelClears: 0, perfectSlides: 0, starMilestones: [],
+      dungeonCleared: {}, redeemBonus: 0,
+      assets: {}, network: {}, laundered: 0, lastAccrualAt: 0, lastAuditAt: 0,
+      auditsSurvived: 0, assetsSeized: 0
+    }));
+    return p;
+  };
+
+  it('建第一项家产就拿到「第一个抽屉」', () => {
+    const p = base();
+    expect(ACHIEVEMENTS.find(a => a.id === 'first-asset')!.check(p)).toBe(false);
+    p.assets = { purse: 1 };
+    expect(ACHIEVEMENTS.find(a => a.id === 'first-asset')!.check(p)).toBe(true);
+  });
+
+  it('家产万元与百万成就按总值判定', () => {
+    const p = base();
+    const a10k = ACHIEVEMENTS.find(a => a.id === 'asset-10k')!;
+    const a1m = ACHIEVEMENTS.find(a => a.id === 'asset-1m')!;
+    p.assets = { purse: 3 };
+    expect(a10k.check(p)).toBe(false);
+    p.assets = { estate: 3 };   // 2400+4080+6936 = 13416
+    expect(a10k.check(p)).toBe(true);
+    expect(a1m.check(p)).toBe(false);
+    // 全满级约 20.8 万,应当能拿到「一方诸侯」
+    p.assets = { purse: 8, villa: 8, shell: 8, mine: 8, offshore: 6, estate: 6 };
+    expect(a1m.check(p)).toBe(true);
+  });
+
+  it('人脉总等级与审查统计类成就', () => {
+    const p = base();
+    const net = ACHIEVEMENTS.find(a => a.id === 'network-10')!;
+    p.network = { mentor: 5 };
+    expect(net.check(p)).toBe(false);
+    p.network = { mentor: 5, accountant: 5 };
+    expect(net.check(p)).toBe(true);
+    expect(ACHIEVEMENTS.find(a => a.id === 'audit-5')!.check({ ...p, auditsSurvived: 5 })).toBe(true);
+    expect(ACHIEVEMENTS.find(a => a.id === 'seized-3')!.check({ ...p, assetsSeized: 3 })).toBe(true);
+  });
+
+  it('新成就都有奖励且 id 唯一', () => {
+    const ids = new Set<string>();
+    ACHIEVEMENTS.forEach(a => {
+      expect(ids.has(a.id)).toBe(false);
+      ids.add(a.id);
+      expect(a.reward).toBeGreaterThan(0);
+      expect(a.desc.length).toBeGreaterThan(0);
+    });
   });
 });
