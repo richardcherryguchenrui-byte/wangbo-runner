@@ -205,3 +205,83 @@ export function launderEffect(h: Holdings): number {
   if (risk <= 0) return 0;
   return Math.max(1, Math.round(risk * 0.3));
 }
+
+
+// ============================================================
+// 资产对玩法的加成:钱不是白花的 —— 盖出来的东西要能改变你跑关的手感
+// ============================================================
+
+export interface AssetPerks {
+  /** 情妇别墅:每 2 级多一顶乌纱帽 */
+  extraLives: number;
+  /** 关联公司:局内银币倍率 */
+  coinMul: number;
+  /** 干股煤矿:横版近战伤害加成 */
+  meleeBonus: number;
+  /** 海外账户:横版开局人脉 */
+  startMp: number;
+  /** 学区房:星级/首通奖励倍率 */
+  rewardMul: number;
+  /** 小金库:每次通关额外银币(直接加) */
+  clearBonus: number;
+}
+
+export const EMPTY_PERKS: AssetPerks = {
+  extraLives: 0, coinMul: 1, meleeBonus: 0, startMp: 0, rewardMul: 1, clearBonus: 0
+};
+
+/** 根据当前资产等级算出玩法加成 */
+export function assetPerks(h: Holdings): AssetPerks {
+  const lv = (id: string) => h.assets[id] ?? 0;
+  const villa = lv('villa');
+  const shell = lv('shell');
+  const mine = lv('mine');
+  const offshore = lv('offshore');
+  const estate = lv('estate');
+  const purse = lv('purse');
+  return {
+    extraLives: Math.floor(villa / 2),
+    coinMul: 1 + shell * 0.04,
+    meleeBonus: Math.min(3, Math.floor(mine / 2)),
+    startMp: offshore * 12,
+    rewardMul: 1 + estate * 0.05,
+    clearBonus: purse * 2
+  };
+}
+
+/** 家产总值(用于主界面展示与排行) */
+export function totalAssetValue(h: Holdings): number {
+  return ASSETS.reduce((sum, a) => {
+    const level = h.assets[a.id] ?? 0;
+    let cost = 0;
+    for (let i = 0; i < level; i++) cost += nextCost(a, i) ?? 0;
+    return sum + cost;
+  }, 0);
+}
+
+/** 每项资产的一句话玩法说明(界面展示用) */
+export const ASSET_PERK_TEXT: Record<string, string> = {
+  purse: '每关通关额外 +2 银币',
+  villa: '每 2 级 +1 顶乌纱帽',
+  shell: '局内银币 +4%/级',
+  mine: '每 2 级横版近战 +1',
+  offshore: '横版开局人脉 +12/级',
+  estate: '星级奖励 +5%/级'
+};
+
+/** 界面上的短标签版玩法说明 */
+export const ASSET_PERK_SHORT: Record<string, string> = {
+  purse: '通关 +2',
+  villa: '2级 +1帽',
+  shell: '银币 +4%/级',
+  mine: '2级 +1攻',
+  offshore: '人脉 +12/级',
+  estate: '奖励 +5%/级'
+};
+
+/** 家产总值的中文简写(万/亿),主界面展示用 */
+export function formatValue(v: number): string {
+  if (v >= 100000000) return `${(v / 100000000).toFixed(2)}亿`;
+  if (v >= 10000) return `${(v / 10000).toFixed(1)}万`;
+  return String(v);
+}

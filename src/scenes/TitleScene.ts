@@ -6,6 +6,7 @@ import { startBgm, playSfx } from '../systems/audio';
 import { ensureSkinTextures, playerFrameKey } from '../systems/skins';
 import { loadControls } from '../systems/controls';
 import { LEVELS, totalStars } from '../systems/levels';
+import { totalAssetValue, formatValue } from '../systems/assets';
 import { checkIn } from '../systems/daily';
 import { hasCustomHead } from '../systems/customhead';
 import { RUN_RANKS } from '../systems/ranks';
@@ -327,7 +328,16 @@ export default class TitleScene extends Phaser.Scene {
     // 5) 次级入口:3 行 × 2 列
     const items: { icon: string; label: string; sub: string; onClick: () => void }[] = [
       { icon: 'ui-shop', label: '晋升商店', sub: '皮肤 · 手枪', onClick: () => this.scene.start('Shop') },
-      { icon: 'coin', label: '家产人脉', sub: '盖房 · 养关系', onClick: () => this.scene.start('Assets') },
+      {
+        icon: 'coin', label: '家产人脉',
+        sub: (() => {
+          const v = totalAssetValue({
+            assets: p.assets ?? {}, network: p.network ?? {}, laundered: p.laundered ?? 0
+          });
+          return v > 0 ? `总值 ${formatValue(v)}` : '盖房 · 养关系';
+        })(),
+        onClick: () => this.scene.start('Assets')
+      },
       { icon: 'ui-clipboard', label: '任务成就', sub: '签到 · 排行', onClick: () => this.scene.start('Quest') },
       { icon: 'ui-palette', label: '自定义', sub: '换上你的脸', onClick: () => this.scene.start('CustomChar') },
       { icon: 'ui-clock', label: '无尽模式', sub: '能撑多久', onClick: () => this.startGame(false) },

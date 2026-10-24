@@ -21,6 +21,7 @@ import { isPerfectSlideTiming, tightSlideIndex } from '../src/systems/slideJudge
 import {
   ASSETS, NETWORK, nextCost, incomePerMin, rawRisk, protection, netRisk, auditShield,
   accrueOffline, resolveAudit, launderCost, launderEffect, MAX_OFFLINE_MS,
+  assetPerks, totalAssetValue, ASSET_PERK_TEXT, EMPTY_PERKS,
   type Holdings
 } from '../src/systems/assets';
 import {
@@ -1166,6 +1167,55 @@ describe('贪官养成系统', () => {
     NETWORK.forEach(n => {
       expect(n.baseCost).toBeGreaterThan(0);
       expect(n.protection + n.incomeBonus + n.auditShield).toBeGreaterThan(0);
+    });
+  });
+});
+
+// 资产对玩法的加成
+describe('资产加成与家产总值', () => {
+  const empty: Holdings = { assets: {}, network: {}, laundered: 0 };
+
+  it('空资产时所有加成都是中性值', () => {
+    const p = assetPerks(empty);
+    expect(p.extraLives).toBe(0);
+    expect(p.coinMul).toBe(1);
+    expect(p.meleeBonus).toBe(0);
+    expect(p.startMp).toBe(0);
+    expect(p.rewardMul).toBe(1);
+    expect(p.clearBonus).toBe(0);
+  });
+
+  it('各项资产给对应加成,且随等级提升', () => {
+    const one = { assets: { shell: 1, villa: 2, mine: 2, offshore: 1, estate: 1, purse: 3 }, network: {}, laundered: 0 };
+    const p = assetPerks(one);
+    expect(p.coinMul).toBeCloseTo(1.04, 5);
+    expect(p.extraLives).toBe(1);        // 别墅 2 级 → 1 顶
+    expect(p.meleeBonus).toBe(1);        // 煤矿 2 级 → +1
+    expect(p.startMp).toBe(12);
+    expect(p.rewardMul).toBeCloseTo(1.05, 5);
+    expect(p.clearBonus).toBe(6);        // 小金库 3 级 ×2
+
+    const many = { assets: { shell: 5, villa: 5, mine: 6, offshore: 3, estate: 3, purse: 8 }, network: {}, laundered: 0 };
+    const q = assetPerks(many);
+    expect(q.coinMul).toBeGreaterThan(p.coinMul);
+    expect(q.extraLives).toBeGreaterThan(p.extraLives);
+    expect(q.meleeBonus).toBeLessThanOrEqual(3);   // 近战加成有上限
+  });
+
+  it('家产总值随建造增长,且只算资产不算人脉', () => {
+    expect(totalAssetValue(empty)).toBe(0);
+    const onePurse = { assets: { purse: 1 }, network: {}, laundered: 0 };
+    expect(totalAssetValue(onePurse)).toBe(ASSETS[0].baseCost);
+    const twoPurse = { assets: { purse: 2 }, network: {}, laundered: 0 };
+    expect(totalAssetValue(twoPurse)).toBeGreaterThan(totalAssetValue(onePurse));
+    // 人脉不计入家产
+    expect(totalAssetValue({ assets: { purse: 1 }, network: { mentor: 5 }, laundered: 0 }))
+      .toBe(totalAssetValue(onePurse));
+  });
+
+  it('每项资产都有玩法说明文案', () => {
+    ASSETS.forEach(a => {
+      expect(ASSET_PERK_TEXT[a.id]).toBeTruthy();
     });
   });
 });

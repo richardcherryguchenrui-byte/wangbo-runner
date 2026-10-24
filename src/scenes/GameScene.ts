@@ -97,6 +97,7 @@ import {
 import { generatePattern, FLYER_Y, type RunPattern } from '../systems/patterns';
 import { tightSlideIndex } from '../systems/slideJudge';
 import { loadControls, type ControlSettings } from '../systems/controls';
+import { assetPerks, EMPTY_PERKS, type AssetPerks } from '../systems/assets';
 import {
   levelById,
   levelSpeedAt,
@@ -178,6 +179,7 @@ export default class GameScene extends Phaser.Scene {
   private rng: () => number = () => Math.random();
   private dailySpeedMul = 1;
   private dailyCoinMul = 1;
+  private assetPerks: AssetPerks = EMPTY_PERKS;
 
   // ---- 闯关模式 ----
   private level?: LevelDef;
@@ -348,8 +350,17 @@ export default class GameScene extends Phaser.Scene {
       this.progress.redeemBonus = 0;
       saveProgress(this.progress);
     }
+    // 贪污资产的加成:别墅给乌纱帽,公司给银币倍率
+    this.assetPerks = assetPerks({
+      assets: this.progress.assets ?? {},
+      network: this.progress.network ?? {},
+      laundered: this.progress.laundered ?? 0
+    });
     const redeemLives = this.level ? redeemed : 0;
-    this.totalLives = Math.max(1, 2 + this.progress.extraLives + livesDelta + redeemLives);
+    this.totalLives = Math.max(
+      1,
+      2 + this.progress.extraLives + livesDelta + redeemLives + this.assetPerks.extraLives
+    );
     this.bribeCarried = Math.min(this.progress.bribeMoon, bribeCarryLimit(this.progress));
 
     // 场景重启复用实例:所有局内字段必须完整重置
@@ -1128,10 +1139,15 @@ export default class GameScene extends Phaser.Scene {
       : this.daily && this.challenge ? `今日挑战 · ${this.challenge.modifier.name}` : '开跑!';
     const baseLives = 2 + (this.progress.extraLives ?? 0);
     const extraHats = this.level ? Math.max(0, this.totalLives - baseLives) : 0;
-    const sub = this.level
+    const perks = this.assetPerks;
+    const perkBits: string[] = [];
+    if (perks.extraLives > 0) perkBits.push(`别墅 +${perks.extraLives} 帽`);
+    if (perks.coinMul > 1) perkBits.push(`公司 银币×${perks.coinMul.toFixed(2)}`);
+    const subBase = this.level
       ? `活到 ${Math.round(this.level.durationMs / 1000)} 秒 · ${this.level.flavor}`
         + (extraHats > 0 ? `  ·  宽大处理 +${extraHats} 顶乌纱帽` : '')
       : this.daily && this.challenge ? this.challenge.modifier.desc : '一路高升,冲上厅长!';
+    const sub = perkBits.length > 0 ? `${subBase}  ·  ${perkBits.join(' · ')}` : subBase;
     const c = this.add.container(GAME_WIDTH / 2, 214).setDepth(70).setAlpha(0).setScale(0.6);
     const t1 = this.add
       .text(0, 0, title, {
@@ -2298,7 +2314,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private coinAmount(base: number): number {
-    let n = base * this.dailyCoinMul;
+    let n = base * this.dailyCoinMul * (this.assetPerks?.coinMul ?? 1);
     if (this.elapsedMs < this.doubleCoinsUntil) n *= 2;
     if (this.overdriveActive) n *= OVERDRIVE_COIN_MULT;
     return Math.max(1, Math.round(n));

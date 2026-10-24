@@ -9,6 +9,7 @@ import { explode, poof, dust, shake, redFlash, confettiBurst, impactBurst } from
 import { buildDungeonTextures } from '../systems/dungeonArt';
 import { buildHatTexture } from '../systems/hatArt';
 import { loadControls } from '../systems/controls';
+import { assetPerks, EMPTY_PERKS, type AssetPerks } from '../systems/assets';
 import {
   DG_TILE,
   DG_PLAYER_MAX_HP,
@@ -138,6 +139,7 @@ export default class DungeonScene extends Phaser.Scene {
   private invulnUntil = 0;
   private lastGroundAt = 0;
   private useQiSkin = false;
+  private perks: AssetPerks = EMPTY_PERKS;
 
   private keyLeft!: Phaser.Input.Keyboard.Key;
   private keyRight!: Phaser.Input.Keyboard.Key;
@@ -182,9 +184,16 @@ export default class DungeonScene extends Phaser.Scene {
     this.level = dungeonLevelById(this.levelId) ?? DUNGEON_LEVELS[0];
     this.parsed = parseDungeon(this.level.map);
 
+    const prog = loadProgress();
+    this.perks = assetPerks({
+      assets: prog.assets ?? {},
+      network: prog.network ?? {},
+      laundered: prog.laundered ?? 0
+    });
     this.hp = DG_PLAYER_MAX_HP;
     this.maxHp = DG_PLAYER_MAX_HP;
-    this.mp = DG_PLAYER_MAX_MP;
+    // 海外账户:开局自带人脉
+    this.mp = Math.min(DG_PLAYER_MAX_MP, DG_PLAYER_MAX_MP * 0.6 + this.perks.startMp);
     this.reportReadyAt = 0;
     this.shieldReadyAt = 0;
     this.shieldUntil = 0;
@@ -921,7 +930,7 @@ export default class DungeonScene extends Phaser.Scene {
 
     // 命中判定
     let hitAny = false;
-    const dmg = playerMeleeDamage(this.combo, this.time.now < this.wineUntil);
+    const dmg = playerMeleeDamage(this.combo, this.time.now < this.wineUntil) + (this.perks?.meleeBonus ?? 0);
     this.enemies.forEach(u => {
       if (u.hp <= 0) return;
       const b = u.sprite.body as Phaser.Physics.Arcade.Body;

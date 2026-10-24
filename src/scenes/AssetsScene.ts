@@ -21,6 +21,7 @@ import {
   resolveAudit,
   launderCost,
   launderEffect,
+  ASSET_PERK_SHORT,
   type Holdings
 } from '../systems/assets';
 
@@ -249,8 +250,8 @@ export default class AssetsScene extends Phaser.Scene {
         const cost = nextCost(a, cur);
         lv.setText(cur > 0 ? `Lv.${cur}` : '未建');
         info.setText(cur > 0
-          ? `+${a.incomePerMin * cur}/分 · 风险 ${a.risk * cur}`
-          : `${a.desc}`);
+          ? `+${a.incomePerMin * cur}/分 · 风险 ${a.risk * cur} · ${ASSET_PERK_SHORT[a.id] ?? ''}`
+          : `${a.desc} · ${ASSET_PERK_SHORT[a.id] ?? ''}`);
         if (cost === null) {
           btn.text.setText('已满级');
           btn.rect.setAlpha(0.6);
