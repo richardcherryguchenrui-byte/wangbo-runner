@@ -61,6 +61,7 @@ export interface Progress {
   lastAuditAt: number;              // 上次纪检委审查时间戳
   auditsSurvived: number;           // 累计躲过的审查次数
   assetsSeized: number;             // 累计被没收的资产次数
+  assetsIntroDone: boolean;         // 家产界面首次引导是否看过
 }
 
 const KEY = 'wangboProgress';
@@ -95,7 +96,8 @@ function defaults(): Progress {
     bestRankIndex: 0, missionsDone: 0, overdrives: 0, nearMisses: 0, dailyPlays: 0,
     levelStars: {}, levelClears: 0, perfectSlides: 0, starMilestones: [], dungeonCleared: {}, redeemBonus: 0,
     assets: {}, network: {}, laundered: 0,
-    lastAccrualAt: 0, lastAuditAt: 0, auditsSurvived: 0, assetsSeized: 0
+    lastAccrualAt: 0, lastAuditAt: 0, auditsSurvived: 0, assetsSeized: 0,
+    assetsIntroDone: false
   };
 }
 

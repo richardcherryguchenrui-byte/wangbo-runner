@@ -99,6 +99,7 @@ export default class AssetsScene extends Phaser.Scene {
     addMenuFooter(this, '资产越肥风险越高 · 洗白能压风险,人脉能保命');
     this.refreshAll();
     this.drawShareButton();
+    this.maybeShowIntro(p);
     this.maybeAudit(p);
   }
 
@@ -233,6 +234,50 @@ export default class AssetsScene extends Phaser.Scene {
     }
     void risk;
     this.time.delayedCall(600, () => this.scene.restart());
+  }
+
+  // 首次进入的家产引导:三步讲清「生钱 → 风险 → 洗白」的循环
+  private maybeShowIntro(p: ReturnType<typeof loadProgress>) {
+    if (p.assetsIntroDone) return;
+    p.assetsIntroDone = true;
+    saveProgress(p);
+    const layer = this.add.container(0, 0).setDepth(130);
+    layer.add(this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x02060c, 0.82).setInteractive());
+    const panel = this.add.graphics();
+    panel.fillStyle(0x0a1930, 0.98);
+    panel.fillRoundedRect(GAME_WIDTH / 2 - 290, 96, 580, 344, 22);
+    panel.lineStyle(2, 0xffd43b, 0.45);
+    panel.strokeRoundedRect(GAME_WIDTH / 2 - 290, 96, 580, 344, 22);
+    layer.add(panel);
+    layer.add(this.add.text(GAME_WIDTH / 2, 136, '怎么当家', {
+      fontFamily: FONT, fontSize: '26px', color: '#ffe066', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0.5));
+    const steps: [string, string][] = [
+      ['① 盖产业', '花银币建小金库、别墅、公司,它们会自己生银币 —— 离线也在赚'],
+      ['② 风险跟着涨', '产业越肥,被查风险越高;每 20 分钟风向也会变'],
+      ['③ 躲纪检委', '养人脉降风险,或者花银币洗白;真被查了还能花钱打点']
+    ];
+    steps.forEach(([title, body], i) => {
+      const y = 186 + i * 74;
+      layer.add(this.add.text(GAME_WIDTH / 2 - 258, y, title, {
+        fontFamily: FONT, fontSize: '16px', color: '#8ce99a', fontStyle: 'bold', resolution: 2
+      }));
+      layer.add(this.add.text(GAME_WIDTH / 2 - 258, y + 24, body, {
+        fontFamily: FONT, fontSize: '12px', color: '#cfe3ff', resolution: 2,
+        wordWrap: { width: 516 }
+      }));
+    });
+    const btnY = 402;
+    const g = this.add.graphics();
+    g.fillStyle(0xffb703, 0.95);
+    g.fillRoundedRect(GAME_WIDTH / 2 - 100, btnY - 22, 200, 44, 22);
+    layer.add(g);
+    layer.add(this.add.text(GAME_WIDTH / 2, btnY, '开始当家', {
+      fontFamily: FONT, fontSize: '18px', color: '#3a2400', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0.5));
+    const hit = this.add.rectangle(GAME_WIDTH / 2, btnY, 200, 44, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
+    layer.add(hit);
+    hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); layer.destroy(true); });
   }
 
   // 晒家产:生成竖版战绩卡
