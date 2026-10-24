@@ -285,3 +285,91 @@ export function formatValue(v: number): string {
   if (v >= 10000) return `${(v / 10000).toFixed(1)}万`;
   return String(v);
 }
+
+
+// ============================================================
+// 风向:每隔一段时间全局变一次,风险与收益跟着变
+// 用时间窗做种子,同一时间段所有玩家看到的是同一个风向
+// ============================================================
+
+export interface WindDef {
+  id: string;
+  name: string;
+  desc: string;
+  /** 风险倍率 */
+  riskMul: number;
+  /** 收益倍率 */
+  incomeMul: number;
+}
+
+export const WINDS: WindDef[] = [
+  { id: 'inspection', name: '中央巡视组进驻', desc: '风声鹤唳,被查风险 ×1.5', riskMul: 1.5, incomeMul: 1 },
+  { id: 'reshuffle', name: '换届窗口期', desc: '人事一动,银两 ×2', riskMul: 0.8, incomeMul: 2 },
+  { id: 'calm', name: '风平浪静', desc: '上面忙着开会,没人管你', riskMul: 0.6, incomeMul: 1 },
+  { id: 'antigraft', name: '扫黑除恶专项行动', desc: '矿和公司都得低调:风险 ×1.2,收益 ×0.7', riskMul: 1.2, incomeMul: 0.7 },
+  { id: 'boom', name: '土地财政红利', desc: '遍地是钱:收益 ×1.4', riskMul: 1, incomeMul: 1.4 }
+];
+
+/** 风向每 20 分钟换一次 */
+export const WIND_WINDOW_MS = 20 * 60 * 1000;
+
+/** 当前风向(按时间窗确定性选择) */
+export function currentWind(nowMs: number): { wind: WindDef; endsAt: number; windowIndex: number } {
+  const windowIndex = Math.floor(nowMs / WIND_WINDOW_MS);
+  // 简单散列,让相邻窗口不总是同一档
+  const idx = ((windowIndex * 2654435761) >>> 0) % WINDS.length;
+  return { wind: WINDS[idx], endsAt: (windowIndex + 1) * WIND_WINDOW_MS, windowIndex };
+}
+
+/** 叠加风向后的实际收益 */
+export function incomePerMinWithWind(h: Holdings, wind: WindDef): number {
+  return Math.round(incomePerMin(h) * wind.incomeMul);
+}
+
+/** 叠加风向后的实际净风险 */
+export function netRiskWithWind(h: Holdings, wind: WindDef): number {
+  return Math.max(0, Math.min(100, Math.round(netRisk(h) * wind.riskMul)));
+}
+
+// ============================================================
+// 家产称号:总值越高,名头越大
+// ============================================================
+
+export interface AssetTitle {
+  name: string;
+  color: string;
+  minValue: number;
+}
+
+export const ASSET_TITLES: AssetTitle[] = [
+  { name: '白手套', color: '#ced4da', minValue: 0 },
+  { name: '操盘手', color: '#8ce99a', minValue: 10000 },
+  { name: '幕后老板', color: '#74c0fc', minValue: 100000 },
+  { name: '一方诸侯', color: '#b197fc', minValue: 1000000 },
+  { name: '隐形富豪', color: '#ffd43b', minValue: 10000000 }
+];
+
+export function assetTitle(value: number): AssetTitle {
+  let out = ASSET_TITLES[0];
+  ASSET_TITLES.forEach(t => { if (value >= t.minValue) out = t; });
+  return out;
+}
+
+// ---- 新闻弹幕:审查/没收时来一条「本市新闻」 ----
+const NEWS_SEIZED = [
+  '本市某干部涉嫌严重违纪违法,目前正接受纪律审查和监察调查',
+  '有关部门通报:一起领导干部违规经商办企业问题被查处',
+  '据知情人士透露,某项目资金流向正在被逐笔核对',
+  '深夜通报:某单位主要负责人已被采取留置措施'
+];
+const NEWS_PASSED = [
+  '检查组已完成本轮核查,未发现该单位存在明显问题',
+  '举报线索经核实不属实,相关同志继续主持工作',
+  '巡视组结束进驻,反馈会上强调了作风建设'
+];
+
+export function newsFor(seized: boolean, seed: number): string {
+  const pool = seized ? NEWS_SEIZED : NEWS_PASSED;
+  const i = Math.abs(Math.floor(seed * 7919)) % pool.length;
+  return pool[i];
+}

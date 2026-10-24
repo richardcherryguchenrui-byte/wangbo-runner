@@ -22,6 +22,8 @@ import {
   ASSETS, NETWORK, nextCost, incomePerMin, rawRisk, protection, netRisk, auditShield,
   accrueOffline, resolveAudit, launderCost, launderEffect, MAX_OFFLINE_MS,
   assetPerks, totalAssetValue, ASSET_PERK_TEXT, EMPTY_PERKS,
+  WINDS, WIND_WINDOW_MS, currentWind, incomePerMinWithWind, netRiskWithWind,
+  ASSET_TITLES, assetTitle, newsFor,
   type Holdings
 } from '../src/systems/assets';
 import {
@@ -1217,5 +1219,51 @@ describe('资产加成与家产总值', () => {
     ASSETS.forEach(a => {
       expect(ASSET_PERK_TEXT[a.id]).toBeTruthy();
     });
+  });
+});
+
+// 风向 / 家产称号 / 新闻
+describe('风向、称号与新闻', () => {
+  it('风向按时间窗确定性变化,不相邻重复太多', () => {
+    const a = currentWind(0);
+    const b = currentWind(0 + WIND_WINDOW_MS);
+    expect(a.windowIndex).toBe(0);
+    expect(b.windowIndex).toBe(1);
+    expect(a.wind.id).toBe(currentWind(1000).wind.id);   // 同一窗口内不变
+    expect(WINDS.some(w => w.id === a.wind.id)).toBe(true);
+    // 10 个连续窗口里至少出现 2 种不同风向
+    const ids = new Set<number>();
+    for (let i = 0; i < 10; i++) ids.add(currentWind(i * WIND_WINDOW_MS).windowIndex);
+    expect(ids.size).toBe(10);
+  });
+
+  it('风向影响收益与风险', () => {
+    const h: Holdings = { assets: { estate: 2 }, network: {}, laundered: 0 };
+    const calm = WINDS.find(w => w.id === 'calm')!;
+    const boom = WINDS.find(w => w.id === 'boom')!;
+    expect(incomePerMinWithWind(h, boom)).toBeGreaterThan(incomePerMin(h));
+    expect(incomePerMinWithWind(h, calm)).toBe(incomePerMin(h));
+    expect(netRiskWithWind(h, calm)).toBeLessThan(netRisk(h));
+    expect(netRiskWithWind(h, WINDS.find(w => w.id === 'inspection')!)).toBeGreaterThan(netRisk(h));
+    // 风险仍然夹在 0~100
+    const huge: Holdings = { assets: { estate: 6 }, network: {}, laundered: 0 };
+    expect(netRiskWithWind(huge, WINDS.find(w => w.id === 'inspection')!)).toBeLessThanOrEqual(100);
+  });
+
+  it('家产称号随总值升级', () => {
+    expect(assetTitle(0).name).toBe('白手套');
+    expect(assetTitle(9999).name).toBe('白手套');
+    expect(assetTitle(10000).name).toBe('操盘手');
+    expect(assetTitle(1_000_000).name).toBe('一方诸侯');
+    expect(assetTitle(99_999_999).name).toBe('隐形富豪');
+    ASSET_TITLES.forEach(t => expect(t.color).toMatch(/^#[0-9a-f]{6}$/i));
+  });
+
+  it('新闻文案分被查与过关两套', () => {
+    for (const seed of [0.1, 0.5, 0.9]) {
+      expect(newsFor(true, seed).length).toBeGreaterThan(6);
+      expect(newsFor(false, seed).length).toBeGreaterThan(6);
+    }
+    expect(newsFor(true, 0.3)).not.toBe(newsFor(false, 0.3));
   });
 });

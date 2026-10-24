@@ -22,6 +22,14 @@ import {
   launderCost,
   launderEffect,
   ASSET_PERK_SHORT,
+  currentWind,
+  incomePerMinWithWind,
+  netRiskWithWind,
+  assetTitle,
+  totalAssetValue,
+  formatValue,
+  newsFor,
+  type WindDef,
   type Holdings
 } from '../systems/assets';
 
@@ -48,6 +56,8 @@ export default class AssetsScene extends Phaser.Scene {
   /** 待写入存档的统计增量(审查结算与 persist 之间传递) */
   private statSurvived = 0;
   private statSeized = 0;
+  private wind!: WindDef;
+  private windEndsAt = 0;
   private incomeText?: Phaser.GameObjects.Text;
   private protectText?: Phaser.GameObjects.Text;
 
@@ -71,7 +81,11 @@ export default class AssetsScene extends Phaser.Scene {
     const maybeCoin = (header as { text?: Phaser.GameObjects.Text } | undefined)?.text;
     this.coinText = maybeCoin;
 
+    const w = currentWind(Date.now());
+    this.wind = w.wind;
+    this.windEndsAt = w.endsAt;
     this.collectOffline(p);
+    this.drawWindBanner();
     this.drawAssetColumn();
     this.drawNetworkColumn();
     this.drawRiskPanel();
@@ -92,7 +106,7 @@ export default class AssetsScene extends Phaser.Scene {
       p.coins = this.coins;
       const tip = r.capped ? '(离线收益按 12 小时封顶)' : '';
       this.time.delayedCall(320, () => {
-        showToast(this, GAME_WIDTH / 2, 150, `离线进账 +${r.coins} 银币 ${tip}`, '#ffe066', 'coin');
+        showToast(this, GAME_WIDTH / 2, 470, `离线进账 +${r.coins} 银币 ${tip}`, '#ffe066', 'coin');
       });
       playSfx(this, 'coin', 0.4);
     }
@@ -151,7 +165,7 @@ export default class AssetsScene extends Phaser.Scene {
         this.coins -= bribeCost;
         this.statSurvived += 1;
         playSfx(this, 'coin', 0.45);
-        showToast(this, GAME_WIDTH / 2, 190, `打点出去了 ${bribeCost} 银币 · 这次没人再提`, '#8ce99a', 'ui-check');
+        showToast(this, GAME_WIDTH / 2, 470, `打点出去了 ${bribeCost} 银币 · 这次没人再提`, '#8ce99a', 'ui-check');
       } else {
         // 钱不够打点,只能认
         this.applyAuditPenalty(p, risk, roll, shieldLeft);
@@ -195,11 +209,12 @@ export default class AssetsScene extends Phaser.Scene {
     const r = resolveAudit(this.holdings, this.coins, roll, shieldLeft);
     if (r.shielded) {
       this.statSurvived += 1;
-      showToast(this, GAME_WIDTH / 2, 190, `巡视组的熟人咳嗽了一声 · ${r.message}`, '#8ce99a', 'ui-siren');
+      showToast(this, GAME_WIDTH / 2, 470, `巡视组的熟人咳嗽了一声 · ${r.message}`, '#8ce99a', 'ui-siren');
       playSfx(this, 'shield', 0.5);
     } else if (r.passed) {
       this.statSurvived += 1;
-      showToast(this, GAME_WIDTH / 2, 190, `查了一圈 · ${r.message}`, '#ffe066', 'ui-siren');
+      showToast(this, GAME_WIDTH / 2, 470, `查了一圈 · ${r.message}`, '#ffe066', 'ui-siren');
+      this.showNewsTicker(newsFor(false, Math.random()), false);
     } else {
       if (r.seizedAssetId) {
         const cur = this.holdings.assets[r.seizedAssetId] ?? 0;
@@ -210,23 +225,51 @@ export default class AssetsScene extends Phaser.Scene {
       redFlash(this);
       shake(this, 0.014, 300);
       playSfx(this, 'gameover', 0.5);
-      showToast(this, GAME_WIDTH / 2, 190, `被查了 · ${r.message}${r.fine > 0 ? ` · 罚款 ${r.fine}` : ''}`, '#ff8787', 'ui-siren');
+      const news = newsFor(true, Math.random());
+      showToast(this, GAME_WIDTH / 2, 470, `被查了 · ${r.message}${r.fine > 0 ? ` · 罚款 ${r.fine}` : ''}`, '#ff8787', 'ui-siren');
+      this.showNewsTicker(news, true);
     }
     void risk;
     this.time.delayedCall(600, () => this.scene.restart());
   }
 
+  // 顶部风向横幅:每 20 分钟变一次,收益/风险跟着变
+  private drawWindBanner() {
+    const x = LEFT_X;
+    const y = 78;
+    const w = GAME_WIDTH - 40;
+    const g = this.add.graphics().setDepth(21);
+    const bad = this.wind.riskMul > 1;
+    g.fillStyle(bad ? 0x2a1218 : 0x102a1e, 0.92);
+    g.fillRoundedRect(x, y, w, 26, 9);
+    g.lineStyle(1.2, bad ? 0xff8787 : 0x8ce99a, 0.4);
+    g.strokeRoundedRect(x, y, w, 26, 9);
+    this.add.image(x + 16, y + 13, 'ui-siren').setDisplaySize(14, 14).setDepth(22);
+    this.add.text(x + 30, y + 13, `当前风向 · ${this.wind.name}`, {
+      fontFamily: FONT, fontSize: '12px', color: bad ? '#ff8787' : '#8ce99a', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0, 0.5).setDepth(22);
+    this.add.text(x + 170, y + 13, this.wind.desc, {
+      fontFamily: FONT, fontSize: '11px', color: '#b7cfe8', resolution: 2
+    }).setOrigin(0, 0.5).setDepth(22);
+    // 家产称号
+    const value = totalAssetValue(this.holdings);
+    const title = assetTitle(value);
+    this.add.text(x + w - 12, y + 13, `${title.name} · 家产 ${formatValue(value)}`, {
+      fontFamily: FONT, fontSize: '12px', color: title.color, fontStyle: 'bold', resolution: 2
+    }).setOrigin(1, 0.5).setDepth(22);
+  }
+
   // ---- 资产列表 ----
   private drawAssetColumn() {
-    this.add.text(LEFT_X + 8, 78, '贪污资产', {
+    this.add.text(LEFT_X + 8, 112, '贪污资产', {
       fontFamily: FONT, fontSize: '14px', color: '#ffe066', fontStyle: 'bold', resolution: 2
     }).setDepth(21);
-    this.incomeText = this.add.text(LEFT_X + LEFT_W - 8, 78, '', {
+    this.incomeText = this.add.text(LEFT_X + LEFT_W - 8, 112, '', {
       fontFamily: FONT, fontSize: '12px', color: '#8ce99a', resolution: 2
     }).setOrigin(1, 0).setDepth(21);
 
     ASSETS.forEach((a, i) => {
-      const y = 100 + i * ROW_H;
+      const y = 134 + i * ROW_H;
       const level = this.holdings.assets[a.id] ?? 0;
       addMenuCard(this, LEFT_X, y, LEFT_W, ROW_H - 6, { depth: 20 });
       this.add.image(LEFT_X + 24, y + (ROW_H - 6) / 2, ASSET_ICONS[a.id] ?? 'coin')
@@ -268,15 +311,15 @@ export default class AssetsScene extends Phaser.Scene {
 
   // ---- 人脉列表 ----
   private drawNetworkColumn() {
-    this.add.text(RIGHT_X + 8, 78, '人脉关系', {
+    this.add.text(RIGHT_X + 8, 112, '人脉关系', {
       fontFamily: FONT, fontSize: '14px', color: '#b197fc', fontStyle: 'bold', resolution: 2
     }).setDepth(21);
-    this.protectText = this.add.text(RIGHT_X + RIGHT_W - 8, 78, '', {
+    this.protectText = this.add.text(RIGHT_X + RIGHT_W - 8, 112, '', {
       fontFamily: FONT, fontSize: '12px', color: '#8ce99a', resolution: 2
     }).setOrigin(1, 0).setDepth(21);
 
     NETWORK.forEach((n, i) => {
-      const y = 172 + i * ROW_H;
+      const y = 206 + i * ROW_H;
       addMenuCard(this, RIGHT_X, y, RIGHT_W, ROW_H - 6, { depth: 20 });
       this.add.image(RIGHT_X + 24, y + (ROW_H - 6) / 2, NETWORK_ICONS[n.id] ?? 'ui-person')
         .setDisplaySize(22, 22).setDepth(22);
@@ -317,8 +360,8 @@ export default class AssetsScene extends Phaser.Scene {
 
   // ---- 风险面板 ----
   private drawRiskPanel() {
-    const y = 96;
-    const h = 62;
+    const y = 130;
+    const h = 74;
     const g = this.add.graphics().setDepth(21);
     g.fillStyle(0x2a0f14, 0.92);
     g.fillRoundedRect(RIGHT_X, y, RIGHT_W, h, 12);
@@ -330,7 +373,7 @@ export default class AssetsScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '13px', color: '#ff8787', fontStyle: 'bold', resolution: 2
     }).setDepth(22);
     const bar = this.add.graphics().setDepth(22);
-    const detail = this.add.text(RIGHT_X + 42, y + 34, '', {
+    const detail = this.add.text(RIGHT_X + 42, y + 32, '', {
       fontFamily: FONT, fontSize: '10px', color: '#e2b6b6', resolution: 2
     }).setDepth(22);
 
@@ -339,14 +382,14 @@ export default class AssetsScene extends Phaser.Scene {
     });
 
     const refresh = () => {
-      const risk = netRisk(this.holdings);
+      const risk = netRiskWithWind(this.holdings, this.wind);
       riskText.setText(`被查风险 ${risk} / 100`);
       detail.setText(`资产风险 ${rawRisk(this.holdings)} - 人脉保护 ${protection(this.holdings)}`
         + (this.holdings.laundered ? ` - 已洗白 ${this.holdings.laundered}` : ''));
       bar.clear();
-      const bw = RIGHT_W - 100;
+      const bw = RIGHT_W - 130;
       const bx = RIGHT_X + 42;
-      const by = y + 30;
+      const by = y + 52;
       bar.fillStyle(0x3a1a20, 1);
       bar.fillRoundedRect(bx, by, bw, 6, 3);
       bar.fillStyle(risk > 60 ? 0xff3b3b : risk > 25 ? 0xff922b : 0x69db7c, 0.95);
@@ -360,8 +403,30 @@ export default class AssetsScene extends Phaser.Scene {
     this.rowRefs.push({ refresh });
   }
 
+  // 本市新闻:审查结果用一条跑马灯播报,增强「有梗」的观感
+  private showNewsTicker(text: string, bad: boolean) {
+    const y = 206;
+    const g = this.add.graphics().setDepth(110);
+    g.fillStyle(bad ? 0x2a0f14 : 0x0f2430, 0.96);
+    g.fillRoundedRect(24, y, GAME_WIDTH - 48, 30, 8);
+    g.lineStyle(1.2, bad ? 0xff5c5c : 0x74c0fc, 0.5);
+    g.strokeRoundedRect(24, y, GAME_WIDTH - 48, 30, 8);
+    const tag = this.add.text(38, y + 15, bad ? '本市新闻' : '通报', {
+      fontFamily: FONT, fontSize: '11px', color: bad ? '#ff8787' : '#74c0fc', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0, 0.5).setDepth(111);
+    const line = this.add.text(110, y + 15, text, {
+      fontFamily: FONT, fontSize: '12px', color: '#e2e8f0', resolution: 2
+    }).setOrigin(0, 0.5).setDepth(111);
+    [g, tag, line].forEach(o => { o.setAlpha(0); this.tweens.add({ targets: o, alpha: 1, duration: 220 }); });
+    this.time.delayedCall(2600, () => {
+      [g, tag, line].forEach(o => this.tweens.add({
+        targets: o, alpha: 0, duration: 320, onComplete: () => o.destroy()
+      }));
+    });
+  }
+
   private refreshAll() {
-    this.incomeText?.setText(`+${incomePerMin(this.holdings)} 银币/分`);
+    this.incomeText?.setText(`+${incomePerMinWithWind(this.holdings, this.wind)} 银币/分`);
     this.protectText?.setText(`风险保护 -${protection(this.holdings)}`);
     this.coinText?.setText(String(this.coins));
     this.rowRefs.forEach(r => r.refresh());
@@ -375,7 +440,7 @@ export default class AssetsScene extends Phaser.Scene {
     const cost = nextCost(a, cur);
     if (cost === null) return;
     if (this.coins < cost) {
-      showToast(this, GAME_WIDTH / 2, 150, '银币不够 · 先去跑两圈', '#ff8787', 'coin');
+      showToast(this, GAME_WIDTH / 2, 470, '银币不够 · 先去跑两圈', '#ff8787', 'coin');
       return;
     }
     this.coins -= cost;
@@ -383,7 +448,7 @@ export default class AssetsScene extends Phaser.Scene {
     playSfx(this, cur === 0 ? 'unlock' : 'coin', 0.45);
     if (cur === 0) {
       confettiBurst(this, GAME_WIDTH / 2, 150, 16);
-      showToast(this, GAME_WIDTH / 2, 150, `建好了「${a.name}」· 开始生钱`, '#ffe066', 'ui-shop');
+      showToast(this, GAME_WIDTH / 2, 470, `建好了「${a.name}」· 开始生钱`, '#ffe066', 'ui-shop');
     }
     this.persist();
   }
@@ -395,13 +460,13 @@ export default class AssetsScene extends Phaser.Scene {
     const cost = nextCost(n, cur);
     if (cost === null) return;
     if (this.coins < cost) {
-      showToast(this, GAME_WIDTH / 2, 150, '银币不够 · 关系也是要花钱的', '#ff8787', 'coin');
+      showToast(this, GAME_WIDTH / 2, 470, '银币不够 · 关系也是要花钱的', '#ff8787', 'coin');
       return;
     }
     this.coins -= cost;
     this.holdings.network[id] = cur + 1;
     playSfx(this, 'unlock', 0.4);
-    showToast(this, GAME_WIDTH / 2, 150, `和「${n.name}」吃上了饭`, '#b197fc', 'ui-person');
+    showToast(this, GAME_WIDTH / 2, 470, `和「${n.name}」吃上了饭`, '#b197fc', 'ui-person');
     this.persist();
   }
 
@@ -409,18 +474,18 @@ export default class AssetsScene extends Phaser.Scene {
     const risk = netRisk(this.holdings);
     const cost = launderCost(this.holdings);
     if (risk <= 0) {
-      showToast(this, GAME_WIDTH / 2, 150, '干干净净,不用洗', '#8ce99a', 'ui-check');
+      showToast(this, GAME_WIDTH / 2, 470, '干干净净,不用洗', '#8ce99a', 'ui-check');
       return;
     }
     if (this.coins < cost) {
-      showToast(this, GAME_WIDTH / 2, 150, `洗白要 ${cost} 银币,不够`, '#ff8787', 'coin');
+      showToast(this, GAME_WIDTH / 2, 470, `洗白要 ${cost} 银币,不够`, '#ff8787', 'coin');
       return;
     }
     const eff = launderEffect(this.holdings);
     this.coins -= cost;
     this.holdings.laundered = (this.holdings.laundered ?? 0) + eff;
     playSfx(this, 'shield', 0.45);
-    showToast(this, GAME_WIDTH / 2, 150, `账做平了 · 风险 -${eff}`, '#8ce99a', 'ui-check');
+    showToast(this, GAME_WIDTH / 2, 470, `账做平了 · 风险 -${eff}`, '#8ce99a', 'ui-check');
     this.persist();
   }
 
