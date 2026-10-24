@@ -26,6 +26,7 @@ import {
   assetPerks, totalAssetValue, ASSET_PERK_TEXT, EMPTY_PERKS,
   WINDS, WIND_WINDOW_MS, currentWind, incomePerMinWithWind, netRiskWithWind,
   ASSET_TITLES, assetTitle, newsFor, RIVALS, assetLeaderboard, nextRival,
+  quoteCost, canAfford, bribeCost,
   type Holdings
 } from '../src/systems/assets';
 import {
@@ -1445,5 +1446,37 @@ describe('官场名人堂', () => {
       expect(r.name.length).toBeGreaterThan(1);
       expect(r.taunt.length).toBeGreaterThan(3);
     });
+  });
+});
+
+// 双货币:银币(公开收入) vs 黑金(赃款)
+describe('双货币体系', () => {
+  const purse = ASSETS[0];
+
+  it('首建花银币,升级花黑金', () => {
+    const build = quoteCost(purse, 0)!;
+    expect(build.currency).toBe('coin');
+    expect(build.amount).toBe(purse.baseCost);
+    const up1 = quoteCost(purse, 1)!;
+    expect(up1.currency).toBe('corrupt');
+    expect(up1.amount).toBeGreaterThan(nextCost(purse, 1)!);
+    // 满级没有报价
+    expect(quoteCost(purse, purse.maxLevel)).toBe(null);
+  });
+
+  it('银币与黑金互不通用', () => {
+    const build = quoteCost(purse, 0)!;
+    const up = quoteCost(purse, 1)!;
+    expect(canAfford({ coins: 1000, corrupt: 0 }, build)).toBe(true);
+    expect(canAfford({ coins: 1000, corrupt: 0 }, up)).toBe(false);   // 只有银币升不了级
+    expect(canAfford({ coins: 0, corrupt: 100000 }, up)).toBe(true);
+    expect(canAfford({ coins: 0, corrupt: 100000 }, build)).toBe(false); // 只有黑金盖不了新房
+  });
+
+  it('打点与洗白按黑金计价', () => {
+    expect(bribeCost(10)).toBe(200);
+    expect(bribeCost(0)).toBe(80);      // 最低 80
+    const h: Holdings = { assets: { estate: 2 }, network: {}, laundered: 0 };
+    expect(launderCost(h)).toBeGreaterThan(0);
   });
 });

@@ -333,12 +333,12 @@ export default class TitleScene extends Phaser.Scene {
     const items: { icon: string; label: string; sub: string; onClick: () => void }[] = [
       { icon: 'ui-shop', label: '晋升商店', sub: '皮肤 · 手枪', onClick: () => this.scene.start('Shop') },
       {
-        icon: 'coin', label: '家产人脉',
+        icon: 'ui-home', label: '我的家',
         sub: (() => {
           const v = totalAssetValue({
             assets: p.assets ?? {}, network: p.network ?? {}, laundered: p.laundered ?? 0
           });
-          return v > 0 ? `总值 ${formatValue(v)}` : '盖房 · 养关系';
+          return v > 0 ? `家产 ${formatValue(v)}` : '进屋看看';
         })(),
         onClick: () => this.scene.start('Assets')
       },
@@ -401,16 +401,16 @@ export default class TitleScene extends Phaser.Scene {
   // 回访钩子:一进游戏先把离线期间的家产收益结算掉并报喜
   private settleOffline() {
     const r = collectOfflineIncome();
-    if (r.coins <= 0) return;
+    if (r.corrupt <= 0) return;
     const dur = formatDuration(r.elapsedMs);
     this.time.delayedCall(600, () => {
       showToast(
         this,
         GAME_WIDTH / 2,
         168,
-        `离线 ${dur} · 家产进账 +${r.coins} 银币${r.capped ? '(封顶)' : ''}`,
-        '#ffe066',
-        'coin'
+        `离线 ${dur} · 家产进账 +${formatValue(r.corrupt)} 黑金${r.capped ? '(封顶)' : ''}`,
+        '#ffd43b',
+        'as-purse'
       );
     });
   }

@@ -61,10 +61,39 @@ export function networkById(id: string): NetworkDef | undefined {
   return NETWORK.find(n => n.id === id);
 }
 
-/** 下一级造价;已满级返回 null */
+/** 下一级造价(沿用旧语义,单位是银币);已满级返回 null */
 export function nextCost(def: { baseCost: number; costMul: number; maxLevel: number }, level: number): number | null {
   if (level >= def.maxLevel) return null;
   return Math.round(def.baseCost * Math.pow(def.costMul, level));
+}
+
+/** 货币种类:coin = 跑酷赚的银币(公开收入), corrupt = 产业产出的黑金(赃款) */
+export type Currency = 'coin' | 'corrupt';
+
+export interface CostQuote {
+  currency: Currency;
+  amount: number;
+}
+
+/**
+ * 分档消费:
+ * - 首次建造(0→1)花「银币」—— 明面上拿工资去置办
+ * - 后续升级(n→n+1)花「黑金」—— 私下用赃款扩产
+ */
+export function quoteCost(
+  def: { baseCost: number; costMul: number; maxLevel: number },
+  level: number,
+  corruptMul = 1.6
+): CostQuote | null {
+  const coins = nextCost(def, level);
+  if (coins === null) return null;
+  if (level === 0) return { currency: 'coin', amount: coins };
+  return { currency: 'corrupt', amount: Math.round(coins * corruptMul) };
+}
+
+/** 黑金余额够不够 */
+export function canAfford(wallet: { coins: number; corrupt: number }, q: CostQuote): boolean {
+  return q.currency === 'coin' ? wallet.coins >= q.amount : wallet.corrupt >= q.amount;
 }
 
 export interface Holdings {
@@ -183,7 +212,7 @@ export function resolveAudit(h: Holdings, coins: number, roll: number, shieldLef
     return { triggered: true, shielded: false, passed: false, seizedAssetId: null, fine: 0, message: '被叫去谈话,好在没什么可交代的' };
   }
   const seized = worst as AssetDef;
-  const fine = Math.min(coins, seized.risk * 12);
+  const fine = Math.min(coins, seized.risk * 12);   // 罚款扣的是黑金
   return {
     triggered: true,
     shielded: false,
@@ -194,9 +223,14 @@ export function resolveAudit(h: Holdings, coins: number, roll: number, shieldLef
   };
 }
 
-/** 洗白造价:风险越高越贵 */
+/** 洗白造价(黑金):风险越高越贵 */
 export function launderCost(h: Holdings): number {
   return Math.round(netRisk(h) * 14);
+}
+
+/** 打点造价(黑金):被查时花钱摆平 */
+export function bribeCost(risk: number): number {
+  return Math.max(80, Math.round(risk * 20));
 }
 
 /** 洗白效果:抵掉当前净风险的 30%(至少 1 点) */

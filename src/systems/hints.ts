@@ -24,7 +24,7 @@ export function nextStep(p: Progress): NextStep | null {
   // 1) 风险过高:优先救命
   const risk = netRisk(holdings);
   if (risk >= 60) {
-    return { text: `被查风险 ${risk} · 去洗白或养人脉`, scene: 'Assets', tone: 'urgent' };
+    return { text: `被查风险 ${risk} · 回家洗白或养人脉`, scene: 'Assets', tone: 'urgent' };
   }
 
   // 2) 每日奖励可领
@@ -37,7 +37,7 @@ export function nextStep(p: Progress): NextStep | null {
 
   // 3) 一项家产都没有:教他养成
   if (totalAssetValue(holdings) === 0) {
-    return { text: '去家产界面盖第一项产业,离线也生钱', scene: 'Assets', tone: 'normal' };
+    return { text: '回家置办第一项产业,离线也在给你产黑金', scene: 'Assets', tone: 'normal' };
   }
 
   // 4) 还有没通关的主线关卡
