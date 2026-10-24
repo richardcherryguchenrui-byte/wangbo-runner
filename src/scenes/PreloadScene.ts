@@ -42,8 +42,7 @@ export default class PreloadScene extends Phaser.Scene {
     // 顾哥神秘商铺商品贴图
     this.load.image('bribe-moon', 'assets/bribe-moon.png');
     // 音效与 BGM(原创芯片音乐风格;小游戏环境自动静音兜底)
-    this.load.audio('bgm', 'assets/bgm.wav');
-    this.load.audio('bgm2', 'assets/bgm2.wav');
+    // 两首 BGM 共 660KB,改成首屏之后再懒加载(见 systems/audio 的 loadBgmAsync)
     this.load.audio('jump', 'assets/jump.wav');
     this.load.audio('fail', 'assets/fail.wav');
     this.load.audio('shield', 'assets/shield.wav');

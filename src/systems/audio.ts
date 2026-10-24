@@ -32,6 +32,8 @@ export function soundMult(): number {
 function playLoop(scene: Phaser.Scene, key: string) {
   const mult = soundMult();
   if (mult <= 0) return null;
+  // BGM 改成懒加载:还没下载完就先静音,等加载完会自动续上
+  if (!scene.cache.audio.exists(key)) return null;
   const existing = scene.sound.get(key) as Phaser.Sound.WebAudioSound | null;
   if (existing) {
     if (!existing.isPlaying) existing.play();
@@ -111,4 +113,35 @@ export function playSfx(scene: Phaser.Scene, key: string, baseVolume = 0.5) {
   const mult = soundMult();
   if (mult <= 0) return;
   try { scene.sound.play(key, { volume: baseVolume * mult }); } catch {}
+}
+
+
+// ---- BGM 懒加载 ----
+// 两首 WAV 共 660KB,占首屏下载量的一半。原先卡在 preload 里,
+// 慢网下会让人干等;改成首屏出来后再后台加载,加载完自动播放。
+let bgmLoading = false;
+
+export function loadBgmAsync(scene: Phaser.Scene, onReady?: () => void) {
+  const needBgm = !scene.cache.audio.exists('bgm');
+  const needBgm2 = !scene.cache.audio.exists('bgm2');
+  if (!needBgm && !needBgm2) {
+    onReady?.();
+    return;
+  }
+  if (bgmLoading) return;
+  bgmLoading = true;
+  try {
+    if (needBgm) scene.load.audio('bgm', 'assets/bgm.wav');
+    if (needBgm2) scene.load.audio('bgm2', 'assets/bgm2.wav');
+    scene.load.once('complete', () => {
+      bgmLoading = false;
+      onReady?.();
+    });
+    scene.load.once('loaderror', () => {
+      bgmLoading = false;
+    });
+    scene.load.start();
+  } catch {
+    bgmLoading = false;
+  }
 }
