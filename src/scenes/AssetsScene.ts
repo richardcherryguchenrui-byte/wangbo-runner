@@ -17,7 +17,6 @@ import {
   rawRisk,
   protection,
   auditShield,
-  accrueOffline,
   resolveAudit,
   launderCost,
   launderEffect,
@@ -35,6 +34,7 @@ import {
 } from '../systems/assets';
 import { buildAssetShareCard, downloadCanvas } from '../systems/sharecard';
 import { isWx, wxShare } from '../systems/wxapi';
+import { collectOfflineIncome } from '../systems/offline';
 
 const ASSET_ICONS: Record<string, string> = {
   purse: 'coin', villa: 'bg-hotel', shell: 'ui-shop',
@@ -102,23 +102,17 @@ export default class AssetsScene extends Phaser.Scene {
     this.maybeAudit(p);
   }
 
-  // ---- 离线收益 ----
+  // ---- 离线收益(统一入口,主界面已经领过的话这里就是 0) ----
   private collectOffline(p: ReturnType<typeof loadProgress>) {
-    const now = Date.now();
-    const last = p.lastAccrualAt || 0;
-    const elapsed = last > 0 ? now - last : 0;
-    const r = accrueOffline(this.holdings, elapsed);
-    p.lastAccrualAt = now;
-    if (r.coins > 0) {
-      this.coins += r.coins;
-      p.coins = this.coins;
-      const tip = r.capped ? '(离线收益按 12 小时封顶)' : '';
-      this.time.delayedCall(320, () => {
-        showToast(this, GAME_WIDTH / 2, 470, `离线进账 +${r.coins} 银币 ${tip}`, '#ffe066', 'coin');
-      });
-      playSfx(this, 'coin', 0.4);
-    }
-    saveProgress(p);
+    const r = collectOfflineIncome();
+    if (r.coins <= 0) return;
+    this.coins = p.coins + r.coins;
+    p.coins = this.coins;
+    const tip = r.capped ? '(按 12 小时封顶)' : '';
+    this.time.delayedCall(320, () => {
+      showToast(this, GAME_WIDTH / 2, 470, `离线进账 +${r.coins} 银币 ${tip}`, '#ffe066', 'coin');
+    });
+    playSfx(this, 'coin', 0.4);
   }
 
   // ---- 纪检委审查 ----

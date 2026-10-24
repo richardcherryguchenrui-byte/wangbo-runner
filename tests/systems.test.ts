@@ -18,6 +18,7 @@ import {
 } from '../src/systems/missions';
 import { generatePattern, stageFor, FLYER_Y } from '../src/systems/patterns';
 import { isPerfectSlideTiming, tightSlideIndex } from '../src/systems/slideJudge';
+import { formatDuration } from '../src/systems/offline';
 import {
   ASSETS, NETWORK, nextCost, incomePerMin, rawRisk, protection, netRisk, auditShield,
   accrueOffline, resolveAudit, launderCost, launderEffect, MAX_OFFLINE_MS,
@@ -1326,5 +1327,15 @@ describe('贪官养成成就', () => {
       expect(a.reward).toBeGreaterThan(0);
       expect(a.desc.length).toBeGreaterThan(0);
     });
+  });
+});
+
+// 离线收益结算与时长格式
+describe('离线收益结算', () => {
+  it('时长格式化成小时/分钟', () => {
+    expect(formatDuration(0)).toBe('0 分钟');
+    expect(formatDuration(45 * 60 * 1000)).toBe('45 分钟');
+    expect(formatDuration(2 * 60 * 60 * 1000)).toBe('2 小时');
+    expect(formatDuration((2 * 60 + 30) * 60 * 1000)).toBe('2 小时 30 分');
   });
 });

@@ -7,6 +7,7 @@ import { ensureSkinTextures, playerFrameKey } from '../systems/skins';
 import { loadControls } from '../systems/controls';
 import { LEVELS, totalStars } from '../systems/levels';
 import { totalAssetValue, formatValue } from '../systems/assets';
+import { collectOfflineIncome, formatDuration } from '../systems/offline';
 import { checkIn } from '../systems/daily';
 import { hasCustomHead } from '../systems/customhead';
 import { RUN_RANKS } from '../systems/ranks';
@@ -20,6 +21,8 @@ export default class TitleScene extends Phaser.Scene {
 
   create() {
     startBgm(this);
+    // 先结算离线家产收益,再读存档,保证界面上的银币是结算后的数字
+    this.settleOffline();
     const p = loadProgress();
 
     // 每日签到
@@ -368,6 +371,23 @@ export default class TitleScene extends Phaser.Scene {
     this.add.text(px + pw / 2, 452, pad ? '点「继续闯关」开始 · D 每日挑战' : '空格进无尽模式 · D 每日挑战 · ↓ 滑铲', {
       fontFamily: FONT, fontSize: '11px', color: '#cfe3ff'
     }).setOrigin(0.5).setDepth(10).setAlpha(0.92);
+  }
+
+  // 回访钩子:一进游戏先把离线期间的家产收益结算掉并报喜
+  private settleOffline() {
+    const r = collectOfflineIncome();
+    if (r.coins <= 0) return;
+    const dur = formatDuration(r.elapsedMs);
+    this.time.delayedCall(600, () => {
+      showToast(
+        this,
+        GAME_WIDTH / 2,
+        168,
+        `离线 ${dur} · 家产进账 +${r.coins} 银币${r.capped ? '(封顶)' : ''}`,
+        '#ffe066',
+        'coin'
+      );
+    });
   }
 
   private buildFooter(p: ReturnType<typeof loadProgress>) {
