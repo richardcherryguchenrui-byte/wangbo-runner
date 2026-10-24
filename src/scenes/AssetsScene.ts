@@ -44,6 +44,9 @@ export default class AssetsScene extends Phaser.Scene {
   private coins = 0;
   private rowRefs: { refresh: () => void }[] = [];
   private coinText?: Phaser.GameObjects.Text;
+  /** 待写入存档的统计增量(审查结算与 persist 之间传递) */
+  private statSurvived = 0;
+  private statSeized = 0;
   private incomeText?: Phaser.GameObjects.Text;
   private protectText?: Phaser.GameObjects.Text;
 
@@ -107,40 +110,109 @@ export default class AssetsScene extends Phaser.Scene {
       saveProgress(p);
       return;
     }
-    const shieldLeft = Math.max(0, auditShield(this.holdings) - (p.auditsSurvived > 0 ? 0 : 0));
-    const r = resolveAudit(this.holdings, this.coins, Math.random(), shieldLeft);
+    const roll = Math.random();
+    const shieldLeft = auditShield(this.holdings);
+    const r = resolveAudit(this.holdings, this.coins, roll, shieldLeft);
     if (!r.triggered) {
       saveProgress(p);
       return;
     }
-    this.time.delayedCall(700, () => {
-      if (r.shielded) {
-        p.auditsSurvived += 1;
-        showToast(this, GAME_WIDTH / 2, 190, `巡视组来了 · ${r.message}`, '#8ce99a', 'ui-siren');
-        playSfx(this, 'shield', 0.5);
-      } else if (r.passed) {
-        p.auditsSurvived += 1;
-        showToast(this, GAME_WIDTH / 2, 190, `纪检委来了 · ${r.message}`, '#ffe066', 'ui-siren');
+    saveProgress(p);
+    this.time.delayedCall(600, () => this.showAuditOverlay(p, risk, roll, shieldLeft));
+  }
+
+  // 审查交互层:要么花钱打点,要么硬扛赌一把
+  private showAuditOverlay(p: ReturnType<typeof loadProgress>, risk: number, roll: number, shieldLeft: number) {
+    const bribeCost = Math.max(80, Math.round(risk * 20));
+    const layer = this.add.container(0, 0).setDepth(120);
+    layer.add(this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x02060c, 0.8).setInteractive());
+    const panel = this.add.graphics();
+    panel.fillStyle(0x1a0b12, 0.98);
+    panel.fillRoundedRect(GAME_WIDTH / 2 - 260, 110, 520, 300, 22);
+    panel.lineStyle(2, 0xff5c5c, 0.6);
+    panel.strokeRoundedRect(GAME_WIDTH / 2 - 260, 110, 520, 300, 22);
+    layer.add(panel);
+    layer.add(this.add.text(GAME_WIDTH / 2, 148, '纪检委来了', {
+      fontFamily: FONT, fontSize: '34px', color: '#ff8787', fontStyle: 'bold',
+      resolution: 2, stroke: '#08131f', strokeThickness: 6
+    }).setOrigin(0.5));
+    layer.add(this.add.text(GAME_WIDTH / 2, 186, '有人把你的名字写进了举报信', {
+      fontFamily: FONT, fontSize: '13px', color: '#e2b6b6', resolution: 2
+    }).setOrigin(0.5));
+    layer.add(this.add.text(GAME_WIDTH / 2, 218, `被查风险 ${risk} / 100`
+      + (shieldLeft > 0 ? ` · 人脉豁免 ×${shieldLeft}` : ''), {
+      fontFamily: FONT, fontSize: '12px', color: '#ffe066', resolution: 2
+    }).setOrigin(0.5));
+
+    const doBribe = () => {
+      layer.removeAll(true);
+      if (this.coins >= bribeCost) {
+        this.coins -= bribeCost;
+        this.statSurvived += 1;
+        playSfx(this, 'coin', 0.45);
+        showToast(this, GAME_WIDTH / 2, 190, `打点出去了 ${bribeCost} 银币 · 这次没人再提`, '#8ce99a', 'ui-check');
       } else {
-        // 没收资产 + 罚款
-        if (r.seizedAssetId) {
-          const cur = this.holdings.assets[r.seizedAssetId] ?? 0;
-          this.holdings.assets[r.seizedAssetId] = Math.max(0, cur - 1);
-        }
-        this.coins = Math.max(0, this.coins - r.fine);
-        p.assetsSeized += r.seizedAssetId ? 1 : 0;
-        redFlash(this);
-        shake(this, 0.014, 300);
-        playSfx(this, 'gameover', 0.5);
-        showToast(this, GAME_WIDTH / 2, 190, `被查了 · ${r.message}${r.fine > 0 ? ` · 罚款 ${r.fine}` : ''}`, '#ff8787', 'ui-siren');
+        // 钱不够打点,只能认
+        this.applyAuditPenalty(p, risk, roll, shieldLeft);
       }
-      p.coins = this.coins;
-      p.assets = this.holdings.assets;
-      p.network = this.holdings.network;
-      p.laundered = this.holdings.laundered ?? 0;
-      saveProgress(p);
-      this.time.delayedCall(500, () => this.scene.restart());
+      this.persist();
+    };
+    const doRisky = () => {
+      layer.removeAll(true);
+      this.applyAuditPenalty(p, risk, roll, shieldLeft);
+      this.persist();
+    };
+
+    [
+      { label: `打点 -${bribeCost}`, x: GAME_WIDTH / 2 - 130, primary: false, fn: doBribe },
+      { label: '硬扛着', x: GAME_WIDTH / 2 + 130, primary: true, fn: doRisky }
+    ].forEach(b => {
+      const w = 200; const h = 48; const y = 340;
+      const g = this.add.graphics();
+      const fill = b.primary ? 0xffb703 : 0x16324f;
+      g.fillStyle(fill, 0.95);
+      g.fillRoundedRect(b.x - w / 2, y - h / 2, w, h, h / 2);
+      g.lineStyle(2, b.primary ? 0xffecb3 : 0xffffff, b.primary ? 0.9 : 0.2);
+      g.strokeRoundedRect(b.x - w / 2, y - h / 2, w, h, h / 2);
+      const t = this.add.text(b.x, y, b.label, {
+        fontFamily: FONT, fontSize: '19px', color: b.primary ? '#3a2400' : '#cfe3ff',
+        fontStyle: 'bold', resolution: 2
+      }).setOrigin(0.5);
+      const hit = this.add.rectangle(b.x, y, w, h, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
+      hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); b.fn(); });
+      layer.add([g, t, hit]);
     });
+    layer.add(this.add.text(GAME_WIDTH / 2, 384, '打点必胜但花钱 · 硬扛省钱,赌你运气', {
+      fontFamily: FONT, fontSize: '11px', color: '#8ba9c7', resolution: 2
+    }).setOrigin(0.5));
+    playSfx(this, 'warn', 0.5);
+    shake(this, 0.008, 240);
+  }
+
+  // 结算审查后果(硬扛或钱不够打点时)
+  private applyAuditPenalty(p: ReturnType<typeof loadProgress>, risk: number, roll: number, shieldLeft: number) {
+    const r = resolveAudit(this.holdings, this.coins, roll, shieldLeft);
+    if (r.shielded) {
+      this.statSurvived += 1;
+      showToast(this, GAME_WIDTH / 2, 190, `巡视组的熟人咳嗽了一声 · ${r.message}`, '#8ce99a', 'ui-siren');
+      playSfx(this, 'shield', 0.5);
+    } else if (r.passed) {
+      this.statSurvived += 1;
+      showToast(this, GAME_WIDTH / 2, 190, `查了一圈 · ${r.message}`, '#ffe066', 'ui-siren');
+    } else {
+      if (r.seizedAssetId) {
+        const cur = this.holdings.assets[r.seizedAssetId] ?? 0;
+        this.holdings.assets[r.seizedAssetId] = Math.max(0, cur - 1);
+      }
+      this.coins = Math.max(0, this.coins - r.fine);
+      if (r.seizedAssetId) this.statSeized += 1;
+      redFlash(this);
+      shake(this, 0.014, 300);
+      playSfx(this, 'gameover', 0.5);
+      showToast(this, GAME_WIDTH / 2, 190, `被查了 · ${r.message}${r.fine > 0 ? ` · 罚款 ${r.fine}` : ''}`, '#ff8787', 'ui-siren');
+    }
+    void risk;
+    this.time.delayedCall(600, () => this.scene.restart());
   }
 
   // ---- 资产列表 ----
@@ -358,6 +430,10 @@ export default class AssetsScene extends Phaser.Scene {
     p.network = this.holdings.network;
     p.laundered = this.holdings.laundered ?? 0;
     p.lastAccrualAt = Date.now();
+    p.auditsSurvived = (p.auditsSurvived ?? 0) + this.statSurvived;
+    p.assetsSeized = (p.assetsSeized ?? 0) + this.statSeized;
+    this.statSurvived = 0;
+    this.statSeized = 0;
     saveProgress(p);
     this.refreshAll();
     // 顶部银币显示同步
