@@ -281,3 +281,208 @@ export function downloadCanvas(canvas: HTMLCanvasElement, filename: string): boo
     return false;
   }
 }
+
+// ============================================================
+// 闯关战绩卡:竖版 1080×1440,主打「官场现形记」的自嘲梗
+// ============================================================
+
+export interface LevelShareData {
+  chapterName: string;
+  levelName: string;
+  cleared: boolean;
+  stars: number;
+  endingLine: string;
+  starTotal: number;
+  totalStarsMax: number;
+  dodged: number;
+  nearMisses: number;
+  coins: number;
+  timeMs: number;
+}
+
+export function buildLevelShareCard(scene: Phaser.Scene, d: LevelShareData): HTMLCanvasElement {
+  const W = 1080, H = 1440;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext('2d');
+  if (!ctx) return c;
+
+  // 背景:通关走暗金,落马走暗红,情绪一眼能看出
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  if (d.cleared) {
+    bg.addColorStop(0, '#0b1a34');
+    bg.addColorStop(0.5, '#1b2f52');
+    bg.addColorStop(1, '#4a3a15');
+  } else {
+    bg.addColorStop(0, '#150a12');
+    bg.addColorStop(0.5, '#2a1220');
+    bg.addColorStop(1, '#3b1a1a');
+  }
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // 放射光,颜色跟着情绪走
+  const rayColor = d.cleared ? '255,212,59' : '255,107,107';
+  ctx.save();
+  ctx.translate(W / 2, 430);
+  for (let i = 0; i < 18; i++) {
+    ctx.rotate((Math.PI * 2) / 18);
+    const g = ctx.createLinearGradient(0, 0, 0, -760);
+    g.addColorStop(0, `rgba(${rayColor},0.13)`);
+    g.addColorStop(1, `rgba(${rayColor},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-28, 0);
+    ctx.lineTo(0, -760);
+    ctx.lineTo(28, 0);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // 星点
+  for (let i = 0; i < 44; i++) {
+    const x = pseudo(i * 7.13 + 11) * W;
+    const y = pseudo(i * 3.77 + 5) * H;
+    const r = 1 + pseudo(i * 1.9 + 7) * 3;
+    ctx.fillStyle = `rgba(255,240,200,${0.1 + pseudo(i * 2.2 + 1) * 0.3})`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // 品牌
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffd43b';
+  ctx.font = `bold 34px ${FONT}`;
+  ctx.fillText('官场现形记', 70, 110);
+  ctx.fillStyle = 'rgba(220,235,255,0.6)';
+  ctx.font = `22px ${FONT}`;
+  ctx.fillText(`${d.chapterName} · ${d.levelName}`, 70, 152);
+
+  // 结论文案
+  ctx.textAlign = 'center';
+  const head = d.cleared ? (d.stars >= 3 ? '完美通关' : '仕途通关') : '落马了';
+  ctx.save();
+  ctx.shadowColor = d.cleared ? 'rgba(255,212,59,0.55)' : 'rgba(255,90,90,0.55)';
+  ctx.shadowBlur = 40;
+  ctx.fillStyle = d.cleared ? '#ffe066' : '#ff8787';
+  ctx.font = `bold 128px ${FONT}`;
+  ctx.fillText(head, W / 2, 360);
+  ctx.restore();
+
+  // 结局一句话
+  ctx.fillStyle = 'rgba(235,244,255,0.9)';
+  ctx.font = `36px ${FONT}`;
+  wrapText(ctx, `「${d.endingLine}」`, W / 2, 424, 860, 52);
+
+  // 三颗星
+  const starY = 612;
+  const starR = 56;
+  for (let i = 0; i < 3; i++) {
+    const cx = W / 2 + (i - 1) * 190;
+    drawStar(ctx, cx, starY, starR, i < d.stars);
+  }
+
+  // 数据四宫格
+  const cells: [string, string][] = [
+    [String(d.dodged), '翻过诱惑'],
+    [String(d.nearMisses), '擦身而过'],
+    [String(d.coins), '到手银币'],
+    [String(d.starTotal), `累计星数/${d.totalStarsMax}`]
+  ];
+  const gridY = 780;
+  cells.forEach(([value, label], i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const bx = 120 + col * 440;   // 两列各 400,间距 40,左右边距各 120
+    const by = gridY + row * 168;
+    ctx.fillStyle = 'rgba(8,20,38,0.62)';
+    roundRect(ctx, bx, by, 400, 140, 24);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 2;
+    roundRect(ctx, bx, by, 400, 140, 24);
+    ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffe066';
+    ctx.font = `bold 56px ${FONT}`;
+    ctx.fillText(value, bx + 200, by + 74);
+    ctx.fillStyle = 'rgba(200,220,245,0.75)';
+    ctx.font = `24px ${FONT}`;
+    ctx.fillText(label, bx + 200, by + 116);
+  });
+
+  // 挑战语
+  ctx.textAlign = 'center';
+  ctx.fillStyle = d.cleared ? '#ffe066' : '#ff9f9f';
+  ctx.font = `bold 34px ${FONT}`;
+  ctx.fillText(d.cleared ? '这一关,我上岸了' : '这一关,我栽了', W / 2, 1170);
+  ctx.fillStyle = 'rgba(210,230,255,0.6)';
+  ctx.font = `22px ${FONT}`;
+  ctx.fillText('你能比我升得快吗?', W / 2, 1212);
+
+  // 页脚
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(60, 1260, 960, 2);
+  ctx.fillStyle = 'rgba(210,230,255,0.55)';
+  ctx.font = `20px ${FONT}`;
+  ctx.fillText(`王博晋升之路跑酷 · 六章十八关 · v${GAME_VERSION}`, W / 2, 1316);
+  ctx.fillStyle = 'rgba(255,212,59,0.8)';
+  ctx.font = `bold 22px ${FONT}`;
+  ctx.fillText('nmjdzmy 反弹工作室', W / 2, 1358);
+
+  void scene;
+  return c;
+}
+
+function drawStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, filled: boolean) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i / 10) * Math.PI * 2;
+    const rr = i % 2 === 0 ? r : r * 0.44;
+    const x = cx + Math.cos(a) * rr;
+    const y = cy + Math.sin(a) * rr;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  if (filled) {
+    const g = ctx.createLinearGradient(cx, cy - r, cx, cy + r);
+    g.addColorStop(0, '#ffe066');
+    g.addColorStop(1, '#e8a100');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = '#fff6cf';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+}
+
+function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  cx: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number
+) {
+  const chars = Array.from(text);
+  let line = '';
+  let cursorY = y;
+  for (const ch of chars) {
+    const test = line + ch;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      ctx.fillText(line, cx, cursorY);
+      line = ch;
+      cursorY += lineHeight;
+    } else {
+      line = test;
+    }
+  }
+  if (line) ctx.fillText(line, cx, cursorY);
+}

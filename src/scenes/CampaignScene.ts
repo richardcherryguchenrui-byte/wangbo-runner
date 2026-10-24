@@ -14,6 +14,8 @@ import {
   isLevelUnlocked,
   isChapterUnlocked,
   totalStars,
+  nextMilestone,
+  STAR_MILESTONES,
   type LevelDef
 } from '../systems/levels';
 
@@ -52,6 +54,24 @@ export default class CampaignScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setDepth(22);
+
+    // 下一个里程碑:星数面板下方一条细进度条 + 页脚文案,不占关卡行
+    const nextMile = nextMilestone(sum);
+    const prevStars = nextMile
+      ? (STAR_MILESTONES.filter(m => m.stars <= sum).slice(-1)[0]?.stars ?? 0)
+      : TOTAL_STARS;
+    const barW = 186;
+    const barX = GAME_WIDTH - 210;
+    const barY = 99;
+    const fill = nextMile
+      ? Math.min(1, Math.max(0, (sum - prevStars) / Math.max(1, nextMile.stars - prevStars)))
+      : 1;
+    const track = this.add.graphics().setDepth(21);
+    track.fillStyle(0x0b1a2e, 0.9);
+    track.fillRoundedRect(barX, barY, barW, 5, 2.5);
+    const fillG = this.add.graphics().setDepth(22);
+    fillG.fillStyle(0xffd43b, 0.95);
+    fillG.fillRoundedRect(barX, barY, Math.max(5, barW * fill), 5, 2.5);
 
     CHAPTERS.forEach((ch, i) => {
       const rowY = ROW_Y0 + i * ROW_H;
@@ -108,7 +128,12 @@ export default class CampaignScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setDepth(24);
 
-    addMenuFooter(this, '打通一关即可解锁下一关 · 星级越高奖励越多');
+    if (nextMile) {
+      const gain = nextMile.bribeMoon ? `+${nextMile.coins} 银币 + 贿月×${nextMile.bribeMoon}` : `+${nextMile.coins} 银币`;
+      addMenuFooter(this, `再拿 ${nextMile.stars - sum} 星 →「${nextMile.label}」${gain}`);
+    } else {
+      addMenuFooter(this, '全部里程碑已达成 · 打通一关解锁下一关');
+    }
   }
 
   private makeLevelChip(x: number, y: number, level: LevelDef, stars: number, unlocked: boolean) {

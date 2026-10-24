@@ -105,6 +105,10 @@ import {
   remainingMs,
   levelReward,
   nextLevelId,
+  totalStars,
+  newlyReachedMilestones,
+  clearLine,
+  landfallLine,
   type LevelDef,
   type LevelStats
 } from '../systems/levels';
@@ -2817,6 +2821,9 @@ export default class GameScene extends Phaser.Scene {
       levelReward: number;
       levelName: string;
       levelChapter: number;
+      levelEndingLine: string;
+      levelStarTotal: number;
+      levelMilestones: { stars: number; coins: number; bribeMoon: number; label: string }[];
     } | undefined;
     if (this.level) {
       const stats = this.levelStats(cleared);
@@ -2824,12 +2831,27 @@ export default class GameScene extends Phaser.Scene {
       const prevStars = this.progress.levelStars[this.level.id] ?? 0;
       const firstClear = cleared && prevStars === 0;
       const reward = cleared ? levelReward(this.level, stars, firstClear) : 0;
+      const prevTotal = totalStars(this.progress.levelStars);
       if (cleared) {
         this.progress.levelStars[this.level.id] = Math.max(prevStars, stars);
         this.progress.levelClears += 1;
         this.progress.coins += reward;
       }
-      levelData = {        levelId: this.level.id,
+      // 累计星数跨过里程碑:当场发奖,给刷星一个即时回报
+      const newTotal = totalStars(this.progress.levelStars);
+      const claimed = new Set(this.progress.starMilestones ?? []);
+      const crossed = newlyReachedMilestones(prevTotal, newTotal).filter(m => !claimed.has(m.stars));
+      const milestoneRewards = crossed.map(m => {
+        this.progress.coins += m.coins;
+        if (m.bribeMoon) this.progress.bribeMoon = Math.min(bribeCarryLimit(this.progress) + 9, this.progress.bribeMoon + m.bribeMoon);
+        claimed.add(m.stars);
+        return { stars: m.stars, coins: m.coins, bribeMoon: m.bribeMoon ?? 0, label: m.label };
+      });
+      this.progress.starMilestones = Array.from(claimed).sort((a, b) => a - b);
+      const ratio = this.level.durationMs > 0 ? Math.min(1, stats.timeMs / this.level.durationMs) : 0;
+      const endingLine = cleared ? clearLine(stars) : landfallLine(this.level, ratio);
+      levelData = {
+        levelId: this.level.id,
         levelCleared: cleared,
         levelStars: stars,
         levelPrevStars: prevStars,
@@ -2843,7 +2865,10 @@ export default class GameScene extends Phaser.Scene {
         levelFirstClear: firstClear,
         levelReward: reward,
         levelName: this.level.name,
-        levelChapter: this.level.chapter
+        levelChapter: this.level.chapter,
+        levelEndingLine: endingLine,
+        levelStarTotal: newTotal,
+        levelMilestones: milestoneRewards
       };
     }
     this.progress.perfectSlides += this.runPerfectSlides;

@@ -20,7 +20,8 @@ import { generatePattern, stageFor, FLYER_Y } from '../src/systems/patterns';
 import { isPerfectSlideTiming, tightSlideIndex } from '../src/systems/slideJudge';
 import {
   LEVELS, CHAPTERS, starCount, goalDone, isLevelUnlocked, isChapterUnlocked,
-  levelSpeedAt, levelReward, nextLevelId, totalStars, MAX_STARS_PER_LEVEL
+  levelSpeedAt, levelReward, nextLevelId, totalStars, MAX_STARS_PER_LEVEL,
+  STAR_MILESTONES, TOTAL_STARS, newlyReachedMilestones, nextMilestone, clearLine, landfallLine
 } from '../src/systems/levels';
 import { gradeRun } from '../src/systems/grade';
 import {
@@ -699,6 +700,56 @@ describe('闯关模式 · 官场现形记', () => {
     // 每章 3 关
     CHAPTERS.forEach(c => {
       expect(LEVELS.filter(l => l.chapter === c.index).length).toBe(3);
+    });
+  });
+});
+
+// 星级里程碑与结局文案
+describe('星级里程碑与结局文案', () => {
+  it('里程碑只发新跨过的那些,重复不会重复发', () => {
+    expect(newlyReachedMilestones(0, 4).length).toBe(0);
+    expect(newlyReachedMilestones(0, 5).map(m => m.stars)).toEqual([5]);
+    expect(newlyReachedMilestones(4, 11).map(m => m.stars)).toEqual([5, 10]);
+    // 星数没涨:不发
+    expect(newlyReachedMilestones(10, 10).length).toBe(0);
+    // 一次跨很多档:全部按顺序发
+    expect(newlyReachedMilestones(0, 54).map(m => m.stars)).toEqual(STAR_MILESTONES.map(m => m.stars));
+  });
+
+  it('里程碑奖励是递增的,并且最后一档正好是满星', () => {
+    let last = 0;
+    STAR_MILESTONES.forEach(m => {
+      expect(m.stars).toBeGreaterThan(last);
+      expect(m.coins).toBeGreaterThan(0);
+      last = m.stars;
+    });
+    expect(STAR_MILESTONES[STAR_MILESTONES.length - 1].stars).toBe(TOTAL_STARS);
+  });
+
+  it('下一个里程碑提示', () => {
+    expect(nextMilestone(0)?.stars).toBe(5);
+    expect(nextMilestone(4)?.stars).toBe(5);
+    expect(nextMilestone(5)?.stars).toBe(10);
+    expect(nextMilestone(TOTAL_STARS)).toBe(null);
+  });
+
+  it('通关文案按星级分档', () => {
+    expect(clearLine(1)).not.toBe(clearLine(3));
+    expect(clearLine(3).length).toBeGreaterThan(0);
+    // 越界不崩
+    expect(clearLine(0).length).toBeGreaterThan(0);
+    expect(clearLine(9).length).toBeGreaterThan(0);
+  });
+
+  it('落马文案按推进程度分档,且每章都有词', () => {
+    CHAPTERS.forEach(ch => {
+      const level = LEVELS.find(l => l.chapter === ch.index)!;
+      const early = landfallLine(level, 0.1);
+      const mid = landfallLine(level, 0.6);
+      const late = landfallLine(level, 0.95);
+      expect(early.length).toBeGreaterThan(0);
+      // 三档应当是三句不同的话
+      expect(new Set([early, mid, late]).size).toBe(3);
     });
   });
 });

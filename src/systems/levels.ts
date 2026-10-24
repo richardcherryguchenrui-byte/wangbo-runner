@@ -261,3 +261,70 @@ export function levelReward(level: LevelDef, stars: number, firstClear: boolean)
   const base = stars * level.rewardStar;
   return base + (firstClear ? level.rewardFirst : 0);
 }
+
+// ============================================================
+// 星级里程碑:累计星数换实物奖励,给「回头刷星」一个看得见的终点
+// ============================================================
+
+export interface StarMilestone {
+  stars: number;
+  coins: number;
+  bribeMoon?: number;
+  label: string;
+}
+
+export const STAR_MILESTONES: StarMilestone[] = [
+  { stars: 5, coins: 60, label: '初露头角' },
+  { stars: 10, coins: 100, bribeMoon: 1, label: '小有门路' },
+  { stars: 18, coins: 140, bribeMoon: 1, label: '半个圈内人' },
+  { stars: 27, coins: 200, bribeMoon: 2, label: '说得上话' },
+  { stars: 36, coins: 260, bribeMoon: 2, label: '手眼通天' },
+  { stars: 45, coins: 320, bribeMoon: 3, label: '一路绿灯' },
+  { stars: 54, coins: 500, bribeMoon: 3, label: '全身而退 · 查无此人' }
+];
+
+/** 本次从 prevTotal 涨到 newTotal,跨过了哪些里程碑(用于发放奖励) */
+export function newlyReachedMilestones(prevTotal: number, newTotal: number): StarMilestone[] {
+  return STAR_MILESTONES.filter(m => m.stars > prevTotal && m.stars <= newTotal);
+}
+
+/** 下一个还没拿到的里程碑(展示用) */
+export function nextMilestone(totalStarsCount: number): StarMilestone | null {
+  return STAR_MILESTONES.find(m => m.stars > totalStarsCount) ?? null;
+}
+
+// ============================================================
+// 结局文案:通关与落马都分档,失败也要有戏
+// ============================================================
+
+const CLEAR_LINES = [
+  '勉强上岸,冷汗一身',
+  '平安落地,履历干净',
+  '一路顺风顺水,查无此人'
+];
+
+/** 通关文案:按星级分档(1~3 星) */
+export function clearLine(stars: number): string {
+  const idx = Math.min(CLEAR_LINES.length - 1, Math.max(0, stars - 1));
+  return CLEAR_LINES[idx];
+}
+
+// 每章三种落马说法,按「推进到哪一步」挑一句
+const LANDFALL_LINES: string[][] = [
+  ['刚端起茶杯就被叫去谈话', '材料改到第八遍,人先烦了', '文件都归档了,人却没能下班'],
+  ['酒还没敬到位,人先倒了', '红包塞回去的时候手抖了', '人都送到门口了,还差最后一句客套'],
+  ['标书第一页就把名字写错了', '审计翻到第三页就停了下来', '标书都封好了,信封却掉在地上'],
+  ['名单还没拟,自己先被划掉了', '组织谈话时话多说了半句', '名单就差最后一个名字没签'],
+  ['巡视组一进门就点了你的名', '线索移交单上出现了自己的名字', '巡视组都准备走了,又被叫了回去'],
+  ['凌晨的敲门声比闹钟还准时', '留置室的灯一直亮着', '最后一句陈述卡在喉咙里']
+];
+
+/**
+ * 落马文案:ratio = 本关推进程度(0~1),越接近通关,说法越让人心疼。
+ * 分三档:不到一半 / 过半 / 就差一点。
+ */
+export function landfallLine(level: LevelDef, ratio: number): string {
+  const lines = LANDFALL_LINES[level.chapter] ?? LANDFALL_LINES[0];
+  const tier = ratio < 0.5 ? 0 : ratio < 0.85 ? 1 : 2;
+  return lines[tier];
+}

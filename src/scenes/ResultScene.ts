@@ -5,10 +5,10 @@ import { addPanel, makeButton, makeHeroButton, showToast, FONT } from '../system
 import { stopBgm, playSfx } from '../systems/audio';
 import { confettiBurst } from '../systems/effects';
 import { isWx, wxShare } from '../systems/wxapi';
-import { buildShareCard, downloadCanvas } from '../systems/sharecard';
+import { buildShareCard, buildLevelShareCard, downloadCanvas } from '../systems/sharecard';
 import { rankProgress } from '../systems/ranks';
 import { gradeRun } from '../systems/grade';
-import { CHAPTERS } from '../systems/levels';
+import { CHAPTERS, TOTAL_STARS } from '../systems/levels';
 
 interface ResultData {
   timeMs?: number;
@@ -46,6 +46,9 @@ interface ResultData {
   levelReward?: number;
   levelName?: string;
   levelChapter?: number;
+  levelEndingLine?: string;
+  levelStarTotal?: number;
+  levelMilestones?: { stars: number; coins: number; bribeMoon: number; label: string }[];
 }
 
 export default class ResultScene extends Phaser.Scene {
@@ -84,6 +87,9 @@ export default class ResultScene extends Phaser.Scene {
   private levelReward = 0;
   private levelName = '';
   private levelChapter = 0;
+  private levelEndingLine = '';
+  private levelStarTotal = 0;
+  private levelMilestones: { stars: number; coins: number; bribeMoon: number; label: string }[] = [];
 
   constructor() {
     super('Result');
@@ -123,6 +129,9 @@ export default class ResultScene extends Phaser.Scene {
     this.levelReward = data?.levelReward ?? 0;
     this.levelName = data?.levelName ?? '';
     this.levelChapter = data?.levelChapter ?? 0;
+    this.levelEndingLine = data?.levelEndingLine ?? '';
+    this.levelStarTotal = data?.levelStarTotal ?? 0;
+    this.levelMilestones = data?.levelMilestones ?? [];
   }
 
   create() {
@@ -448,9 +457,10 @@ export default class ResultScene extends Phaser.Scene {
       ? this.levelStars >= 3 ? '完美通关!' : '仕途通关!'
       : '落马了…';
     const verdictColor = this.levelCleared ? '#ffe066' : '#ff8787';
-    const verdictSub = this.levelCleared
-      ? isFinalLevel ? '全书终 · 这一路都走过来了' : '下一关已解锁'
-      : '账本还差最后一页,再来一次';
+    const verdictSub = this.levelEndingLine
+      || (this.levelCleared
+        ? isFinalLevel ? '全书终 · 这一路都走过来了' : '下一关已解锁'
+        : '账本还差最后一页,再来一次');
 
     if (this.levelCleared) {
       playSfx(this, 'promote', 0.55);
@@ -548,8 +558,23 @@ export default class ResultScene extends Phaser.Scene {
         .setDepth(22);
     }
 
+    // 星级里程碑:跨档时当场报喜,给刷星一个即时回报
+    if (this.levelMilestones.length > 0) {
+      const m = this.levelMilestones[this.levelMilestones.length - 1];
+      const extra = m.bribeMoon > 0 ? ` + 贿月 ×${m.bribeMoon}` : '';
+      this.add
+        .text(GAME_WIDTH / 2, starY + 52 + this.levelGoals.length * 34 + 32, `★ 累计 ${m.stars} 星达成「${m.label}」  +${m.coins} 银币${extra}`, {
+          fontFamily: FONT, fontSize: '14px', color: '#ffd43b', fontStyle: 'bold',
+          resolution: 2, stroke: '#08131f', strokeThickness: 4
+        })
+        .setOrigin(0.5)
+        .setDepth(22);
+      playSfx(this, 'record', 0.5);
+      confettiBurst(this, GAME_WIDTH / 2, 300, 20);
+    }
+
     // 本局数据条:填补空白,也给「这一把到底干了什么」一个交代
-    const statsY = starY + 52 + this.levelGoals.length * 34 + 44;
+    const statsY = starY + 52 + this.levelGoals.length * 34 + 62;
     const stats = [
       `存活 ${(this.timeMs / 1000).toFixed(1)}s`,
       `翻越 ${this.dodged}`,
@@ -571,49 +596,48 @@ export default class ResultScene extends Phaser.Scene {
 
     // 按钮
     const btnY = 436;
-    makeButton(this, 268, btnY, 150, 46, '关卡列表', () => {
+    const goCampaign = () => {
       if (this.leaving) return;
       this.leaving = true;
       this.scene.start('Campaign');
-    }, 15, { depth: 22, iconKey: 'ui-clipboard', iconSize: 15 });
-    makeButton(this, 452, btnY, 150, 46, '重玩本关', () => {
+    };
+    const goReplay = () => {
       if (this.leaving) return;
       this.leaving = true;
       this.scene.start('Game', { levelId: this.levelId });
-    }, 15, { depth: 22, iconKey: 'ui-restart', iconSize: 15 });
+    };
+    const goShare = () => this.shareLevelCard();
 
     if (hasNext) {
-      const btn = makeHeroButton(
-        this,
-        660,
-        btnY,
-        190,
-        50,
-        '下一关',
-        () => {
-          if (this.leaving) return;
-          this.leaving = true;
-          this.scene.start('Game', { levelId: this.levelNextId });
-        },
-        { iconKey: 'ui-play', iconSize: 20, fontSize: 20, depth: 22 }
-      );
-      void btn;
+      makeButton(this, 196, btnY, 118, 46, '关卡列表', goCampaign, 13, { depth: 22, iconKey: 'ui-clipboard', iconSize: 14 });
+      makeButton(this, 326, btnY, 118, 46, '重玩', goReplay, 13, { depth: 22, iconKey: 'ui-restart', iconSize: 14 });
+      makeButton(this, 456, btnY, 118, 46, '分享', goShare, 13, { depth: 22, iconKey: 'ui-share', iconSize: 14 });
+      makeHeroButton(this, 654, btnY, 190, 50, '下一关', () => {
+        if (this.leaving) return;
+        this.leaving = true;
+        this.scene.start('Game', { levelId: this.levelNextId });
+      }, { iconKey: 'ui-play', iconSize: 20, fontSize: 20, depth: 22 });
     } else if (this.levelCleared) {
-      makeHeroButton(
-        this,
-        660,
-        btnY,
-        190,
-        50,
-        '回主菜单',
-        () => {
-          if (this.leaving) return;
-          this.leaving = true;
-          this.scene.start('Title');
-        },
-        { iconKey: 'ui-home', iconSize: 20, fontSize: 20, depth: 22 }
-      );
+      makeButton(this, 206, btnY, 118, 46, '关卡列表', goCampaign, 13, { depth: 22, iconKey: 'ui-clipboard', iconSize: 14 });
+      makeButton(this, 336, btnY, 118, 46, '重玩', goReplay, 13, { depth: 22, iconKey: 'ui-restart', iconSize: 14 });
+      makeButton(this, 466, btnY, 118, 46, '分享', goShare, 13, { depth: 22, iconKey: 'ui-share', iconSize: 14 });
+      makeHeroButton(this, 664, btnY, 190, 50, '回主菜单', () => {
+        if (this.leaving) return;
+        this.leaving = true;
+        this.scene.start('Title');
+      }, { iconKey: 'ui-home', iconSize: 20, fontSize: 20, depth: 22 });
+    } else {
+      makeButton(this, 240, btnY, 130, 46, '关卡列表', goCampaign, 13, { depth: 22, iconKey: 'ui-clipboard', iconSize: 14 });
+      makeButton(this, 400, btnY, 130, 46, '分享', goShare, 13, { depth: 22, iconKey: 'ui-share', iconSize: 14 });
+      makeHeroButton(this, 620, btnY, 200, 50, '再试一次', goReplay, { iconKey: 'ui-restart', iconSize: 20, fontSize: 20, depth: 22 });
     }
+
+    this.add
+      .text(GAME_WIDTH / 2, 470, `累计 ★${this.levelStarTotal} / ${TOTAL_STARS}`, {
+        fontFamily: FONT, fontSize: '12px', color: '#ffe066', resolution: 2
+      })
+      .setOrigin(0.5)
+      .setDepth(21);
 
     this.add
       .text(GAME_WIDTH / 2, 500, '按 R 重玩 · 按 ESC 回关卡列表', {
@@ -631,6 +655,45 @@ export default class ResultScene extends Phaser.Scene {
     playSfx(this, 'click', 0.4);
     this.cameras.main.fadeOut(180, 8, 18, 34);
     this.time.delayedCall(190, () => this.scene.start('Game', { daily: this.daily }));
+  }
+
+  // 关卡战绩卡:通关晒星、落马晒梗,都是可传播的素材
+  private shareLevelCard() {
+    const chapterName = CHAPTERS[this.levelChapter]?.name ?? '';
+    const text = this.levelCleared
+      ? `我在《官场现形记》${chapterName}·${this.levelName} 拿了 ${this.levelStars} 星,累计 ${this.levelStarTotal} 星,你能比我升得快吗?`
+      : `我在《官场现形记》${chapterName}·${this.levelName} 落马了:${this.levelEndingLine || '这一关没过'}。`;
+    if (isWx()) {
+      wxShare(text);
+      return;
+    }
+    try {
+      const canvas = buildLevelShareCard(this, {
+        chapterName,
+        levelName: this.levelName,
+        cleared: this.levelCleared,
+        stars: this.levelStars,
+        endingLine: this.levelEndingLine || (this.levelCleared ? '平安落地' : '这一关没过'),
+        starTotal: this.levelStarTotal,
+        totalStarsMax: TOTAL_STARS,
+        dodged: this.dodged,
+        nearMisses: this.nearMisses,
+        coins: this.coins,
+        timeMs: this.timeMs
+      });
+      const ok = downloadCanvas(canvas, `官场现形记-${this.levelName}.png`);
+      showToast(
+        this,
+        GAME_WIDTH / 2,
+        152,
+        ok ? '战绩卡已保存,发群里吧!' : '保存失败,直接截图也行',
+        ok ? '#8ce99a' : '#ff8787',
+        'ui-image'
+      );
+      if (ok) playSfx(this, 'record', 0.35);
+    } catch {
+      showToast(this, GAME_WIDTH / 2, 152, '保存失败,直接截图也行', '#ff8787');
+    }
   }
 
   private shareOrSave() {
