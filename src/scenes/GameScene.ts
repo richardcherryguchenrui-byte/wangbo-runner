@@ -810,11 +810,12 @@ export default class GameScene extends Phaser.Scene {
     this.padSlideBounds = { x: 0, y: 0, w: 0, h: 0 };
     if (!this.controls.virtualButtons) return;
 
-    const r = 46;
-    const y = GROUND_TOP - 58;
-    // 左撇子也能用:铲在左、跳在右,和大多数横版手游一致
-    this.makePadButton(92, y, r, 0x74c0fc, 'down', '滑铲', false);
-    this.makePadButton(GAME_WIDTH - 92, y, r, 0xffd43b, 'up', '跳跃', true);
+    const r = 44;
+    const y = GROUND_TOP - 30;
+    // 左撇子也能用:铲在左、跳在右,和大多数横版手游一致。
+    // 圆心贴到两角,标签画在圆内,底边不会压到地面线。
+    this.makePadButton(70, y, r, 0x74c0fc, 'down', '滑铲', false);
+    this.makePadButton(GAME_WIDTH - 70, y, r, 0xffd43b, 'up', '跳跃', true);
   }
 
   private makePadButton(
@@ -826,37 +827,39 @@ export default class GameScene extends Phaser.Scene {
     label: string,
     isJump: boolean
   ) {
-    const base = this.add.graphics().setDepth(90);
-    const glyph = this.add.graphics().setDepth(91);
-    this.add
-      .text(x, y + r + 11, label, {
-        fontFamily: FONT, fontSize: '13px', color: '#ffffff', fontStyle: 'bold',
+    // 深度放在地面之上、角色之下:角色永远压在按钮上面,不会被挡住
+    const base = this.add.graphics().setDepth(3);
+    const glyph = this.add.graphics().setDepth(3);
+    const text = this.add
+      .text(x, y + 17, label, {
+        fontFamily: FONT, fontSize: '12px', color: '#ffffff', fontStyle: 'bold',
         resolution: 2, stroke: '#08131f', strokeThickness: 4
       })
       .setOrigin(0.5)
-      .setDepth(91);
+      .setDepth(3);
 
     const drawBase = (pressed: boolean) => {
       base.clear();
-      base.fillStyle(accent, pressed ? 0.3 : 0.15);
-      base.fillCircle(x, y, r + 7);
-      base.fillStyle(0x08131f, pressed ? 0.74 : 0.46);
+      base.fillStyle(accent, pressed ? 0.32 : 0.16);
+      base.fillCircle(x, y, r + 6);
+      base.fillStyle(0x08131f, pressed ? 0.72 : 0.42);
       base.fillCircle(x, y, r);
-      base.lineStyle(2.6, accent, pressed ? 1 : 0.78);
+      base.lineStyle(2.6, accent, pressed ? 1 : 0.75);
       base.strokeCircle(x, y, r);
     };
     const drawGlyph = (pressed: boolean) => {
       glyph.clear();
-      glyph.fillStyle(accent, pressed ? 1 : 0.92);
-      const s = r * 0.36;
-      if (dir === 'up') glyph.fillTriangle(x - s, y + s * 0.55, x + s, y + s * 0.55, x, y - s * 0.9);
-      else glyph.fillTriangle(x - s, y - s * 0.55, x + s, y - s * 0.55, x, y + s * 0.9);
+      glyph.fillStyle(accent, pressed ? 1 : 0.9);
+      const s = r * 0.3;
+      const gy = y - 10;
+      if (dir === 'up') glyph.fillTriangle(x - s, gy + s * 0.6, x + s, gy + s * 0.6, x, gy - s * 0.95);
+      else glyph.fillTriangle(x - s, gy - s * 0.6, x + s, gy - s * 0.6, x, gy + s * 0.95);
     };
     drawBase(false);
     drawGlyph(false);
 
     const hitR = r + 8;
-    const hit = this.add.circle(x, y, hitR, 0xffffff, 0.001).setDepth(92);
+    const hit = this.add.circle(x, y, hitR, 0xffffff, 0.001).setDepth(93);
     // 用圆形命中区,手指按偏一点也能触发
     hit.setInteractive(new Phaser.Geom.Circle(hitR, hitR, hitR), Phaser.Geom.Circle.Contains);
 
@@ -864,6 +867,7 @@ export default class GameScene extends Phaser.Scene {
       if (this.paused || this.dead || this.tutorialStep >= 0) return;
       drawBase(true);
       drawGlyph(true);
+      text.setColor('#ffe066');
       playSfx(this, 'click', 0.22);
       if (isJump) this.onJumpInput();
       else this.trySlide();
@@ -871,6 +875,7 @@ export default class GameScene extends Phaser.Scene {
     const release = () => {
       drawBase(false);
       drawGlyph(false);
+      text.setColor('#ffffff');
       if (isJump) this.onJumpRelease();
     };
     hit.on('pointerdown', press);
