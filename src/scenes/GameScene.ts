@@ -1110,8 +1110,13 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private announceStart() {
-    const title = this.daily && this.challenge ? `今日挑战 · ${this.challenge.modifier.name}` : '开跑!';
-    const sub = this.daily && this.challenge ? this.challenge.modifier.desc : '一路高升,冲上厅长!';
+    // 关卡模式:横幅直接报关卡名 + 存活目标,进关就知道要干什么
+    const title = this.level
+      ? this.level.name
+      : this.daily && this.challenge ? `今日挑战 · ${this.challenge.modifier.name}` : '开跑!';
+    const sub = this.level
+      ? `活到 ${Math.round(this.level.durationMs / 1000)} 秒 · ${this.level.flavor}`
+      : this.daily && this.challenge ? this.challenge.modifier.desc : '一路高升,冲上厅长!';
     const c = this.add.container(GAME_WIDTH / 2, 214).setDepth(70).setAlpha(0).setScale(0.6);
     const t1 = this.add
       .text(0, 0, title, {
