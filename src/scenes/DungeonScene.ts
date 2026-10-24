@@ -26,6 +26,14 @@ import {
   DG_BOSS_HP,
   DG_BOSS_SPEED,
   DG_BOSS_TOUCH_DAMAGE,
+  DG_PLAYER_MAX_MP,
+  DG_MP_ON_KILL,
+  DG_SKILL_REPORT,
+  DG_SKILL_SHIELD,
+  canUseSkill,
+  regenMp,
+  skillCooldownRatio,
+  inRadius,
   DUNGEON_LEVELS,
   boxOverlapRect,
   attackBox,
@@ -71,6 +79,17 @@ export default class DungeonScene extends Phaser.Scene {
   private goalSprite?: Phaser.GameObjects.Image;
 
   private hp = DG_PLAYER_MAX_HP;
+  private mp = DG_PLAYER_MAX_MP;
+  private reportReadyAt = 0;
+  private shieldReadyAt = 0;
+  private shieldUntil = 0;
+  private letters!: Phaser.Physics.Arcade.Group;
+  private combo = 0;
+  private comboUntil = 0;
+  private hitstopUntil = 0;
+  private hudMpBar!: Phaser.GameObjects.Graphics;
+  private hudSkillIcons: { icon: Phaser.GameObjects.Image; mask: Phaser.GameObjects.Graphics; key: Phaser.GameObjects.Text }[] = [];
+  private hudCombo?: Phaser.GameObjects.Text;
   private runCoins = 0;
   private facing: 1 | -1 = 1;
   private jumpsUsed = 0;
@@ -125,6 +144,15 @@ export default class DungeonScene extends Phaser.Scene {
     this.parsed = parseDungeon(this.level.map);
 
     this.hp = DG_PLAYER_MAX_HP;
+    this.mp = DG_PLAYER_MAX_MP;
+    this.reportReadyAt = 0;
+    this.shieldReadyAt = 0;
+    this.shieldUntil = 0;
+    this.combo = 0;
+    this.comboUntil = 0;
+    this.hitstopUntil = 0;
+    this.hudSkillIcons = [];
+    this.hudCombo = undefined;
     this.runCoins = 0;
     this.jumpsUsed = 0;
     this.facing = 1;
@@ -145,6 +173,7 @@ export default class DungeonScene extends Phaser.Scene {
     this.buildBackdrop();
     this.buildPlatforms();
     this.buildPlayer();
+    this.buildProjectiles();
     this.buildEntities();
     this.buildCamera();
     this.ui = this.add.container(0, 0).setDepth(90);
@@ -348,6 +377,17 @@ export default class DungeonScene extends Phaser.Scene {
     if (this.parsed.boss) this.spawnEnemy(this.parsed.boss.x, this.parsed.boss.y, true);
   }
 
+  private buildProjectiles() {
+    this.letters = this.physics.add.group({ allowGravity: false });
+    this.physics.add.overlap(this.letters, this.platforms, (obj) => {
+      const letter = obj as Phaser.Physics.Arcade.Image;
+      if (letter.active) {
+        poof(this, letter.x, letter.y, 3);
+        letter.destroy();
+      }
+    });
+  }
+
   private spawnEnemy(feetX: number, feetY: number, isBoss: boolean) {
     const tex = isBoss ? 'dg-boss' : 'dg-enemy';
     const sprite = this.physics.add.sprite(feetX, feetY - (isBoss ? 62 : 32), tex).setDepth(8);
@@ -432,7 +472,40 @@ export default class DungeonScene extends Phaser.Scene {
       this.hudBossBar = this.add.graphics();
     }
 
+    // MP 条(血条下方)
+    this.hudMpBar = this.add.graphics();
+    const skillHint = loadControls().virtualButtons ? '技能键' : 'Q 举报 / E 护体';
+    const skillLabels: { icon: string; x: number }[] = [
+      { icon: 'dg-letter', x: 214 },
+      { icon: 'dg-skill-shield', x: 252 }
+    ];
+    this.hudSkillIcons = skillLabels.map(({ icon, x }) => {
+      const img = this.add.image(x, 76, icon).setDisplaySize(26, icon === 'dg-skill-shield' ? 26 : 22);
+      const mask = this.add.graphics();
+      const key = this.add
+        .text(x + 15, 62, '', { fontFamily: FONT, fontSize: '10px', color: '#93b5d6', resolution: 2 })
+        .setOrigin(0, 0.5);
+      return { icon: img, mask, key };
+    });
+    const skillHintText = this.add.text(284, 76, skillHint, {
+      fontFamily: FONT, fontSize: '10px', color: '#8ba9c7', resolution: 2
+    }).setOrigin(0, 0.5);
+
     this.ui.add([hudBg, ...this.hudHearts, coinIcon, this.hudCoinText, this.hudLevelText, hintBg, this.hudHint]);
+    this.ui.add(this.hudMpBar);
+    this.hudSkillIcons.forEach(sk => this.ui.add([sk.icon, sk.mask, sk.key]));
+    this.ui.add(skillHintText);
+
+    // 连击计数
+    this.hudCombo = this.add
+      .text(GAME_WIDTH - 40, 96, '', {
+        fontFamily: FONT, fontSize: '22px', color: '#ffd43b', fontStyle: 'bold',
+        resolution: 2, stroke: '#08131f', strokeThickness: 5
+      })
+      .setOrigin(1, 0.5)
+      .setVisible(false);
+    this.ui.add(this.hudCombo);
+    this.refreshMpHud();
     if (this.hudBossBar) this.ui.add(this.hudBossBar);
     if (this.hudBossLabel) this.ui.add(this.hudBossLabel);
 
@@ -445,6 +518,42 @@ export default class DungeonScene extends Phaser.Scene {
     this.hudHearts.forEach((h, i) => {
       h.setAlpha(i < this.hp ? 1 : 0.22);
       h.setTint(i < this.hp ? 0xffffff : 0x44546a);
+    });
+  }
+
+  private refreshMpHud() {
+    if (!this.hudMpBar) return;
+    const x = 30;
+    const y = 58;
+    const w = 160;
+    const h = 8;
+    this.hudMpBar.clear();
+    this.hudMpBar.fillStyle(0x0a1a2e, 0.95);
+    this.hudMpBar.fillRoundedRect(x, y, w, h, 4);
+    const ratio = Math.max(0, Math.min(1, this.mp / DG_PLAYER_MAX_MP));
+    this.hudMpBar.fillStyle(0x74c0fc, 0.95);
+    this.hudMpBar.fillRoundedRect(x, y, Math.max(3, w * ratio), h, 4);
+    this.hudMpBar.lineStyle(1, 0xffffff, 0.18);
+    this.hudMpBar.strokeRoundedRect(x, y, w, h, 4);
+
+    // 技能冷却遮罩 + 可用高亮
+    const now = this.time.now;
+    const slots = [
+      { readyAt: this.reportReadyAt, cd: DG_SKILL_REPORT.cooldownMs, cost: DG_SKILL_REPORT.cost },
+      { readyAt: this.shieldReadyAt, cd: DG_SKILL_SHIELD.cooldownMs, cost: DG_SKILL_SHIELD.cost }
+    ];
+    this.hudSkillIcons.forEach((sk, i) => {
+      const slot = slots[i];
+      const cdRatio = skillCooldownRatio(now, slot.readyAt, slot.cd);
+      const affordable = this.mp >= slot.cost;
+      sk.icon.setAlpha(affordable && cdRatio === 0 ? 1 : 0.45);
+      sk.icon.setTint(affordable && cdRatio === 0 ? 0xffffff : 0x7f93ab);
+      sk.mask.clear();
+      if (cdRatio > 0) {
+        sk.mask.fillStyle(0x02060c, 0.66);
+        sk.mask.fillRoundedRect(sk.icon.x - 13, 63, 26, 26 * cdRatio, 6);
+      }
+      sk.key.setText(loadControls().virtualButtons ? '' : (i === 0 ? 'Q' : 'E'));
     });
   }
 
@@ -493,6 +602,8 @@ export default class DungeonScene extends Phaser.Scene {
     kb.on('keydown-J', () => this.pressAttack());
     kb.on('keydown-Z', () => this.pressAttack());
     kb.on('keydown-K', () => this.pressDash());
+    kb.on('keydown-Q', () => this.pressReport());
+    kb.on('keydown-E', () => this.pressShield());
     kb.on('keydown-SHIFT', () => this.pressDash());
     kb.on('keydown-ESC', () => this.leave());
 
@@ -576,6 +687,9 @@ export default class DungeonScene extends Phaser.Scene {
     this.makePadButton(GAME_WIDTH - 74, y, r, 0xffd43b, 'up', '跳', () => this.pressJump(), () => this.releaseJump());
     this.makePadButton(GAME_WIDTH - 172, y, r - 4, 0xff8787, 'hit', '攻击', () => this.pressAttack());
     this.makePadButton(GAME_WIDTH - 262, y, r - 8, 0xb197fc, 'dash', '冲刺', () => this.pressDash());
+    // 技能键:放在移动键上方,避免和右手三键打架
+    this.makePadButton(78, y - 104, r - 12, 0xffd43b, 'hit', '举报', () => this.pressReport());
+    this.makePadButton(178, y - 104, r - 12, 0x8ce99a, 'up', '护体', () => this.pressShield());
   }
 
   private isOnTouchButton(p: Phaser.Input.Pointer): boolean {
@@ -645,6 +759,15 @@ export default class DungeonScene extends Phaser.Scene {
   }
 
   private killEnemy(u: EnemyUnit) {
+    this.mp = Math.min(DG_PLAYER_MAX_MP, this.mp + DG_MP_ON_KILL);
+    this.combo += 1;
+    this.comboUntil = this.time.now + 3200;
+    this.refreshMpHud();
+    if (this.hudCombo) {
+      this.hudCombo.setText(`×${this.combo}`).setVisible(this.combo >= 2);
+    }
+    this.hitstop(u.isBoss ? 90 : 45);
+
     const s = u.sprite;
     const x = s.x;
     const y = s.y;
@@ -661,6 +784,96 @@ export default class DungeonScene extends Phaser.Scene {
       this.runCoins += 2;
       this.refreshCoinHud();
     }
+  }
+
+  // 「实名举报」:远程投掷,命中即造成伤害
+  private pressReport() {
+    if (this.over) return;
+    if (!canUseSkill(this.mp, this.time.now, this.reportReadyAt, DG_SKILL_REPORT.cost)) {
+      if (this.mp < DG_SKILL_REPORT.cost) showToast(this, GAME_WIDTH / 2, 130, '法力不够 · 先去揍几个', '#b197fc', 'ui-bolt');
+      return;
+    }
+    this.mp -= DG_SKILL_REPORT.cost;
+    this.reportReadyAt = this.time.now + DG_SKILL_REPORT.cooldownMs;
+    playSfx(this, 'shoot', 0.4);
+
+    // 注意:必须先用组 create 再设速度 —— Arcade Group 的 defaults 会在 add 时把速度清零
+    // 发射高度对准胸口:小兵碰撞盒在身体下半部,平射高度太低会从头顶飞过
+    const letter = this.letters.create(
+      this.player.x + this.facing * 40,
+      this.player.y + 18,
+      'dg-letter'
+    ) as Phaser.Physics.Arcade.Image;
+    letter.setDepth(12).setDisplaySize(44, 32).setFlipX(this.facing === -1);
+    const lb0 = letter.body as Phaser.Physics.Arcade.Body;
+    lb0.setAllowGravity(false);
+    lb0.setVelocityX(this.facing * DG_SKILL_REPORT.speed);
+
+    let hits = 0;
+    const until = this.time.now + DG_SKILL_REPORT.lifeMs;
+    const tick = this.time.addEvent({
+      delay: 16,
+      loop: true,
+      callback: () => {
+        if (!letter.active || this.time.now > until || hits >= DG_SKILL_REPORT.pierce + 1) {
+          if (letter.active) letter.destroy();
+          tick.remove();
+          return;
+        }
+        const lb = letter.body as Phaser.Physics.Arcade.Body;
+        for (const u of this.enemies) {
+          if (u.hp <= 0 || !u.sprite.active) continue;
+          const b = u.sprite.body as Phaser.Physics.Arcade.Body;
+          if (!boxOverlapRect({ x: lb.x, y: lb.y, w: lb.width, h: lb.height }, b.x, b.y, b.width, b.height)) continue;
+          hits += 1;
+          this.damageEnemy(u, DG_SKILL_REPORT.damage);
+          letter.setTint(0xffd43b);
+          break;
+        }
+      }
+    });
+    this.refreshMpHud();
+  }
+
+  // 「金句护体」:短暂无敌 + 范围震开
+  private pressShield() {
+    if (this.over) return;
+    if (!canUseSkill(this.mp, this.time.now, this.shieldReadyAt, DG_SKILL_SHIELD.cost)) {
+      if (this.mp < DG_SKILL_SHIELD.cost) showToast(this, GAME_WIDTH / 2, 130, '法力不够 · 先去揍几个', '#b197fc', 'ui-bolt');
+      return;
+    }
+    this.mp -= DG_SKILL_SHIELD.cost;
+    this.shieldReadyAt = this.time.now + DG_SKILL_SHIELD.cooldownMs;
+    this.shieldUntil = this.time.now + DG_SKILL_SHIELD.shieldMs;
+    this.invulnUntil = Math.max(this.invulnUntil, this.shieldUntil);
+    playSfx(this, 'shield', 0.5);
+
+    const burst = this.add
+      .image(this.player.x, this.player.y, 'dg-burst')
+      .setDepth(11)
+      .setDisplaySize(DG_SKILL_SHIELD.radius * 2.2, DG_SKILL_SHIELD.radius * 2.2)
+      .setAlpha(0.95);
+    this.tweens.add({ targets: burst, scale: burst.scale * 1.25, alpha: 0, duration: 380, onComplete: () => burst.destroy() });
+
+    this.enemies.forEach(u => {
+      if (u.hp <= 0 || !u.sprite.active) return;
+      if (!inRadius(this.player.x, this.player.y, u.sprite.x, u.sprite.y, DG_SKILL_SHIELD.radius)) return;
+      this.damageEnemy(u, DG_SKILL_SHIELD.damage);
+      const b = u.sprite.body as Phaser.Physics.Arcade.Body;
+      b.setVelocityX((u.sprite.x < this.player.x ? -1 : 1) * 320);
+    });
+    this.refreshMpHud();
+    showToast(this, GAME_WIDTH / 2, 150, '金句护体:组织上已经了解情况了', '#ffe066', 'ui-shield');
+  }
+
+  // 命中顿帧:短暂停住世界,打击更实
+  private hitstop(ms: number) {
+    if (this.over) return;
+    this.hitstopUntil = this.time.now + ms;
+    this.physics.pause();
+    this.time.delayedCall(ms, () => {
+      if (!this.over) this.physics.resume();
+    });
   }
 
   private pressDash() {
@@ -810,6 +1023,19 @@ export default class DungeonScene extends Phaser.Scene {
     this.uiTop.setPosition(view.x, view.y);
     if (this.over) return;
     const dt = Math.min(delta, 50);
+    // 命中顿帧:世界静止,输入也不推进
+    if (time < this.hitstopUntil) return;
+
+    // MP 自然回复
+    const mpBefore = Math.floor(this.mp);
+    this.mp = regenMp(this.mp, dt);
+    if (Math.floor(this.mp) !== mpBefore) this.refreshMpHud();
+
+    // 连击超时清零
+    if (this.combo > 0 && time > this.comboUntil) {
+      this.combo = 0;
+      this.hudCombo?.setVisible(false);
+    }
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     const onGround = body.blocked.down || body.touching.down;
     if (onGround) {
@@ -874,6 +1100,13 @@ export default class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ---- 护体金光 ----
+    if (time < this.shieldUntil) {
+      this.player.setTint(0xffe066);
+    } else if (time >= this.invulnUntil) {
+      this.player.clearTint();
+    }
+
     // ---- 无敌闪烁 ----
     this.player.setAlpha(time < this.invulnUntil ? (Math.floor(time / 70) % 2 ? 0.35 : 1) : 1);
 
@@ -913,6 +1146,9 @@ export default class DungeonScene extends Phaser.Scene {
         u.sprite.setFlipX(u.dir === -1);
       }
     });
+
+    // 技能冷却指示
+    if (time < this.reportReadyAt || time < this.shieldReadyAt) this.refreshMpHud();
 
     // ---- 掉出世界 ----
     if (this.player.y > this.parsed.heightPx + 200) {

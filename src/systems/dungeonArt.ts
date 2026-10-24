@@ -197,6 +197,98 @@ export function buildDungeonTextures(scene: Phaser.Scene) {
     ctx.fill();
   });
 
+
+  // ---- 举报信:技能「实名举报」的投掷物 ----
+  tex(scene, 'dg-letter', 44, 32, (ctx) => {
+    ctx.save();
+    ctx.translate(22, 16);
+    ctx.rotate(-0.12);
+    // 信封
+    const g = ctx.createLinearGradient(0, -14, 0, 14);
+    g.addColorStop(0, '#f5f0e2');
+    g.addColorStop(1, '#d8cdb2');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = '#8a5200';
+    ctx.lineWidth = 2;
+    rrect(ctx, -20, -13, 40, 26, 3);
+    ctx.fill();
+    ctx.stroke();
+    // 封口三角
+    ctx.strokeStyle = '#a8763a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-20, -13);
+    ctx.lineTo(0, 2);
+    ctx.lineTo(20, -13);
+    ctx.stroke();
+    // 红色「举报」章
+    ctx.fillStyle = '#c92a2a';
+    ctx.beginPath();
+    ctx.arc(9, 6, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 8px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('举', 9, 6);
+    ctx.restore();
+  });
+
+  // ---- 护体光环:技能「金句护体」 ----
+  tex(scene, 'dg-burst', 320, 320, (ctx) => {
+    const g = ctx.createRadialGradient(160, 160, 20, 160, 160, 160);
+    g.addColorStop(0, 'rgba(255,236,160,0.85)');
+    g.addColorStop(0.45, 'rgba(255,212,59,0.34)');
+    g.addColorStop(1, 'rgba(255,212,59,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(160, 160, 160, 0, Math.PI * 2);
+    ctx.fill();
+    // 外圈虚线
+    ctx.strokeStyle = 'rgba(255,236,160,0.9)';
+    ctx.lineWidth = 5;
+    for (let i = 0; i < 24; i++) {
+      const a0 = (i / 24) * Math.PI * 2;
+      const a1 = a0 + 0.12;
+      ctx.beginPath();
+      ctx.arc(160, 160, 142, a0, a1);
+      ctx.stroke();
+    }
+  });
+
+
+  // ---- 技能图标:护体(金印) ----
+  tex(scene, 'dg-skill-shield', 40, 40, (ctx) => {
+    const g = ctx.createRadialGradient(20, 20, 4, 20, 20, 20);
+    g.addColorStop(0, '#fff3bf');
+    g.addColorStop(0.6, '#ffd43b');
+    g.addColorStop(1, '#e8a100');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(20, 20, 17, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#8a5200';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(20, 20, 17, 0, Math.PI * 2);
+    ctx.stroke();
+    // 四道光芒
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      ctx.beginPath();
+      ctx.moveTo(20 + Math.cos(a) * 10, 20 + Math.sin(a) * 10);
+      ctx.lineTo(20 + Math.cos(a) * 15, 20 + Math.sin(a) * 15);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#7a1414';
+    ctx.font = 'bold 15px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('护', 20, 21);
+  });
+
   // ---- 平台边缘高光条 ----
   tex(scene, 'dg-edge', 8, 8, (ctx) => {
     ctx.fillStyle = 'rgba(150,220,255,0.55)';

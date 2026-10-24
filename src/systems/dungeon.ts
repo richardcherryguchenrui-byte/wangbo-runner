@@ -87,6 +87,22 @@ const LEVEL_2_MAP = [
   '######################.XX.######################.XX.############################'
 ];
 
+const LEVEL_ARCHIVE_MAP = [
+  '########################################################################',
+  '........................................................................',
+  '........................................................................',
+  '........................................................................',
+  '................***...............***................***................',
+  '...............#######...........#######............#######.............',
+  '........................................................................',
+  '.......***................e.................e...........................',
+  '......#######...........#######...........#######............#######....',
+  '........................................................................',
+  '...P.......e.......e....e.......h..e........e.....XX...e........e.....G.',
+  '##########################....################....######################',
+  '##########################.XX.################.XX.######################'
+];
+
 export const DUNGEON_LEVELS: DungeonLevelDef[] = [
   {
     id: 'd1',
@@ -98,6 +114,14 @@ export const DUNGEON_LEVELS: DungeonLevelDef[] = [
   },
   {
     id: 'd2',
+    name: '档案室',
+    subtitle: '一柜子一柜子的材料,全压在你身上',
+    theme: 'archive',
+    enemyHp: 3,
+    map: LEVEL_ARCHIVE_MAP
+  },
+  {
+    id: 'd3',
     name: '留置室深处',
     subtitle: '档案搬完了,人也走不掉了',
     theme: 'detention',
@@ -294,4 +318,69 @@ export function attackBox(
 /** 矩形与「x/y/w/h」描述的另一个矩形是否相交(场景里对物理体用) */
 export function boxOverlapRect(rect: DGRect, x: number, y: number, w: number, h: number): boolean {
   return boxesOverlap(rect.x, rect.y, rect.w, rect.h, x, y, w, h);
+}
+
+
+// ============================================================
+// 技能与 MP:两个技能对应两段官场戏 ——「实名举报」远程、「金句护体」保命
+// ============================================================
+
+export const DG_PLAYER_MAX_MP = 100;
+export const DG_MP_REGEN_PER_SEC = 7;
+export const DG_MP_ON_KILL = 16;
+
+export interface SkillDef {
+  id: 'report' | 'shield';
+  name: string;
+  desc: string;
+  cost: number;
+  cooldownMs: number;
+}
+
+/** 实名举报:扔出一封举报信,远程穿透一击 */
+export const DG_SKILL_REPORT: SkillDef & { damage: number; speed: number; lifeMs: number; pierce: number } = {
+  id: 'report',
+  name: '实名举报',
+  desc: '扔出举报信,远处解决',
+  cost: 25,
+  cooldownMs: 420,
+  damage: 2,
+  speed: 780,
+  lifeMs: 1100,
+  pierce: 1
+};
+
+/** 金句护体:短暂无敌并震开周围敌人 */
+export const DG_SKILL_SHIELD: SkillDef & { shieldMs: number; radius: number; damage: number } = {
+  id: 'shield',
+  name: '金句护体',
+  desc: '念一句场面话,短暂无敌并震开敌人',
+  cost: 45,
+  cooldownMs: 3200,
+  shieldMs: 1300,
+  radius: 165,
+  damage: 1
+};
+
+/** MP 够且冷却好了才能放 */
+export function canUseSkill(mp: number, nowMs: number, readyAt: number, cost: number): boolean {
+  return mp >= cost && nowMs >= readyAt;
+}
+
+/** 每帧回蓝,封顶 */
+export function regenMp(mp: number, dtMs: number, max = DG_PLAYER_MAX_MP, ratePerSec = DG_MP_REGEN_PER_SEC): number {
+  if (dtMs <= 0) return Math.min(max, Math.max(0, mp));
+  return Math.min(max, Math.max(0, mp + (ratePerSec * dtMs) / 1000));
+}
+
+/** 技能冷却剩余比例(0=可用,1=刚进冷却),用于 HUD 遮罩 */
+export function skillCooldownRatio(nowMs: number, readyAt: number, cooldownMs: number): number {
+  if (cooldownMs <= 0) return 0;
+  const remain = Math.max(0, readyAt - nowMs);
+  return Math.min(1, remain / cooldownMs);
+}
+
+/** 圆形范围命中(护体震开) */
+export function inRadius(ax: number, ay: number, bx: number, by: number, radius: number): boolean {
+  return (ax - bx) * (ax - bx) + (ay - by) * (ay - by) <= radius * radius;
 }

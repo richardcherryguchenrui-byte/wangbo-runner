@@ -22,7 +22,10 @@ import {
   DUNGEON_LEVELS, DG_LEGEND, DG_TILE, parseDungeon, isDungeonUnlocked, nextDungeonId,
   attackBox, boxesOverlap, canDash, DG_PLAYER_MAX_HP, DG_PLAYER_SPEED, DG_PLAYER_JUMP,
   DG_DOUBLE_JUMP_RATIO, DG_BOSS_HP, DG_ATTACK_DAMAGE, DG_DASH_MS, DG_DASH_COOLDOWN_MS,
-  DG_ATTACK_MS, DG_ATTACK_COOLDOWN_MS, DG_ATTACK_RANGE
+  DG_ATTACK_MS, DG_ATTACK_COOLDOWN_MS, DG_ATTACK_RANGE,
+  DG_PLAYER_MAX_MP, DG_MP_REGEN_PER_SEC, DG_MP_ON_KILL, DG_INVULN_MS,
+  DG_SKILL_REPORT, DG_SKILL_SHIELD,
+  canUseSkill, regenMp, skillCooldownRatio, inRadius
 } from '../src/systems/dungeon';
 import {
   LEVELS, CHAPTERS, starCount, goalDone, isLevelUnlocked, isChapterUnlocked,
@@ -850,8 +853,8 @@ describe('留置室横版闯关 · 地图解析', () => {
       expect(p.goal).not.toBe(null);
       expect(p.widthPx).toBeGreaterThan(DG_TILE * 40);
     });
-    const l2 = DUNGEON_LEVELS[1];
-    expect(parseDungeon(l2.map).boss).not.toBe(null);
+    const last = DUNGEON_LEVELS[DUNGEON_LEVELS.length - 1];
+    expect(parseDungeon(last.map).boss).not.toBe(null);
     expect(parseDungeon(DUNGEON_LEVELS[0].map).boss).toBe(null);
   });
 
@@ -890,7 +893,8 @@ describe('留置室横版闯关 · 地图解析', () => {
     expect(isDungeonUnlocked('d2', {})).toBe(false);
     expect(isDungeonUnlocked('d2', { d1: 1 })).toBe(true);
     expect(nextDungeonId('d1')).toBe('d2');
-    expect(nextDungeonId('d2')).toBe(null);
+    expect(nextDungeonId('d2')).toBe('d3');
+    expect(nextDungeonId('d3')).toBe(null);
   });
 
   it('攻击盒朝向正确,命中判定是矩形相交', () => {
@@ -918,5 +922,54 @@ describe('留置室横版闯关 · 地图解析', () => {
     expect(DG_BOSS_HP).toBeGreaterThan(DG_ATTACK_DAMAGE);
     expect(DG_DASH_MS).toBeLessThan(DG_DASH_COOLDOWN_MS);
     expect(DG_ATTACK_MS).toBeLessThan(DG_ATTACK_COOLDOWN_MS);
+  });
+});
+
+// 技能与 MP
+describe('留置室技能与 MP', () => {
+  it('MP 不够或冷却没好都放不出技能', () => {
+    expect(canUseSkill(30, 1000, 0, DG_SKILL_REPORT.cost)).toBe(true);
+    expect(canUseSkill(10, 1000, 0, DG_SKILL_REPORT.cost)).toBe(false);
+    expect(canUseSkill(100, 500, 800, DG_SKILL_REPORT.cost)).toBe(false);
+  });
+
+  it('回蓝按时间累加并封顶,不会超上限也不会负数', () => {
+    expect(regenMp(0, 1000)).toBeCloseTo(DG_MP_REGEN_PER_SEC, 5);
+    expect(regenMp(50, 0)).toBe(50);
+    expect(regenMp(99, 10000)).toBe(DG_PLAYER_MAX_MP);
+    expect(regenMp(-5, 100)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('两段技能消耗不同,冷却时长的比例用于 HUD 遮罩', () => {
+    expect(DG_SKILL_REPORT.cost).toBeLessThan(DG_SKILL_SHIELD.cost);
+    expect(DG_SKILL_SHIELD.cooldownMs).toBeGreaterThan(DG_SKILL_REPORT.cooldownMs);
+    expect(skillCooldownRatio(1000, 1000, 400)).toBe(0);
+    expect(skillCooldownRatio(800, 1000, 400)).toBeCloseTo(0.5, 5);
+    expect(skillCooldownRatio(0, 1000, 400)).toBe(1);
+    expect(skillCooldownRatio(0, 1000, 0)).toBe(0);
+  });
+
+  it('圆形范围判定', () => {
+    expect(inRadius(0, 0, 100, 0, 120)).toBe(true);
+    expect(inRadius(0, 0, 200, 0, 120)).toBe(false);
+    // 边界上算命中
+    expect(inRadius(0, 0, 120, 0, 120)).toBe(true);
+  });
+
+  it('三关按顺序解锁,最终关有 BOSS', () => {
+    expect(DUNGEON_LEVELS.map(l => l.id)).toEqual(['d1', 'd2', 'd3']);
+    expect(isDungeonUnlocked('d2', {})).toBe(false);
+    expect(isDungeonUnlocked('d2', { d1: 1 })).toBe(true);
+    expect(isDungeonUnlocked('d3', { d1: 1, d2: 1 })).toBe(true);
+    expect(parseDungeon(DUNGEON_LEVELS[2].map).boss).not.toBe(null);
+    expect(parseDungeon(DUNGEON_LEVELS[1].map).boss).toBe(null);
+  });
+
+  it('技能数值在合理范围', () => {
+    expect(DG_SKILL_REPORT.damage).toBeGreaterThan(DG_ATTACK_DAMAGE);
+    expect(DG_SKILL_REPORT.speed).toBeGreaterThan(0);
+    expect(DG_SKILL_SHIELD.shieldMs).toBeGreaterThan(DG_INVULN_MS);
+    expect(DG_SKILL_SHIELD.radius).toBeGreaterThan(100);
+    expect(DG_MP_ON_KILL).toBeGreaterThan(0);
   });
 });
