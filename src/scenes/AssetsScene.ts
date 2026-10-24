@@ -50,9 +50,10 @@ const ASSET_ICONS: Record<string, string> = {
   purse: 'as-purse', villa: 'as-villa', shell: 'as-shell',
   mine: 'as-mine', offshore: 'as-offshore', estate: 'as-estate'
 };
-const NETWORK_ICONS: Record<string, string> = {
-  mentor: 'ui-person', secretary: 'ui-clipboard', accountant: 'ui-save',
-  inspector: 'ui-siren', cadre: 'ui-rank'
+/** 客人染色:每个人看着都不一样 */
+const NETWORK_TINT: Record<string, number> = {
+  mentor: 0x9aa4b2, secretary: 0xf2c9a0, accountant: 0x8fd0e8,
+  inspector: 0xff9b9b, cadre: 0xc3a8ff
 };
 
 /** 房间几何:墙 58~440,地板 440~540 */
@@ -79,7 +80,7 @@ interface Interactable {
   action: () => void;
   label: Phaser.GameObjects.Text;
   highlight: Phaser.GameObjects.Graphics;
-  icon: Phaser.GameObjects.Image;
+  icon: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite;
   glow: Phaser.GameObjects.Image;
   maxLevel: number;
 }
@@ -117,6 +118,8 @@ export default class AssetsScene extends Phaser.Scene {
   private overlayDepth = 120;
   private pendingAuditShow: (() => void) | null = null;
   private visitorUsed = false;
+  /** 客人用的主角贴图皮肤(默认就是 player-idle) */
+  private npcSkin = '';
   /** 地上散落的黑金:产业每次进账会掉一点,走过去就捡起来 */
   private drops: { img: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image; amount: number }[] = [];
   private tvText?: Phaser.GameObjects.Text;
@@ -450,16 +453,21 @@ export default class AssetsScene extends Phaser.Scene {
       const x = NPC_X[i];
       const level = this.holdings.network[n.id] ?? 0;
       this.add.graphics().setDepth(4).fillStyle(0x1a2233, 0.5).fillEllipse(x, NPC_BASE, 38, 9);
-      const icon = this.add.image(x, NPC_BASE, NETWORK_ICONS[n.id] ?? 'ui-person')
+      // 客人用主角贴图染色,看上去是屋里站着的人,而不是一个图标
+      ensureSkinTextures(this, this.npcSkin);
+      const guestKey = playerFrameKey(this, this.npcSkin, 'idle');
+      const icon = this.add.sprite(x, NPC_BASE, guestKey)
         .setOrigin(0.5, 1)
-        .setDisplaySize(level > 0 ? 34 : 24, level > 0 ? 34 : 24)
+        .setDisplaySize(28, level > 0 ? 48 : 42)
         .setDepth(4)
-        .setAlpha(level > 0 ? 1 : 0.26);
+        .setTint(NETWORK_TINT[n.id] ?? 0xffffff)
+        .setFlipX(i % 2 === 0)
+        .setAlpha(level > 0 ? 1 : 0.3);
       this.tweens.add({
         targets: icon, y: NPC_BASE - 2, duration: 1200 + i * 180,
         yoyo: true, repeat: -1, ease: 'Sine.inOut'
       });
-      const name = this.add.text(x, NPC_BASE - 40, '', {
+      const name = this.add.text(x, NPC_BASE - 52, '', {
         fontFamily: FONT, fontSize: '10px', color: level > 0 ? '#b197fc' : '#66788f', fontStyle: 'bold', resolution: 2
       }).setOrigin(0.5, 1).setDepth(7);
       const glow = this.add.image(x, NPC_BASE - 16, 'spark')
@@ -691,7 +699,7 @@ export default class AssetsScene extends Phaser.Scene {
 
   /** 在某个交互物头上冒一句话 */
   private sayAbove(it: Interactable, line: string) {
-    const bubble = this.add.text(it.x, it.y - (it.kind === 'asset' ? 76 : 56), line, {
+    const bubble = this.add.text(it.x, it.y - (it.kind === 'asset' ? 76 : 66), line, {
       fontFamily: FONT, fontSize: '11px', color: '#0b1220', fontStyle: 'bold', resolution: 2,
       backgroundColor: '#ffe8a3', padding: { x: 7, y: 4 }
     }).setOrigin(0.5, 1).setDepth(50).setAlpha(0);
@@ -853,9 +861,14 @@ export default class AssetsScene extends Phaser.Scene {
         it.label.setText(lv > 0 ? `${def.name} Lv.${lv} · 护${n.protection * lv}` : def.name);
       }
       it.label.setColor(lv > 0 ? (isAsset ? '#ffe066' : '#b197fc') : '#66788f');
-      it.icon.setAlpha(lv > 0 ? 1 : 0.28);
-      const size = lv > 0 ? (isAsset ? 54 : 28) : (isAsset ? 30 : 20);
-      it.icon.setDisplaySize(size, size);
+      it.icon.setAlpha(lv > 0 ? 1 : 0.3);
+      if (isAsset) {
+        const size = lv > 0 ? 54 : 30;
+        it.icon.setDisplaySize(size, size);
+      } else {
+        const hPx = lv > 0 ? 48 : 42;
+        it.icon.setDisplaySize(hPx * 0.58, hPx);
+      }
       it.glow.setAlpha(lv > 0 ? Math.min(0.34, 0.1 + lv * 0.03) : 0);
       it.glow.setVisible(lv > 0);
       if (lv >= it.maxLevel) it.glow.setTint(0xff8787);
@@ -994,8 +1007,10 @@ export default class AssetsScene extends Phaser.Scene {
       ['隔壁市的王总', '带着一幅画,说是「朋友画的」']
     ];
     const [who, line] = names[Phaser.Math.Between(0, names.length - 1)];
-    const x = Phaser.Math.Between(140, 820);
-    const base = 464;
+    // 站在两件家具之间的空档里,别把家具挡住
+    const slots = [177, 315, 453, 591, 729];
+    const x = slots[Phaser.Math.Between(0, slots.length - 1)];
+    const base = 452;
     this.add.graphics().setDepth(9).fillStyle(0x1a2233, 0.5).fillEllipse(x, base, 42, 10);
     const glow = this.add.image(x, base - 20, 'spark')
       .setDepth(9).setTint(0xffd43b).setAlpha(0.32).setDisplaySize(64, 56);
