@@ -50,6 +50,7 @@ export interface Progress {
   levelClears: number;                // 累计通关次数(含重复刷)
   perfectSlides: number;              // 累计完美滑铲次数
   starMilestones: number[];           // 已领取的星级里程碑(存星数阈值)
+  dungeonCleared: Record<string, number>; // 留置室横版关卡通关次数(关卡 id → 次数)
 }
 
 const KEY = 'wangboProgress';
@@ -82,7 +83,7 @@ function defaults(): Progress {
     pistolLevel: 0, bribeCarryLevel: 0,
     tutorialDone: false,
     bestRankIndex: 0, missionsDone: 0, overdrives: 0, nearMisses: 0, dailyPlays: 0,
-    levelStars: {}, levelClears: 0, perfectSlides: 0, starMilestones: []
+    levelStars: {}, levelClears: 0, perfectSlides: 0, starMilestones: [], dungeonCleared: {}
   };
 }
 

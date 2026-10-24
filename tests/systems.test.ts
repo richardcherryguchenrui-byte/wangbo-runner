@@ -19,6 +19,12 @@ import {
 import { generatePattern, stageFor, FLYER_Y } from '../src/systems/patterns';
 import { isPerfectSlideTiming, tightSlideIndex } from '../src/systems/slideJudge';
 import {
+  DUNGEON_LEVELS, DG_LEGEND, DG_TILE, parseDungeon, isDungeonUnlocked, nextDungeonId,
+  attackBox, boxesOverlap, canDash, DG_PLAYER_MAX_HP, DG_PLAYER_SPEED, DG_PLAYER_JUMP,
+  DG_DOUBLE_JUMP_RATIO, DG_BOSS_HP, DG_ATTACK_DAMAGE, DG_DASH_MS, DG_DASH_COOLDOWN_MS,
+  DG_ATTACK_MS, DG_ATTACK_COOLDOWN_MS, DG_ATTACK_RANGE
+} from '../src/systems/dungeon';
+import {
   LEVELS, CHAPTERS, starCount, goalDone, isLevelUnlocked, isChapterUnlocked,
   levelSpeedAt, levelReward, nextLevelId, totalStars, MAX_STARS_PER_LEVEL,
   STAR_MILESTONES, TOTAL_STARS, newlyReachedMilestones, nextMilestone, clearLine, landfallLine,
@@ -820,5 +826,97 @@ describe('终局双结局', () => {
     expect(isCampaignFinished({})).toBe(false);
     expect(isCampaignFinished({ [last.id]: 1 })).toBe(true);
     expect(isCampaignFinished({ 'l1-1': 3 })).toBe(false);
+  });
+});
+
+// 留置室横版闯关:地图解析、碰撞盒合并、实体提取与数值
+describe('留置室横版闯关 · 地图解析', () => {
+  it('所有关卡地图每行等宽,且只含合法字符', () => {
+    DUNGEON_LEVELS.forEach(lv => {
+      const widths = new Set(lv.map.map(r => r.length));
+      expect(widths.size).toBe(1);
+      lv.map.forEach(row => {
+        Array.from(row).forEach(ch => {
+          expect(DG_LEGEND.includes(ch)).toBe(true);
+        });
+      });
+    });
+  });
+
+  it('每关都有出生点和出口,BOSS 关有 BOSS', () => {
+    DUNGEON_LEVELS.forEach(lv => {
+      const p = parseDungeon(lv.map);
+      expect(p.playerStart.x).toBeGreaterThan(0);
+      expect(p.goal).not.toBe(null);
+      expect(p.widthPx).toBeGreaterThan(DG_TILE * 40);
+    });
+    const l2 = DUNGEON_LEVELS[1];
+    expect(parseDungeon(l2.map).boss).not.toBe(null);
+    expect(parseDungeon(DUNGEON_LEVELS[0].map).boss).toBe(null);
+  });
+
+  it('水平平台被合并成一块,而不是一堆小格子', () => {
+    const p = parseDungeon(DUNGEON_LEVELS[0].map);
+    // 第一关只有地面 + 3 块平台,合并后碰撞体应当是十几块以内
+    expect(p.colliders.length).toBeLessThan(20);
+    expect(p.colliders.length).toBeGreaterThan(2);
+    // 地面这一块应当横跨整个关卡宽度
+    const widest = p.colliders.reduce((a, b) => (a.w > b.w ? a : b));
+    expect(widest.w).toBeGreaterThanOrEqual(28 * DG_TILE);
+    expect(widest.h % DG_TILE).toBe(0);
+  });
+
+  it('垂直堆叠的地块合并成同一个矩形', () => {
+    const p = parseDungeon(['##', '##', '..']);
+    expect(p.colliders.length).toBe(1);
+    expect(p.colliders[0]).toEqual({ x: 0, y: 0, w: DG_TILE * 2, h: DG_TILE * 2 });
+  });
+
+  it('实体位置落在格子底部,便于贴地摆放', () => {
+    const p = parseDungeon(['P..e', '####']);
+    expect(p.playerStart).toEqual({ x: DG_TILE / 2, y: DG_TILE });
+    expect(p.enemies[0]).toEqual({ x: DG_TILE * 3 + DG_TILE / 2, y: DG_TILE });
+  });
+
+  it('尖刺单独成块,不会和平台合并', () => {
+    const p = parseDungeon(['.X.', '###']);
+    expect(p.spikes.length).toBe(1);
+    expect(p.spikes[0].w).toBeLessThan(DG_TILE);
+    expect(p.colliders.length).toBe(1);
+  });
+
+  it('关卡解锁:第一层永远开放,后续需要上一层通关', () => {
+    expect(isDungeonUnlocked('d1', {})).toBe(true);
+    expect(isDungeonUnlocked('d2', {})).toBe(false);
+    expect(isDungeonUnlocked('d2', { d1: 1 })).toBe(true);
+    expect(nextDungeonId('d1')).toBe('d2');
+    expect(nextDungeonId('d2')).toBe(null);
+  });
+
+  it('攻击盒朝向正确,命中判定是矩形相交', () => {
+    const right = attackBox(100, 200, 1);
+    const left = attackBox(100, 200, -1);
+    expect(right.x).toBe(100);
+    expect(left.x).toBe(100 - DG_ATTACK_RANGE);
+    // 正前方 30px 的敌人应当被打到
+    expect(boxesOverlap(right.x, right.y, right.w, right.h, 130, 180, 40, 40)).toBe(true);
+    // 身后的敌人打不到
+    expect(boxesOverlap(right.x, right.y, right.w, right.h, 40, 180, 40, 40)).toBe(false);
+  });
+
+  it('冲刺冷却判定', () => {
+    expect(canDash(1000, 900)).toBe(true);
+    expect(canDash(800, 900)).toBe(false);
+  });
+
+  it('数值都在可玩范围内(不会出现负血量/零速)', () => {
+    expect(DG_PLAYER_MAX_HP).toBeGreaterThan(0);
+    expect(DG_PLAYER_SPEED).toBeGreaterThan(0);
+    expect(DG_PLAYER_JUMP).toBeGreaterThan(0);
+    expect(DG_DOUBLE_JUMP_RATIO).toBeGreaterThan(0);
+    expect(DG_DOUBLE_JUMP_RATIO).toBeLessThanOrEqual(1);
+    expect(DG_BOSS_HP).toBeGreaterThan(DG_ATTACK_DAMAGE);
+    expect(DG_DASH_MS).toBeLessThan(DG_DASH_COOLDOWN_MS);
+    expect(DG_ATTACK_MS).toBeLessThan(DG_ATTACK_COOLDOWN_MS);
   });
 });

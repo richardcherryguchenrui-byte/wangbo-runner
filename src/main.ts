@@ -6,6 +6,7 @@ import SettingsScene from './scenes/SettingsScene';
 import CustomCharScene from './scenes/CustomCharScene';
 import QuestScene from './scenes/QuestScene';
 import CampaignScene from './scenes/CampaignScene';
+import DungeonScene from './scenes/DungeonScene';
 import PreloadScene from './scenes/PreloadScene';
 import TitleScene from './scenes/TitleScene';
 import ShopScene from './scenes/ShopScene';
@@ -41,7 +42,7 @@ const game = new Phaser.Game({
     autoCenter: Phaser.Scale.CENTER_BOTH
     // 不再用 zoom:Phaser 的 zoom 只放大 CSS 显示尺寸,画面依旧被拉伸而发糊
   },
-  scene: [BootScene, PreloadScene, SplashScene, TitleScene, ShopScene, GuShopScene, SettingsScene, CustomCharScene, QuestScene, CampaignScene, GameScene, ResultScene]
+  scene: [BootScene, PreloadScene, SplashScene, TitleScene, ShopScene, GuShopScene, SettingsScene, CustomCharScene, QuestScene, CampaignScene, DungeonScene, GameScene, ResultScene]
 });
 
 // 每个场景的相机放大 renderScale 倍,让 960×540 的逻辑坐标铺满高分辨率画布。

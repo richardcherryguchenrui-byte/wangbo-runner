@@ -287,22 +287,32 @@ export default class TitleScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '11px', color: '#ffe066'
     }).setOrigin(0.5).setDepth(10).setAlpha(0.95);
 
-    // 无尽模式:老玩法保留
+    // 两个次级入口:无尽模式 / 留置室(横版闯关)
     {
-      const bx = px + 18;
+      const bw = (pw - 44) / 2;
       const by = 200;
-      const bw = pw - 36;
-      const bg = this.add.graphics().setDepth(10);
-      bg.fillStyle(0x16324f, 0.85);
-      bg.fillRoundedRect(bx, by, bw, 32, 10);
-      bg.lineStyle(1.2, 0xffffff, 0.12);
-      bg.strokeRoundedRect(bx, by, bw, 32, 10);
-      this.add.image(bx + 20, by + 16, 'ui-clock').setDisplaySize(15, 15).setDepth(11);
-      this.add.text(bx + 36, by + 16, '无尽模式 · 能撑多久算多久', {
-        fontFamily: FONT, fontSize: '13px', color: '#cfe3ff', fontStyle: 'bold'
-      }).setOrigin(0, 0.5).setDepth(11);
-      const hit = this.add.rectangle(bx + bw / 2, by + 16, bw, 32, 0xffffff, 0.001).setDepth(12).setInteractive({ useHandCursor: true });
-      hit.on('pointerdown', () => { playSfx(this, 'click', 0.4); this.startGame(false); });
+      const h = 34;
+      const entries: { icon: string; label: string; x: number; fn: () => void }[] = [
+        { icon: 'ui-clock', label: '无尽模式', x: px + 18, fn: () => this.startGame(false) },
+        { icon: 'ui-person', label: '留置室', x: px + 18 + bw + 8, fn: () => this.scene.start('Dungeon') }
+      ];
+      entries.forEach(e => {
+        const bg = this.add.graphics().setDepth(10);
+        bg.fillStyle(0x16324f, 0.85);
+        bg.fillRoundedRect(e.x, by, bw, h, 10);
+        bg.lineStyle(1.2, 0xffffff, 0.12);
+        bg.strokeRoundedRect(e.x, by, bw, h, 10);
+        this.add.image(e.x + 18, by + h / 2, e.icon).setDisplaySize(14, 14).setDepth(11);
+        this.add
+          .text(e.x + 32, by + h / 2, e.label, { fontFamily: FONT, fontSize: '13px', color: '#cfe3ff', fontStyle: 'bold' })
+          .setOrigin(0, 0.5)
+          .setDepth(11);
+        const hit = this.add
+          .rectangle(e.x + bw / 2, by + h / 2, bw, h, 0xffffff, 0.001)
+          .setDepth(12)
+          .setInteractive({ useHandCursor: true });
+        hit.on('pointerdown', () => { playSfx(this, 'click', 0.4); e.fn(); });
+      });
     }
 
     // 每日挑战卡
