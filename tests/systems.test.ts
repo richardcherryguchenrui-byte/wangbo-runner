@@ -17,6 +17,7 @@ import {
   type MissionId, type MissionState
 } from '../src/systems/missions';
 import { generatePattern, stageFor, FLYER_Y } from '../src/systems/patterns';
+import { isPerfectSlideTiming, tightSlideIndex } from '../src/systems/slideJudge';
 import { gradeRun } from '../src/systems/grade';
 import {
   getDailyChallenge, recordDailyRun, peekDailyState, mulberry32, DAILY_MODIFIERS
@@ -538,5 +539,62 @@ describe('单局评价(gradeRun)', () => {
       expect(g.label.length).toBeGreaterThan(0);
       expect(g.color).toMatch(/^#[0-9a-f]{6}$/i);
     }
+  });
+});
+
+// 完美滑铲判定:只认「起滑瞬间卡点」,提前滑下去躲掉不算完美
+describe('完美滑铲时机判定', () => {
+  const SPEED = 430; // 约 50 秒时的跑速(低空美女开始出现的阶段)
+
+  it('贴脸起滑 = 完美', () => {
+    // 170ms 窗口内在 430px/s 下约 73px
+    expect(isPerfectSlideTiming(10, SPEED)).toBe(true);
+    expect(isPerfectSlideTiming(40, SPEED)).toBe(true);
+    expect(isPerfectSlideTiming(72, SPEED)).toBe(true);
+  });
+
+  it('提前很久滑下去 = 不完美', () => {
+    expect(isPerfectSlideTiming(90, SPEED)).toBe(false);
+    expect(isPerfectSlideTiming(150, SPEED)).toBe(false);
+    expect(isPerfectSlideTiming(400, SPEED)).toBe(false);
+  });
+
+  it('窗口边界随速度换算成时间,而不是固定像素', () => {
+    // 同样 60px,慢速时算卡点(139ms),高速时更宽裕
+    expect(isPerfectSlideTiming(60, 430)).toBe(true);
+    // 高速下 60px 只相当于 67ms,更算卡点
+    expect(isPerfectSlideTiming(60, 900)).toBe(true);
+    // 高速下 200px = 222ms,已超出窗口
+    expect(isPerfectSlideTiming(200, 900)).toBe(false);
+  });
+
+  it('起滑时已经轻微重叠(救险滑铲)仍算完美', () => {
+    expect(isPerfectSlideTiming(0, SPEED)).toBe(true);
+    expect(isPerfectSlideTiming(-8, SPEED)).toBe(true);
+  });
+
+  it('障碍已经完全在身后则不归功于这次起滑', () => {
+    expect(isPerfectSlideTiming(-40, SPEED)).toBe(false);
+    expect(isPerfectSlideTiming(-500, SPEED)).toBe(false);
+  });
+
+  it('异常速度不判定为完美', () => {
+    expect(isPerfectSlideTiming(10, 0)).toBe(false);
+    expect(isPerfectSlideTiming(10, -5)).toBe(false);
+  });
+
+  it('从多个障碍里挑最近的那个卡点目标', () => {
+    const far = { distanceToContact: 300, flyer: true, counted: false, hit: false };
+    const tight = { distanceToContact: 30, flyer: true, counted: false, hit: false };
+    const ground = { distanceToContact: 10, flyer: false, counted: false, hit: false };
+    const passed = { distanceToContact: 5, flyer: true, counted: true, hit: false };
+    expect(tightSlideIndex([far, tight], SPEED)).toBe(1);
+    // 地面障碍不需要滑铲,不参与完美滑铲
+    expect(tightSlideIndex([ground], SPEED)).toBe(null);
+    // 已经计过数(过去了)的不再重复判定
+    expect(tightSlideIndex([passed], SPEED)).toBe(null);
+    // 全是远处的障碍:这次起滑不算卡点
+    expect(tightSlideIndex([far], SPEED)).toBe(null);
+    expect(tightSlideIndex([], SPEED)).toBe(null);
   });
 });

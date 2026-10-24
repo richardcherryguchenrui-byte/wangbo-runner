@@ -41,6 +41,8 @@ import {
   SLIDE_DURATION_MS,
   SLIDE_COOLDOWN_MS,
   SLIDE_BODY_HEIGHT,
+  PERFECT_SLIDE_COINS,
+  PERFECT_SLIDE_HYPE,
   NEAR_MISS_DISTANCE,
   NEAR_MISS_COINS,
   NEAR_MISS_HYPE,
@@ -93,6 +95,7 @@ import {
   type MissionState
 } from '../systems/missions';
 import { generatePattern, FLYER_Y, type RunPattern } from '../systems/patterns';
+import { tightSlideIndex } from '../systems/slideJudge';
 import {
   getDailyChallenge,
   recordDailyRun,
@@ -229,6 +232,7 @@ export default class GameScene extends Phaser.Scene {
   private slideUntil = 0;
   private slideCooldownUntil = 0;
   private slideQueued = false;
+  private slideId = 0; // 本次滑铲编号:完美滑铲只认「起滑瞬间卡点」的那一次
 
   // ---- 气势 / 高光 ----
   private hype = 0;
@@ -949,7 +953,7 @@ export default class GameScene extends Phaser.Scene {
       {
         iconKey: 'ui-arrow-down',
         title: '滑铲',
-        body: '按 ↓ / S,或在屏幕下半部点按、向下滑动\n低空飞来的美女必须滑铲钻过去\n滑铲时身体高度只有一半'
+        body: '按 ↓ / S,或在屏幕下半部点按、向下滑动\n低空飞来的美女必须滑铲钻过去\n贴到脸前才起滑 = 完美滑铲,额外银币 + 气势'
       },
       {
         iconKey: 'mi-combo',
@@ -1562,6 +1566,9 @@ export default class GameScene extends Phaser.Scene {
     this.slideQueued = false;
     this.slideUntil = this.elapsedMs + SLIDE_DURATION_MS;
     this.slideCooldownUntil = this.elapsedMs + SLIDE_DURATION_MS + SLIDE_COOLDOWN_MS;
+    this.slideId += 1;
+    // 完美滑铲看的是「起滑时机」:起滑这一瞬间就决定这次算不算卡点
+    this.markTightSlide();
     this.bobTween?.stop();
     this.bobTween = undefined;
     const scaleX = this.baseScale * 1.12;
@@ -1572,6 +1579,24 @@ export default class GameScene extends Phaser.Scene {
     this.runDustAcc = 999;
     playSfx(this, 'slide', 0.42);
     windStreak(this, this.player.x - 12, this.player.y + 6, 3);
+  }
+
+  // 起滑瞬间给最近的「卡点」低空障碍打上本次滑铲的 id,障碍过去时据此判定完美
+  private markTightSlide() {
+    const pb = this.player.body as Phaser.Physics.Arcade.Body;
+    const children = this.obstacleGroup.getChildren() as Phaser.Physics.Arcade.Image[];
+    const candidates = children.map(o => {
+      const ob = o.body as Phaser.Physics.Arcade.Body;
+      return {
+        distanceToContact: ob.left - pb.right,
+        flyer: !!o.getData('flyer'),
+        counted: !!o.getData('counted'),
+        hit: !!o.getData('hit')
+      };
+    });
+    const idx = tightSlideIndex(candidates, this.runSpeed);
+    if (idx === null) return;
+    children[idx].setData('tightSlideId', this.slideId);
   }
 
   private endSlide(cooldown = true) {
@@ -1970,14 +1995,17 @@ export default class GameScene extends Phaser.Scene {
     this.combo += 1;
     this.comboMax = Math.max(this.comboMax, this.combo);
     const flyer = !!o.getData('flyer');
-    // 完美滑铲:从低空美女下方滑过,额外银币 + 气势 + 专属反馈
-    const perfectSlide = flyer && this.sliding;
+    // 完美滑铲:必须在起滑时就已经卡点(贴脸才滑下去),提前滑着等过去只是普通翻越
+    const perfectSlide =
+      flyer &&
+      this.sliding &&
+      o.getData('tightSlideId') === this.slideId;
     const comboBonus = this.combo >= COMBO_TIER_2 ? 2 : this.combo >= COMBO_TIER_1 ? 1 : 0;
     const value = this.coinAmount(
-      (flyer ? FLYER_COIN_BONUS : 1) + comboBonus + (perfectSlide ? 2 : 0)
+      (flyer ? FLYER_COIN_BONUS : 1) + comboBonus + (perfectSlide ? PERFECT_SLIDE_COINS : 0)
     );
     this.addRunCoins(value);
-    this.gainHype(HYPE_PER_DODGE + (perfectSlide ? 6 : 0));
+    this.gainHype(HYPE_PER_DODGE + (perfectSlide ? PERFECT_SLIDE_HYPE : 0));
     if (perfectSlide) {
       this.floatText(this.player.x + 34, this.player.y - 76, `完美滑铲! +${value} 银币`, '#b2f2bb');
       nearMissStreak(this, this.player.x + 58, this.player.y + 4);
@@ -2612,6 +2640,7 @@ export default class GameScene extends Phaser.Scene {
     this.slideUntil = 0;
     this.slideCooldownUntil = 0;
     this.slideQueued = false;
+    this.slideId = 0;
     this.airborne = false;
     this.runDustAcc = 0;
     this.hype = 0;

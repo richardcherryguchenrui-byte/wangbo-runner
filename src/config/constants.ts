@@ -37,6 +37,14 @@ export const SLIDE_DURATION_MS = 620;
 export const SLIDE_COOLDOWN_MS = 140;
 export const SLIDE_BODY_HEIGHT = 48;
 
+// ---- 完美滑铲:只有「卡点」滑铲才算,提前滑下去躲掉只是普通翻越 ----
+// 起滑瞬间,低空障碍前沿到玩家前沿的剩余时间 ≤ 该值 → 判定完美
+export const PERFECT_SLIDE_ETA_MS = 170;
+// 起滑时障碍已经贴到身上(甚至轻微重叠)仍算卡点,留一帧左右的容差
+export const PERFECT_SLIDE_OVERLAP_TOL_PX = 16;
+export const PERFECT_SLIDE_COINS = 2;
+export const PERFECT_SLIDE_HYPE = 6;
+
 // ---- 擦身而过:极限躲避奖励 + 气势 ----
 export const NEAR_MISS_DISTANCE = 26;
 export const NEAR_MISS_COINS = 2;
