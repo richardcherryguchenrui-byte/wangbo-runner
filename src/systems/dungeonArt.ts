@@ -289,6 +289,226 @@ export function buildDungeonTextures(scene: Phaser.Scene) {
     ctx.fillText('护', 20, 21);
   });
 
+
+  // ---- 远程兵:戴眼镜拿手机,专门打小报告 ----
+  tex(scene, 'dg-thrower', 56, 64, (ctx) => {
+    const body = ctx.createLinearGradient(0, 18, 0, 64);
+    body.addColorStop(0, '#4a3f5e');
+    body.addColorStop(1, '#221c30');
+    ctx.fillStyle = body;
+    ctx.strokeStyle = '#0d131b';
+    ctx.lineWidth = 3;
+    rrect(ctx, 11, 20, 34, 42, 9);
+    ctx.fill();
+    ctx.stroke();
+    // 头
+    ctx.fillStyle = '#e8c39a';
+    ctx.beginPath();
+    ctx.arc(28, 17, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#1a1428';
+    ctx.beginPath();
+    ctx.arc(28, 13, 13, Math.PI, 0);
+    ctx.fill();
+    // 眼镜
+    ctx.strokeStyle = '#8ce99a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(23, 18, 4, 0, Math.PI * 2);
+    ctx.arc(33, 18, 4, 0, Math.PI * 2);
+    ctx.moveTo(27, 18);
+    ctx.lineTo(29, 18);
+    ctx.stroke();
+    // 手机(举起来)
+    ctx.fillStyle = '#cfe3ff';
+    rrect(ctx, 40, 24, 12, 20, 2);
+    ctx.fill();
+    ctx.strokeStyle = '#4a5a6a';
+    ctx.lineWidth = 1.5;
+    rrect(ctx, 40, 24, 12, 20, 2);
+    ctx.stroke();
+    ctx.fillStyle = '#69db7c';
+    ctx.fillRect(42, 28, 8, 12);
+    // 手
+    ctx.fillStyle = '#e8c39a';
+    ctx.beginPath();
+    ctx.arc(38, 34, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // ---- 冲锋兵:壮汉,肩膀上扛着东西 ----
+  tex(scene, 'dg-charger', 62, 68, (ctx) => {
+    const body = ctx.createLinearGradient(0, 16, 0, 68);
+    body.addColorStop(0, '#5a3a3a');
+    body.addColorStop(1, '#2a1414');
+    ctx.fillStyle = body;
+    ctx.strokeStyle = '#0d131b';
+    ctx.lineWidth = 3;
+    rrect(ctx, 8, 20, 46, 46, 12);
+    ctx.fill();
+    ctx.stroke();
+    // 头(小,脖子粗)
+    ctx.fillStyle = '#d9a97a';
+    ctx.beginPath();
+    ctx.arc(31, 15, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#1a0f0f';
+    ctx.beginPath();
+    ctx.arc(31, 11, 12, Math.PI, 0);
+    ctx.fill();
+    // 怒眉 + 眼
+    ctx.strokeStyle = '#1a0f0f';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(22, 12);
+    ctx.lineTo(28, 16);
+    ctx.moveTo(40, 12);
+    ctx.lineTo(34, 16);
+    ctx.stroke();
+    ctx.fillStyle = '#ff3b3b';
+    ctx.beginPath();
+    ctx.arc(26, 19, 2.6, 0, Math.PI * 2);
+    ctx.arc(36, 19, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+    // 肩上的麻袋
+    ctx.fillStyle = '#8a6a3a';
+    rrect(ctx, 34, 6, 26, 18, 6);
+    ctx.fill();
+    ctx.strokeStyle = '#3a2a12';
+    ctx.lineWidth = 2;
+    rrect(ctx, 34, 6, 26, 18, 6);
+    ctx.stroke();
+  });
+
+  // ---- 宝箱 ----
+  tex(scene, 'dg-chest', 56, 48, (ctx) => {
+    const g = ctx.createLinearGradient(0, 10, 0, 48);
+    g.addColorStop(0, '#a8763a');
+    g.addColorStop(1, '#6a4520');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = '#2a1800';
+    ctx.lineWidth = 2.5;
+    rrect(ctx, 4, 14, 48, 32, 5);
+    ctx.fill();
+    ctx.stroke();
+    // 盖
+    ctx.fillStyle = '#c08a44';
+    ctx.beginPath();
+    ctx.moveTo(4, 16);
+    ctx.quadraticCurveTo(28, -2, 52, 16);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // 锁扣
+    ctx.fillStyle = '#ffd43b';
+    rrect(ctx, 23, 22, 10, 12, 2);
+    ctx.fill();
+    ctx.strokeStyle = '#8a5200';
+    ctx.lineWidth = 1.5;
+    rrect(ctx, 23, 22, 10, 12, 2);
+    ctx.stroke();
+    // 铁箍
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(16, 16);
+    ctx.lineTo(16, 46);
+    ctx.moveTo(40, 16);
+    ctx.lineTo(40, 46);
+    ctx.stroke();
+  });
+
+  // ---- 茅台:攻击力提升 ----
+  tex(scene, 'dg-wine', 30, 44, (ctx) => {
+    ctx.fillStyle = '#f5f0e2';
+    rrect(ctx, 6, 10, 18, 32, 4);
+    ctx.fill();
+    ctx.strokeStyle = '#b0a488';
+    ctx.lineWidth = 2;
+    rrect(ctx, 6, 10, 18, 32, 4);
+    ctx.stroke();
+    // 瓶颈
+    ctx.fillStyle = '#f5f0e2';
+    ctx.fillRect(11, 2, 8, 9);
+    ctx.strokeRect(11, 2, 8, 9);
+    // 红标
+    ctx.fillStyle = '#c92a2a';
+    rrect(ctx, 8, 18, 14, 16, 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffe066';
+    ctx.font = 'bold 9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('茅', 15, 26);
+  });
+
+  // ---- 购物卡:回法力 ----
+  tex(scene, 'dg-card', 40, 28, (ctx) => {
+    const g = ctx.createLinearGradient(0, 0, 40, 28);
+    g.addColorStop(0, '#ffd43b');
+    g.addColorStop(1, '#e8590c');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = '#8a5200';
+    ctx.lineWidth = 2;
+    rrect(ctx, 2, 3, 36, 22, 4);
+    ctx.fill();
+    ctx.stroke();
+    // 芯片
+    ctx.fillStyle = '#fff3bf';
+    rrect(ctx, 6, 8, 8, 6, 1.5);
+    ctx.fill();
+    // 磁条
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(2, 17, 36, 4);
+    ctx.fillStyle = '#7a1414';
+    ctx.font = 'bold 8px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('购物卡', 24, 10);
+  });
+
+  // ---- 检查点:小红旗 ----
+  tex(scene, 'dg-flag', 36, 56, (ctx) => {
+    ctx.strokeStyle = '#9db8d8';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(8, 2);
+    ctx.lineTo(8, 54);
+    ctx.stroke();
+    ctx.fillStyle = '#ff6b6b';
+    ctx.beginPath();
+    ctx.moveTo(9, 4);
+    ctx.lineTo(32, 12);
+    ctx.lineTo(9, 22);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#7a1414';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // 底座
+    ctx.fillStyle = '#4a5a6a';
+    rrect(ctx, 2, 50, 14, 6, 2);
+    ctx.fill();
+  });
+
+  // ---- 敌人举报信(飞行道具) ----
+  tex(scene, 'dg-enemy-letter', 36, 26, (ctx) => {
+    ctx.fillStyle = '#f0e8d8';
+    ctx.strokeStyle = '#c92a2a';
+    ctx.lineWidth = 2;
+    rrect(ctx, -16, -11, 32, 22, 3);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = '#c92a2a';
+    ctx.beginPath();
+    ctx.moveTo(-16, -11);
+    ctx.lineTo(0, 1);
+    ctx.lineTo(16, -11);
+    ctx.stroke();
+  });
+
   // ---- 平台边缘高光条 ----
   tex(scene, 'dg-edge', 8, 8, (ctx) => {
     ctx.fillStyle = 'rgba(150,220,255,0.55)';

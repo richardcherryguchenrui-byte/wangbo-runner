@@ -23,6 +23,8 @@ import {
   attackBox, boxesOverlap, canDash, DG_PLAYER_MAX_HP, DG_PLAYER_SPEED, DG_PLAYER_JUMP,
   DG_DOUBLE_JUMP_RATIO, DG_BOSS_HP, DG_ATTACK_DAMAGE, DG_DASH_MS, DG_DASH_COOLDOWN_MS,
   DG_ATTACK_MS, DG_ATTACK_COOLDOWN_MS, DG_ATTACK_RANGE,
+  DG_THROWER_HP, DG_CHARGER_HP, DG_WINE_DAMAGE_BONUS, DG_CARD_MP, DG_CHEST_COINS,
+  comboDamageBonus, playerMeleeDamage,
   DG_PLAYER_MAX_MP, DG_MP_REGEN_PER_SEC, DG_MP_ON_KILL, DG_INVULN_MS,
   DG_SKILL_REPORT, DG_SKILL_SHIELD,
   canUseSkill, regenMp, skillCooldownRatio, inRadius
@@ -971,5 +973,46 @@ describe('留置室技能与 MP', () => {
     expect(DG_SKILL_SHIELD.shieldMs).toBeGreaterThan(DG_INVULN_MS);
     expect(DG_SKILL_SHIELD.radius).toBeGreaterThan(100);
     expect(DG_MP_ON_KILL).toBeGreaterThan(0);
+  });
+});
+
+
+// 新敌人 / 拾取 / 连击加成
+describe('横版深加工:新实体与连击', () => {
+  it('三关地图都包含新实体类型,且都能解析出来', () => {
+    const all = DUNGEON_LEVELS.map(l => parseDungeon(l.map));
+    expect(all.some(p => p.throwers.length > 0)).toBe(true);
+    expect(all.some(p => p.chargers.length > 0)).toBe(true);
+    expect(all.some(p => p.chests.length > 0)).toBe(true);
+    expect(all.some(p => p.wines.length > 0)).toBe(true);
+    expect(all.some(p => p.cards.length > 0)).toBe(true);
+    expect(all.every(p => p.checkpoints.length > 0)).toBe(true);
+  });
+
+  it('远程兵与冲锋兵血量不同,各有分工', () => {
+    expect(DG_THROWER_HP).toBeGreaterThan(0);
+    expect(DG_CHARGER_HP).toBeGreaterThan(DG_THROWER_HP);
+  });
+
+  it('连击越高伤害越高,分两档', () => {
+    expect(comboDamageBonus(0)).toBe(0);
+    expect(comboDamageBonus(5)).toBe(0);
+    expect(comboDamageBonus(6)).toBe(1);
+    expect(comboDamageBonus(11)).toBe(1);
+    expect(comboDamageBonus(12)).toBe(2);
+    expect(comboDamageBonus(99)).toBe(2);
+  });
+
+  it('近战伤害 = 基础 + 连击 + 茅台增益', () => {
+    expect(playerMeleeDamage(0, false)).toBe(DG_ATTACK_DAMAGE);
+    expect(playerMeleeDamage(6, false)).toBe(DG_ATTACK_DAMAGE + 1);
+    expect(playerMeleeDamage(12, false)).toBe(DG_ATTACK_DAMAGE + 2);
+    expect(playerMeleeDamage(12, true)).toBe(DG_ATTACK_DAMAGE + 2 + DG_WINE_DAMAGE_BONUS);
+  });
+
+  it('拾取增益有实际数值', () => {
+    expect(DG_CARD_MP).toBeGreaterThan(0);
+    expect(DG_CHEST_COINS).toBeGreaterThan(0);
+    expect(DG_WINE_DAMAGE_BONUS).toBeGreaterThan(0);
   });
 });

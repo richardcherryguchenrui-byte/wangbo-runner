@@ -28,6 +28,22 @@ import {
   DG_BOSS_TOUCH_DAMAGE,
   DG_PLAYER_MAX_MP,
   DG_MP_ON_KILL,
+  DG_THROWER_HP,
+  DG_THROWER_RANGE,
+  DG_THROWER_COOLDOWN_MS,
+  DG_THROWER_WINDUP_MS,
+  DG_ENEMY_LETTER_SPEED,
+  DG_ENEMY_LETTER_DAMAGE,
+  DG_ENEMY_LETTER_LIFE_MS,
+  DG_CHARGER_HP,
+  DG_CHARGER_TRIGGER,
+  DG_CHARGER_WINDUP_MS,
+  DG_CHARGER_DASH_SPEED,
+  DG_CHARGER_DASH_MS,
+  DG_WINE_BUFF_MS,
+  DG_CARD_MP,
+  DG_CHEST_COINS,
+  playerMeleeDamage,
   DG_SKILL_REPORT,
   DG_SKILL_SHIELD,
   canUseSkill,
@@ -43,15 +59,19 @@ import {
   parseDungeon,
   type DungeonLevelDef,
   type ParsedDungeon,
-  type DGRect
+  type DGRect,
+  type DGPoint
 } from '../systems/dungeon';
 
 interface DGData {
   levelId?: string;
 }
 
+type EnemyKind = 'walker' | 'thrower' | 'charger' | 'boss';
+
 interface EnemyUnit {
   sprite: Phaser.Physics.Arcade.Sprite;
+  kind: EnemyKind;
   hp: number;
   maxHp: number;
   minX: number;
@@ -60,6 +80,9 @@ interface EnemyUnit {
   isBoss: boolean;
   nextChargeAt: number;
   chargingUntil: number;
+  /** 远程/冲锋的抬手预警结束时间 */
+  windupUntil: number;
+  nextActionAt: number;
 }
 
 const PLAYER_BODY_W = 44;
@@ -85,6 +108,10 @@ export default class DungeonScene extends Phaser.Scene {
   private shieldUntil = 0;
   private letters!: Phaser.Physics.Arcade.Group;
   private combo = 0;
+  private wineUntil = 0;
+  private respawnPoint: DGPoint = { x: 0, y: 0 };
+  private respawnAt: DGPoint | null = null;
+  private enemyLetters!: Phaser.Physics.Arcade.Group;
   private comboUntil = 0;
   private hitstopUntil = 0;
   private hudMpBar!: Phaser.GameObjects.Graphics;
@@ -150,6 +177,8 @@ export default class DungeonScene extends Phaser.Scene {
     this.shieldUntil = 0;
     this.combo = 0;
     this.comboUntil = 0;
+    this.wineUntil = 0;
+    this.respawnAt = null;
     this.hitstopUntil = 0;
     this.hudSkillIcons = [];
     this.hudCombo = undefined;
@@ -372,12 +401,34 @@ export default class DungeonScene extends Phaser.Scene {
         .setDisplaySize(84, 120);
     }
 
-    // 敌人
-    this.parsed.enemies.forEach(e => this.spawnEnemy(e.x, e.y, false));
-    if (this.parsed.boss) this.spawnEnemy(this.parsed.boss.x, this.parsed.boss.y, true);
+    // 敌人:巡逻 / 远程 / 冲锋
+    this.parsed.enemies.forEach(e => this.spawnEnemy(e.x, e.y, 'walker'));
+    this.parsed.throwers.forEach(e => this.spawnEnemy(e.x, e.y, 'thrower'));
+    this.parsed.chargers.forEach(e => this.spawnEnemy(e.x, e.y, 'charger'));
+    if (this.parsed.boss) this.spawnEnemy(this.parsed.boss.x, this.parsed.boss.y, 'boss');
+
+    // 宝箱 / 梗向拾取 / 检查点
+    this.buildPickups();
   }
 
   private buildProjectiles() {
+    this.enemyLetters = this.physics.add.group({ allowGravity: false });
+    this.physics.add.overlap(this.player, this.enemyLetters, (_p, obj) => {
+      const letter = obj as Phaser.Physics.Arcade.Image;
+      if (!letter.active) return;
+      const fromX = letter.x;
+      letter.destroy();
+      poof(this, fromX, letter.y, 4);
+      this.hurtPlayer(DG_ENEMY_LETTER_DAMAGE, fromX);
+    });
+    this.physics.add.overlap(this.enemyLetters, this.platforms, (obj) => {
+      const letter = obj as Phaser.Physics.Arcade.Image;
+      if (letter.active) {
+        poof(this, letter.x, letter.y, 2);
+        letter.destroy();
+      }
+    });
+
     this.letters = this.physics.add.group({ allowGravity: false });
     this.physics.add.overlap(this.letters, this.platforms, (obj) => {
       const letter = obj as Phaser.Physics.Arcade.Image;
@@ -388,33 +439,130 @@ export default class DungeonScene extends Phaser.Scene {
     });
   }
 
-  private spawnEnemy(feetX: number, feetY: number, isBoss: boolean) {
-    const tex = isBoss ? 'dg-boss' : 'dg-enemy';
-    const sprite = this.physics.add.sprite(feetX, feetY - (isBoss ? 62 : 32), tex).setDepth(8);
+  // 宝箱 / 茅台 / 购物卡 / 检查点:全部用 overlap 拾取
+  private buildPickups() {
+    const mk = (
+      tex: string, x: number, y: number, size: [number, number], bob: number,
+      onPick: (self: Phaser.Physics.Arcade.Image) => void
+    ) => {
+      const img = this.physics.add.image(x, y - size[1] / 2, tex).setDepth(6).setDisplaySize(size[0], size[1]);
+      const b = img.body as Phaser.Physics.Arcade.Body;
+      b.setAllowGravity(false);
+      b.setSize(size[0] * 0.9, size[1] * 0.9, true);
+      this.tweens.add({ targets: img, y: img.y - bob, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      this.physics.add.overlap(this.player, img, () => {
+        if (!img.active) return;
+        onPick(img);
+      });
+    };
+
+    this.parsed.chests.forEach(c => mk('dg-chest', c.x, c.y, [56, 48], 4, img => {
+      img.destroy();
+      this.runCoins += DG_CHEST_COINS;
+      this.refreshCoinHud();
+      playSfx(this, 'unlock', 0.5);
+      poof(this, img.x, img.y, 12);
+      confettiBurst(this, img.x, img.y, 10);
+      this.floatText(img.x, img.y - 20, `小金库 +${DG_CHEST_COINS}`, '#ffe066');
+    }));
+
+    this.parsed.wines.forEach(c => mk('dg-wine', c.x, c.y, [30, 44], 6, img => {
+      img.destroy();
+      this.wineUntil = this.time.now + DG_WINE_BUFF_MS;
+      playSfx(this, 'hype', 0.45);
+      poof(this, img.x, img.y, 8);
+      this.floatText(img.x, img.y - 20, '茅台下肚 · 攻击 +1', '#ffa94d');
+      showToast(this, GAME_WIDTH / 2, 150, '茅台下肚:12 秒内攻击力 +1', '#ffa94d', 'ui-bolt');
+    }));
+
+    this.parsed.cards.forEach(c => mk('dg-card', c.x, c.y, [40, 28], 5, img => {
+      img.destroy();
+      this.mp = Math.min(DG_PLAYER_MAX_MP, this.mp + DG_CARD_MP);
+      this.refreshMpHud();
+      playSfx(this, 'coin', 0.4);
+      poof(this, img.x, img.y, 6);
+      this.floatText(img.x, img.y - 20, `购物卡 法力 +${DG_CARD_MP}`, '#74c0fc');
+    }));
+
+    this.parsed.checkpoints.forEach((c, i) => mk('dg-flag', c.x, c.y, [36, 56], 0, img => {
+      if (this.respawnAt) return;
+      this.respawnAt = { x: c.x, y: c.y };
+      img.setTint(0x8ce99a);
+      playSfx(this, 'unlock', 0.4);
+      showToast(this, GAME_WIDTH / 2, 150, '插旗了 · 死了从这里重来', '#8ce99a', 'ui-check');
+      void i;
+    }));
+  }
+
+  // 伤害飘字
+  private floatText(x: number, y: number, msg: string, color: string) {
+    const t = this.add
+      .text(x, y, msg, {
+        fontFamily: FONT, fontSize: '15px', color, fontStyle: 'bold',
+        resolution: 2, stroke: '#08131f', strokeThickness: 4
+      })
+      .setOrigin(0.5)
+      .setDepth(30);
+    this.tweens.add({
+      targets: t, y: y - 42, alpha: 0, duration: 720, ease: 'Quad.out',
+      onComplete: () => t.destroy()
+    });
+  }
+
+  // 敌人扔出的举报信
+  private throwEnemyLetter(fromX: number, fromY: number, toX: number, toY: number) {
+    const letter = this.enemyLetters.create(fromX, fromY, 'dg-enemy-letter') as Phaser.Physics.Arcade.Image;
+    letter.setDepth(12).setDisplaySize(36, 26);
+    const b = letter.body as Phaser.Physics.Arcade.Body;
+    b.setAllowGravity(false);
+    const ang = Math.atan2(toY - fromY, toX - fromX);
+    b.setVelocityX(Math.cos(ang) * DG_ENEMY_LETTER_SPEED);
+    b.setVelocityY(Math.sin(ang) * DG_ENEMY_LETTER_SPEED);
+    playSfx(this, 'near', 0.22);
+    this.time.delayedCall(DG_ENEMY_LETTER_LIFE_MS, () => {
+      if (letter.active) letter.destroy();
+    });
+  }
+
+  private spawnEnemy(feetX: number, feetY: number, kind: EnemyKind) {
+    const isBoss = kind === 'boss';
+    const tex = isBoss ? 'dg-boss' : kind === 'thrower' ? 'dg-thrower' : kind === 'charger' ? 'dg-charger' : 'dg-enemy';
+    const halfH = isBoss ? 62 : 32;
+    const sprite = this.physics.add.sprite(feetX, feetY - halfH, tex).setDepth(8);
     const body = sprite.body as Phaser.Physics.Arcade.Body;
     if (isBoss) {
       body.setSize(72, 110, false);
       body.setOffset((sprite.width - 72) / 2, sprite.height - 110);
+    } else if (kind === 'charger') {
+      body.setSize(44, 56, false);
+      body.setOffset((sprite.width - 44) / 2, sprite.height - 56);
     } else {
       body.setSize(40, 54, false);
       body.setOffset((sprite.width - 40) / 2, sprite.height - 54);
     }
     this.physics.add.collider(sprite, this.platforms);
 
+    const hp = isBoss ? DG_BOSS_HP
+      : kind === 'thrower' ? DG_THROWER_HP
+      : kind === 'charger' ? DG_CHARGER_HP
+      : this.level.enemyHp;
+    const patrol = kind === 'thrower' ? DG_TILE * 1.2 : DG_TILE * 2.4;
     const unit: EnemyUnit = {
       sprite,
-      hp: isBoss ? DG_BOSS_HP : this.level.enemyHp,
-      maxHp: isBoss ? DG_BOSS_HP : this.level.enemyHp,
-      minX: feetX - DG_TILE * 2.4,
-      maxX: feetX + DG_TILE * 2.4,
+      kind,
+      hp,
+      maxHp: hp,
+      minX: feetX - patrol,
+      maxX: feetX + patrol,
       dir: -1,
       isBoss,
       nextChargeAt: 0,
-      chargingUntil: 0
+      chargingUntil: 0,
+      windupUntil: 0,
+      nextActionAt: 0
     };
     this.enemies.push(unit);
 
-    // 接触伤害
     this.physics.add.overlap(this.player, sprite, () => this.hurtPlayer(isBoss ? DG_BOSS_TOUCH_DAMAGE : 1, sprite.x));
     return unit;
   }
@@ -732,18 +880,25 @@ export default class DungeonScene extends Phaser.Scene {
 
     // 命中判定
     let hitAny = false;
+    const dmg = playerMeleeDamage(this.combo, this.time.now < this.wineUntil);
     this.enemies.forEach(u => {
       if (u.hp <= 0) return;
       const b = u.sprite.body as Phaser.Physics.Arcade.Body;
       if (!boxOverlapRect(box, b.x, b.y, b.width, b.height)) return;
       hitAny = true;
-      this.damageEnemy(u, DG_ATTACK_DAMAGE);
+      this.damageEnemy(u, dmg);
     });
     if (hitAny) shake(this, 0.006, 110);
   }
 
   private damageEnemy(u: EnemyUnit, amount: number) {
     u.hp -= amount;
+    const heavy = amount > DG_ATTACK_DAMAGE;
+    this.floatText(
+      u.sprite.x, u.sprite.y - 26,
+      heavy ? `${amount}!` : `${amount}`,
+      heavy ? '#ffa94d' : '#ffffff'
+    );
     const s = u.sprite;
     s.setTintFill(0xffffff);
     this.time.delayedCall(70, () => { if (s.active) s.clearTint(); });
@@ -913,6 +1068,27 @@ export default class DungeonScene extends Phaser.Scene {
     this.showOverlay(false);
   }
 
+  // 从检查点继续:保留已吃到的银币,清屏敌人举报信,满血复活
+  private respawnAtCheckpoint() {
+    if (!this.respawnAt) return;
+    this.over = false;
+    this.uiTop.removeAll(true);
+    this.physics.resume();
+    this.hp = DG_PLAYER_MAX_HP;
+    this.refreshHeartHud();
+    this.player.clearTint();
+    this.player.setPosition(this.respawnAt.x, this.respawnAt.y - 64);
+    this.player.setVelocity(0, 0);
+    this.invulnUntil = this.time.now + 1600;
+    this.mpHudSafeRefresh();
+    this.enemyLetters.getChildren().slice().forEach(o => o.destroy());
+    showToast(this, GAME_WIDTH / 2, 150, '从红旗继续 · 再来', '#8ce99a', 'ui-check');
+  }
+
+  private mpHudSafeRefresh() {
+    this.refreshMpHud();
+  }
+
   private onClear() {
     if (this.over || this.cleared) return;
     this.cleared = true;
@@ -970,6 +1146,9 @@ export default class DungeonScene extends Phaser.Scene {
     } else if (win) {
       buttons.push({ label: '再走一遍', primary: true, x: GAME_WIDTH / 2 + 130, fn: () => this.scene.restart({ levelId: this.levelId }) });
       buttons.push({ label: '返回', x: GAME_WIDTH / 2 - 130, fn: () => this.leave() });
+    } else if (this.respawnAt) {
+      buttons.push({ label: '从红旗继续', primary: true, x: GAME_WIDTH / 2 + 130, fn: () => this.respawnAtCheckpoint() });
+      buttons.push({ label: '重头再来', x: GAME_WIDTH / 2 - 130, fn: () => this.scene.restart({ levelId: this.levelId }) });
     } else {
       buttons.push({ label: '再来一次', primary: true, x: GAME_WIDTH / 2 + 130, fn: () => this.scene.restart({ levelId: this.levelId }) });
       buttons.push({ label: '返回', x: GAME_WIDTH / 2 - 130, fn: () => this.leave() });
@@ -1139,6 +1318,47 @@ export default class DungeonScene extends Phaser.Scene {
           b.setVelocityX((this.player.x < u.sprite.x ? -1 : 1) * DG_BOSS_SPEED * 0.7);
         }
         u.sprite.setFlipX(this.player.x < u.sprite.x);
+      } else if (u.kind === 'thrower') {
+        // 远程:站住不动,进射程先抬手(变色预警)再扔举报信
+        b.setVelocityX(0);
+        const dx = this.player.x - u.sprite.x;
+        const dy = Math.abs(this.player.y - u.sprite.y);
+        u.sprite.setFlipX(dx < 0);
+        if (time > u.nextActionAt && Math.abs(dx) < DG_THROWER_RANGE && dy < 240) {
+          u.windupUntil = time + DG_THROWER_WINDUP_MS;
+          u.nextActionAt = u.windupUntil + DG_THROWER_COOLDOWN_MS;
+          u.sprite.setTint(0xffd43b);
+          this.time.delayedCall(DG_THROWER_WINDUP_MS, () => {
+            if (u.hp > 0 && u.sprite.active) {
+              u.sprite.clearTint();
+              this.throwEnemyLetter(u.sprite.x, u.sprite.y - 10, this.player.x, this.player.y - 6);
+            }
+          });
+        }
+      } else if (u.kind === 'charger') {
+        // 冲锋:靠近 → 抬手预警 → 突进撞击 → 硬直
+        const dx = this.player.x - u.sprite.x;
+        const dist = Math.abs(dx);
+        u.sprite.setFlipX(dx < 0);
+        if (time < u.windupUntil) {
+          b.setVelocityX(0);
+        } else if (time < u.chargingUntil) {
+          b.setVelocityX(u.dir * DG_CHARGER_DASH_SPEED);
+        } else {
+          if (dist < DG_CHARGER_TRIGGER && Math.abs(this.player.y - u.sprite.y) < 130 && time > u.nextActionAt) {
+            u.dir = dx > 0 ? 1 : -1;
+            u.windupUntil = time + DG_CHARGER_WINDUP_MS;
+            u.chargingUntil = u.windupUntil + DG_CHARGER_DASH_MS;
+            u.nextActionAt = u.chargingUntil + 800;
+            u.sprite.setTint(0xff6b6b);
+            this.time.delayedCall(DG_CHARGER_WINDUP_MS, () => { if (u.sprite.active) u.sprite.clearTint(); });
+            playSfx(this, 'warn', 0.28);
+          } else {
+            if (b.blocked.left) u.dir = 1;
+            if (b.blocked.right) u.dir = -1;
+            b.setVelocityX(dist > 170 ? (dx > 0 ? 1 : -1) * DG_ENEMY_SPEED * 0.75 : 0);
+          }
+        }
       } else {
         if (b.blocked.left || u.sprite.x <= u.minX) u.dir = 1;
         if (b.blocked.right || u.sprite.x >= u.maxX) u.dir = -1;
@@ -1149,6 +1369,16 @@ export default class DungeonScene extends Phaser.Scene {
 
     // 技能冷却指示
     if (time < this.reportReadyAt || time < this.shieldReadyAt) this.refreshMpHud();
+
+    // 敌人掉出世界(比如冲锋兵冲进坑里):移除,避免留下僵尸单位
+    this.enemies.forEach(u => {
+      if (u.hp <= 0 || !u.sprite.active) return;
+      if (u.sprite.y > this.parsed.heightPx + 160) {
+        u.hp = 0;
+        u.sprite.destroy();
+        if (u.isBoss) this.refreshBossBar();
+      }
+    });
 
     // ---- 掉出世界 ----
     if (this.player.y > this.parsed.heightPx + 200) {
