@@ -70,6 +70,8 @@ export interface Progress {
   corrupt: number;
   /** 上次回家领「进屋红包」的时间戳(每天一次) */
   lastHomeGiftAt: number;
+  /** 海外身份等级:跑路上岸次数,永久 +25% 产出/级 */
+  prestige: number;
 }
 
 const KEY = 'wangboProgress';
@@ -105,7 +107,7 @@ function defaults(): Progress {
     levelStars: {}, levelClears: 0, perfectSlides: 0, starMilestones: [], dungeonCleared: {}, redeemBonus: 0,
     assets: {}, network: {}, laundered: 0,
     lastAccrualAt: 0, lastAuditAt: 0, auditsSurvived: 0, assetsSeized: 0,
-    assetsIntroDone: false, corrupt: 0, lastHomeGiftAt: 0
+    assetsIntroDone: false, corrupt: 0, lastHomeGiftAt: 0, prestige: 0
   };
 }
 

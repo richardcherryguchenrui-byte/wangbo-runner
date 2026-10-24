@@ -104,13 +104,30 @@ export interface Holdings {
   network: Record<string, number>;
   /** 洗白累计抵掉的风险(洗白是持久效果) */
   laundered?: number;
+  /** 海外身份等级(跑路上岸次数):永久提高产出,不受清盘影响 */
+  prestige?: number;
 }
 
-/** 每分钟总收益(含人脉加成) */
+// ---- 跑路上岸:把国内产业清空换海外身份,永久加速下一轮 ----
+/** 家产到「一方诸侯」才跑得出去 */
+export const PRESTIGE_MIN_VALUE = 60000;
+/** 每级海外身份给的产出加成 */
+export const PRESTIGE_BONUS = 0.25;
+
+export function prestigeIncomeMul(h: Holdings): number {
+  return 1 + (h.prestige ?? 0) * PRESTIGE_BONUS;
+}
+
+/** 够不够跑路 */
+export function canPrestige(h: Holdings): boolean {
+  return totalAssetValue(h) >= PRESTIGE_MIN_VALUE;
+}
+
+/** 每分钟总收益(含人脉加成与海外身份) */
 export function incomePerMin(h: Holdings): number {
   const base = ASSETS.reduce((sum, a) => sum + a.incomePerMin * (h.assets[a.id] ?? 0), 0);
   const bonus = NETWORK.reduce((sum, n) => sum + n.incomeBonus * (h.network[n.id] ?? 0), 0);
-  return Math.round(base * (1 + bonus / 100));
+  return Math.round(base * (1 + bonus / 100) * prestigeIncomeMul(h));
 }
 
 /** 资产带来的原始风险 */

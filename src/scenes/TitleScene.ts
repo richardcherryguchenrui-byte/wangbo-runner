@@ -339,6 +339,8 @@ export default class TitleScene extends Phaser.Scene {
           const v = totalAssetValue({
             assets: p.assets ?? {}, network: p.network ?? {}, laundered: p.laundered ?? 0
           });
+          const pv = p.prestige ?? 0;
+          if (pv > 0) return v > 0 ? `家产 ${formatValue(v)} · Lv.${pv}` : `海外身份 Lv.${pv}`;
           return v > 0 ? `家产 ${formatValue(v)}` : '进屋看看';
         })(),
         onClick: () => this.scene.start('Assets')

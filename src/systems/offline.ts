@@ -20,7 +20,8 @@ export function collectOfflineIncome(nowMs = Date.now()): OfflineIncome {
   const h = {
     assets: p.assets ?? {},
     network: p.network ?? {},
-    laundered: p.laundered ?? 0
+    laundered: p.laundered ?? 0,
+    prestige: p.prestige ?? 0
   };
   const last = p.lastAccrualAt || 0;
   const elapsed = last > 0 ? nowMs - last : 0;
@@ -37,7 +38,8 @@ export function peekOfflineIncome(nowMs = Date.now()): OfflineIncome {
   const h = {
     assets: p.assets ?? {},
     network: p.network ?? {},
-    laundered: p.laundered ?? 0
+    laundered: p.laundered ?? 0,
+    prestige: p.prestige ?? 0
   };
   const last = p.lastAccrualAt || 0;
   const elapsed = last > 0 ? nowMs - last : 0;

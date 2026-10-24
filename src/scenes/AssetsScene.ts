@@ -33,6 +33,10 @@ import {
   assetLeaderboard,
   nextRival,
   bribeCost,
+  canPrestige,
+  PRESTIGE_MIN_VALUE,
+  PRESTIGE_BONUS,
+  prestigeIncomeMul,
   ASSET_PERK_SHORT,
   type WindDef,
   type Holdings
@@ -129,7 +133,8 @@ export default class AssetsScene extends Phaser.Scene {
     this.holdings = {
       assets: { ...(p.assets ?? {}) },
       network: { ...(p.network ?? {}) },
-      laundered: p.laundered ?? 0
+      laundered: p.laundered ?? 0,
+      prestige: p.prestige ?? 0
     };
     this.coins = p.coins;
     this.corrupt = p.corrupt ?? 0;
@@ -153,7 +158,8 @@ export default class AssetsScene extends Phaser.Scene {
     this.buildPlayer(p);
     this.buildInput();
     this.drawRoomButtons();
-    this.buildDailyPanel();
+    // 多了「跑路上岸」按钮时,今日任务面板往下让一格
+    this.buildDailyPanel(canPrestige(this.holdings) ? 40 : 0);
 
     this.collectOffline();
     this.refreshAll();
@@ -266,9 +272,9 @@ export default class AssetsScene extends Phaser.Scene {
     g.fillRoundedRect(857, 153, 90, 54, 3);
     g.fillStyle(0xff5c5c, 0.85);
     g.fillRect(857, 153, 90, 4);
-    this.tvText = this.add.text(902, 176, '', {
-      fontFamily: FONT, fontSize: '9px', color: '#e2e8f0', align: 'center',
-      wordWrap: { width: 82 }, resolution: 2
+    this.tvText = this.add.text(902, 178, '', {
+      fontFamily: FONT, fontSize: '8px', color: '#e2e8f0', align: 'center',
+      lineSpacing: 2, wordWrap: { width: 80, useAdvancedWrap: true }, resolution: 2
     }).setOrigin(0.5).setDepth(-16);
     this.time.addEvent({ delay: 6200, loop: true, callback: () => this.rotateNews() });
     this.rotateNews();
@@ -521,6 +527,7 @@ export default class AssetsScene extends Phaser.Scene {
 
   private washLabel!: Phaser.GameObjects.Text;
   private dailyText!: Phaser.GameObjects.Text;
+  private dailyPanelTop = 190;
   private dailyBar!: Phaser.GameObjects.Graphics;
 
   private drawRoomButtons() {
@@ -530,6 +537,9 @@ export default class AssetsScene extends Phaser.Scene {
       ['名人堂', 0x2d2350, () => this.showHall()],
       ['晒家产', 0x1d3350, () => this.shareAssets()]
     ];
+    if (canPrestige(this.holdings)) {
+      items.push(['跑路上岸', 0x5a1b1b, () => this.showPrestige()]);
+    }
     items.forEach(([label, color, fn], i) => {
       const x = 80;
       const y = 96 + i * 40;
@@ -550,9 +560,10 @@ export default class AssetsScene extends Phaser.Scene {
   }
 
   /** 房间里的小目标面板:今天该干什么,一眼看见 */
-  private buildDailyPanel() {
+  private buildDailyPanel(offset = 0) {
     const cx = 80;
-    const top = 190;
+    const top = 190 + offset;
+    this.dailyPanelTop = top;
     const g = this.add.graphics().setDepth(24);
     g.fillStyle(0x060d16, 0.72);
     g.fillRoundedRect(cx - 58, top, 116, 94, 12);
@@ -584,9 +595,10 @@ export default class AssetsScene extends Phaser.Scene {
     this.dailyText.setText(`添置 ${bHave}/${build.target}\n摆平 ${aHave}/${audit.target}\n完成 ${done}/${DAILY_TASKS.length}`);
     this.dailyBar.clear();
     this.dailyBar.fillStyle(0x1b2b3d, 0.95);
-    this.dailyBar.fillRoundedRect(32, 274, 96, 4, 2);
+    const barY = this.dailyPanelTop + 84;
+    this.dailyBar.fillRoundedRect(32, barY, 96, 4, 2);
     this.dailyBar.fillStyle(done >= DAILY_TASKS.length ? 0x69db7c : 0xffd43b, 0.95);
-    this.dailyBar.fillRoundedRect(32, 274, Math.max(3, 96 * (done / DAILY_TASKS.length)), 4, 2);
+    this.dailyBar.fillRoundedRect(32, barY, Math.max(3, 96 * (done / DAILY_TASKS.length)), 4, 2);
   }
 
   // ============================================================
@@ -794,6 +806,7 @@ export default class AssetsScene extends Phaser.Scene {
     p.assets = this.holdings.assets;
     p.network = this.holdings.network;
     p.laundered = this.holdings.laundered ?? 0;
+    p.prestige = this.holdings.prestige ?? 0;
     p.lastAccrualAt = Date.now();
     if (this.pendingBuilds > 0) { noteAssetBuild(p, this.pendingBuilds); this.pendingBuilds = 0; }
     if (this.pendingAudits > 0) { noteAuditHandled(p, this.pendingAudits); this.pendingAudits = 0; }
@@ -808,7 +821,8 @@ export default class AssetsScene extends Phaser.Scene {
     this.hudCoins.setText(String(Math.round(this.coins)));
     this.hudCorrupt.setText(formatValue(this.corrupt));
     this.hudIncome.setText(`${this.wind.name} · 黑金 +${incomePerMinWithWind(this.holdings, this.wind)}/分`);
-    this.hudTitle.setText(`${title.name} · 家产 ${formatValue(value)}`);
+    const pv = this.holdings.prestige ?? 0;
+    this.hudTitle.setText(`${title.name} · 家产 ${formatValue(value)}${pv > 0 ? ` · 海外身份 Lv.${pv}` : ''}`);
     if (this.washLabel) {
       const risk0 = netRisk(this.holdings);
       this.washLabel.setText(risk0 > 0 ? `洗白 -${formatValue(launderCost(this.holdings))} 黑金` : '洗白账目');
@@ -865,15 +879,22 @@ export default class AssetsScene extends Phaser.Scene {
     if (!this.tvText) return;
     const risk = netRiskWithWind(this.holdings, this.wind);
     if (risk >= 70) {
+      const hot = [
+        '突发\n某干部被带走',
+        '突发\n巡视组连夜进驻',
+        '突发\n项目账目被调走',
+        '突发\n实名举报已受理'
+      ];
       this.tvText.setColor('#ff8787');
-      this.tvText.setText('本市新闻\n' + newsFor(true, Math.random()));
+      this.tvText.setText(hot[this.newsIndex % hot.length]);
+      this.newsIndex += 1;
       return;
     }
     const lines = [
-      '新闻联播\n本市经济持续向好',
-      '新闻联播\n又有干部「主动投案」',
-      '新闻联播\n巡视组明日进驻本市',
-      '新闻联播\n重点项目集中开工'
+      '新闻\n经济持续向好',
+      '新闻\n又有人主动投案',
+      '新闻\n巡视组明日进驻',
+      '新闻\n重点项目开工'
     ];
     this.tvText.setColor('#e2e8f0');
     this.tvText.setText(lines[this.newsIndex % lines.length]);
@@ -1292,6 +1313,85 @@ export default class AssetsScene extends Phaser.Scene {
     const hit = this.add.rectangle(GAME_WIDTH / 2, 406, 200, 44, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
     layer.add(hit);
     hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); layer.destroy(true); });
+  }
+
+  /** 跑路上岸:清盘换海外身份,永久 +25% 产出 —— 长线追求 */
+  private showPrestige() {
+    const value = totalAssetValue(this.holdings);
+    const pv = this.holdings.prestige ?? 0;
+    const layer = this.markOverlay(this.add.container(0, 0).setDepth(this.overlayDepth + 15));
+    layer.add(this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x02060c, 0.88).setInteractive());
+    const panel = this.add.graphics();
+    panel.fillStyle(0x140a1c, 0.98);
+    panel.fillRoundedRect(GAME_WIDTH / 2 - 280, 96, 560, 344, 22);
+    panel.lineStyle(2, 0xffa8a8, 0.6);
+    panel.strokeRoundedRect(GAME_WIDTH / 2 - 280, 96, 560, 344, 22);
+    layer.add(panel);
+    layer.add(this.add.text(GAME_WIDTH / 2, 132, '跑路上岸', {
+      fontFamily: FONT, fontSize: '28px', color: '#ff8787', fontStyle: 'bold',
+      resolution: 2, stroke: '#08131f', strokeThickness: 5
+    }).setOrigin(0.5));
+    layer.add(this.add.text(GAME_WIDTH / 2, 168, '护照、机票、海外账户都备好了', {
+      fontFamily: FONT, fontSize: '13px', color: '#e2b6b6', resolution: 2
+    }).setOrigin(0.5));
+    const rows: [string, string][] = [
+      ['清空', `全部产业与人脉(家产 ${formatValue(value)} 归零)`],
+      ['保留', `银币 ${Math.round(this.coins)} 与所有闯关进度`],
+      ['换到', `海外身份 Lv.${pv + 1} · 产出永久 +${Math.round(PRESTIGE_BONUS * 100)}%`]
+    ];
+    rows.forEach(([k, v], i) => {
+      const y = 208 + i * 34;
+      layer.add(this.add.text(GAME_WIDTH / 2 - 244, y, k, {
+        fontFamily: FONT, fontSize: '13px', color: '#ffe066', fontStyle: 'bold', resolution: 2
+      }));
+      layer.add(this.add.text(GAME_WIDTH / 2 - 190, y, v, {
+        fontFamily: FONT, fontSize: '12px', color: '#cfe3ff', resolution: 2
+      }));
+    });
+    layer.add(this.add.text(GAME_WIDTH / 2, 322, `海外身份每级 +${Math.round(PRESTIGE_BONUS * 100)}% 产出,下一轮攒得更快`, {
+      fontFamily: FONT, fontSize: '11px', color: '#8ba9c7', resolution: 2
+    }).setOrigin(0.5));
+
+    const mk = (bx: number, label: string, primary: boolean, fn: () => void) => {
+      const w = 190; const h = 46; const by = 374;
+      const g = this.add.graphics();
+      g.fillStyle(primary ? 0xd9480f : 0x16324f, 0.95);
+      g.fillRoundedRect(bx - w / 2, by - h / 2, w, h, h / 2);
+      g.lineStyle(2, primary ? 0xffd8a8 : 0xffffff, primary ? 0.9 : 0.2);
+      g.strokeRoundedRect(bx - w / 2, by - h / 2, w, h, h / 2);
+      layer.add(g);
+      layer.add(this.add.text(bx, by, label, {
+        fontFamily: FONT, fontSize: '15px', color: primary ? '#fff3e0' : '#cfe3ff', fontStyle: 'bold', resolution: 2
+      }).setOrigin(0.5));
+      const hit = this.add.rectangle(bx, by, w, h, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
+      layer.add(hit);
+      hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); layer.destroy(true); fn(); });
+    };
+    const backdrop = layer.list[0] as Phaser.GameObjects.Rectangle;
+    backdrop.on('pointerdown', () => layer.destroy(true));
+    mk(GAME_WIDTH / 2 - 104, '再等等', false, () => {});
+    mk(GAME_WIDTH / 2 + 104, '走', true, () => this.doPrestige());
+    playSfx(this, 'warn', 0.4);
+  }
+
+  private doPrestige() {
+    const pv = (this.holdings.prestige ?? 0) + 1;
+    this.holdings = { assets: {}, network: {}, laundered: 0, prestige: pv };
+    this.corrupt = 0;
+    const p = loadProgress();
+    p.assets = {};
+    p.network = {};
+    p.laundered = 0;
+    p.corrupt = 0;
+    p.prestige = pv;
+    p.coins = this.coins;
+    p.lastAccrualAt = Date.now();
+    saveProgress(p);
+    playSfx(this, 'promote', 0.5);
+    shake(this, 0.01, 320);
+    confettiBurst(this, GAME_WIDTH / 2, FLOOR_TOP - 30, 24);
+    this.toast(`跑路成功 · 海外身份 Lv.${pv} · 产出 +${Math.round(pv * PRESTIGE_BONUS * 100)}%`, '#ff8787', 'ui-image');
+    this.scene.restart();
   }
 
   private showHall() {

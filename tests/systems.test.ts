@@ -27,6 +27,7 @@ import {
   WINDS, WIND_WINDOW_MS, currentWind, incomePerMinWithWind, netRiskWithWind,
   ASSET_TITLES, assetTitle, newsFor, RIVALS, assetLeaderboard, nextRival,
   quoteCost, canAfford, bribeCost, launderYield, assetTier,
+  canPrestige, prestigeIncomeMul, PRESTIGE_MIN_VALUE, PRESTIGE_BONUS,
   type Holdings
 } from '../src/systems/assets';
 import {
@@ -1490,6 +1491,22 @@ describe('双货币体系', () => {
     expect(launderCost(hot)).toBeGreaterThan(launderCost(h));
     // 干净账目没有可洗的东西
     expect(launderYield({ assets: {}, network: {}, laundered: 0 })).toBe(0);
+  });
+
+  it('海外身份:清盘换永久产出加成', () => {
+    const h: Holdings = { assets: { mine: 4 }, network: {}, laundered: 0 };
+    const base = incomePerMin(h);
+    const p1: Holdings = { ...h, prestige: 1 };
+    const p3: Holdings = { ...h, prestige: 3 };
+    expect(incomePerMin(p1)).toBe(Math.round(base * (1 + PRESTIGE_BONUS)));
+    expect(incomePerMin(p3)).toBe(Math.round(base * (1 + 3 * PRESTIGE_BONUS)));
+    expect(prestigeIncomeMul({ assets: {}, network: {} })).toBe(1);
+    // 门票:家产到门槛才跑得出去
+    expect(canPrestige({ assets: { purse: 1 }, network: {} })).toBe(false);
+    expect(canPrestige({ assets: {}, network: {}, prestige: 2 })).toBe(false);
+    const rich: Holdings = { assets: { estate: 8, mine: 8, offshore: 8 }, network: {} };
+    expect(totalAssetValue(rich)).toBeGreaterThanOrEqual(PRESTIGE_MIN_VALUE);
+    expect(canPrestige(rich)).toBe(true);
   });
 
   it('头衔档位随家产总值单调上升', () => {
