@@ -8,6 +8,7 @@ import { loadControls } from '../systems/controls';
 import { LEVELS, totalStars } from '../systems/levels';
 import { totalAssetValue, formatValue } from '../systems/assets';
 import { collectOfflineIncome, formatDuration } from '../systems/offline';
+import { nextStep } from '../systems/hints';
 import { checkIn } from '../systems/daily';
 import { hasCustomHead } from '../systems/customhead';
 import { RUN_RANKS } from '../systems/ranks';
@@ -366,11 +367,35 @@ export default class TitleScene extends Phaser.Scene {
       hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); it.onClick(); });
     });
 
-    // 底部提示
-    const pad = loadControls().virtualButtons;
-    this.add.text(px + pw / 2, 452, pad ? '点「继续闯关」开始 · D 每日挑战' : '空格进无尽模式 · D 每日挑战 · ↓ 滑铲', {
-      fontFamily: FONT, fontSize: '11px', color: '#cfe3ff'
-    }).setOrigin(0.5).setDepth(10).setAlpha(0.92);
+    // 下一步提示:点一下直接去该去的地方
+    {
+      const step = nextStep(p);
+      if (step) {
+        const y = 450;
+        const w = pw - 32;
+        const g = this.add.graphics().setDepth(10);
+        g.fillStyle(step.tone === 'urgent' ? 0x3a1a20 : 0x122c40, 0.92);
+        g.fillRoundedRect(px + 16, y - 15, w, 30, 10);
+        g.lineStyle(1.2, step.tone === 'urgent' ? 0xff8787 : 0x74c0fc, 0.4);
+        g.strokeRoundedRect(px + 16, y - 15, w, 30, 10);
+        this.add.image(px + 32, y, step.tone === 'urgent' ? 'ui-siren' : 'ui-tips')
+          .setDisplaySize(14, 14).setDepth(11);
+        const t = this.add
+          .text(px + 46, y, step.text, {
+            fontFamily: FONT, fontSize: '11px',
+            color: step.tone === 'urgent' ? '#ff8787' : '#b7cfe8', resolution: 2
+          })
+          .setOrigin(0, 0.5)
+          .setDepth(11);
+        const hit = this.add
+          .rectangle(px + pw / 2, y, w, 30, 0xffffff, 0.001)
+          .setDepth(12)
+          .setInteractive({ useHandCursor: true });
+        hit.on('pointerover', () => t.setColor('#ffe066'));
+        hit.on('pointerout', () => t.setColor(step.tone === 'urgent' ? '#ff8787' : '#b7cfe8'));
+        hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); this.scene.start(step.scene); });
+      }
+    }
   }
 
   // 回访钩子:一进游戏先把离线期间的家产收益结算掉并报喜

@@ -19,6 +19,7 @@ import {
 import { generatePattern, stageFor, FLYER_Y } from '../src/systems/patterns';
 import { isPerfectSlideTiming, tightSlideIndex } from '../src/systems/slideJudge';
 import { formatDuration } from '../src/systems/offline';
+import { nextStep } from '../src/systems/hints';
 import {
   ASSETS, NETWORK, nextCost, incomePerMin, rawRisk, protection, netRisk, auditShield,
   accrueOffline, resolveAudit, launderCost, launderEffect, MAX_OFFLINE_MS,
@@ -1340,5 +1341,60 @@ describe('离线收益结算', () => {
     expect(formatDuration(45 * 60 * 1000)).toBe('45 分钟');
     expect(formatDuration(2 * 60 * 60 * 1000)).toBe('2 小时');
     expect(formatDuration((2 * 60 + 30) * 60 * 1000)).toBe('2 小时 30 分');
+  });
+});
+
+// 「下一步做什么」提示
+describe('下一步提示', () => {
+  const mk = (over: Record<string, unknown> = {}) => {
+    const p = JSON.parse(JSON.stringify({
+      coins: 0, totalDodged: 0, owned: [], pendant: '', extraLives: 0, skin: '',
+      bribeMoon: 0, saveVersion: 2, bestTimeMs: 0, bestDodged: 0, bestCombo: 0,
+      totalRuns: 0, totalTimeMs: 0, totalKills: 0, totalPickups: 0, totalSpent: 0,
+      inspectionsSurvived: 0, achievements: [], daily: null, lastLoginDate: '',
+      loginStreak: 0, pistolLevel: 0, bribeCarryLevel: 0, tutorialDone: false,
+      bestRankIndex: 0, missionsDone: 0, overdrives: 0, nearMisses: 0, dailyPlays: 0,
+      levelStars: {}, levelClears: 0, perfectSlides: 0, starMilestones: [],
+      dungeonCleared: {}, redeemBonus: 0,
+      assets: {}, network: {}, laundered: 0, lastAccrualAt: 0, lastAuditAt: 0,
+      auditsSurvived: 0, assetsSeized: 0, assetsIntroDone: true
+    }));
+    return { ...p, ...over };
+  };
+
+  it('没有家产时提示去盖产业', () => {
+    const r = nextStep(mk());
+    expect(r?.scene).toBe('Assets');
+    expect(r?.text).toContain('第一项产业');
+  });
+
+  it('风险过高优先提示洗白', () => {
+    const r = nextStep(mk({ assets: { estate: 6 } }));
+    expect(r?.scene).toBe('Assets');
+    expect(r?.tone).toBe('urgent');
+    expect(r?.text).toContain('被查风险');
+  });
+
+  it('有家产后提示去打通主线', () => {
+    const r = nextStep(mk({ assets: { purse: 3 } }));
+    expect(r?.scene).toBe('Campaign');
+    expect(r?.text).toContain('还没过');
+  });
+
+  it('主线满星后提示清每日任务', () => {
+    const stars: Record<string, number> = {};
+    LEVELS.forEach(l => { stars[l.id] = 3; });
+    const r = nextStep(mk({ assets: { purse: 3 }, levelStars: stars }));
+    expect(r?.scene).toBe('Quest');
+  });
+
+  it('提示永远带场景与文案', () => {
+    const cases = [mk(), mk({ assets: { purse: 2 } }), mk({ assets: { estate: 6 } })];
+    cases.forEach(p => {
+      const r = nextStep(p);
+      expect(r).not.toBe(null);
+      expect(r!.text.length).toBeGreaterThan(3);
+      expect(['Assets', 'Campaign', 'Quest']).toContain(r!.scene);
+    });
   });
 });
