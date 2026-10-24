@@ -405,6 +405,20 @@ export default class ResultScene extends Phaser.Scene {
     homeBtn.text.setDepth(25);
     homeBtn.icon?.setDepth(25);
 
+    // 银币有富余:直接把玩家领回家花掉(跑酷 → 置办产业的闭环)
+    if (p.coins >= 60) {
+      const link = this.add
+        .text(GAME_WIDTH / 2, 472, '回家置办产业 →', {
+          fontFamily: FONT, fontSize: '13px', color: '#ffd43b', fontStyle: 'bold',
+          resolution: 2, stroke: '#08131f', strokeThickness: 4
+        })
+        .setOrigin(0.5)
+        .setDepth(25)
+        .setInteractive({ useHandCursor: true });
+      this.tweens.add({ targets: link, alpha: 0.62, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      link.on('pointerdown', () => this.scene.start('Assets'));
+    }
+
     const hint = this.add
       .text(GAME_WIDTH / 2, 499, this.daily ? '空格再来一局(保持今日挑战) · ESC 回主菜单' : '空格再来一局 · ESC 回主菜单', {
         fontFamily: FONT, fontSize: '10px', color: '#9db8d8', resolution: 2

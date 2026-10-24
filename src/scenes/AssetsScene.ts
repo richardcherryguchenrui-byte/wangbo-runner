@@ -113,6 +113,8 @@ export default class AssetsScene extends Phaser.Scene {
   private overlayDepth = 120;
   private pendingAuditShow: (() => void) | null = null;
   private visitorUsed = false;
+  /** 地上散落的黑金:产业每次进账会掉一点,走过去就捡起来 */
+  private drops: { img: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image; amount: number }[] = [];
 
   constructor() {
     super('Assets');
@@ -152,11 +154,12 @@ export default class AssetsScene extends Phaser.Scene {
 
     this.collectOffline();
     this.refreshAll();
-    addMenuFooter(this, 'A/D 走动 · 靠近家具或客人按 E 交互 · 银币置办,黑金升级');
+    addMenuFooter(this, 'A/D 走动 · 地上掉的黑金走过去就捡 · 靠近家具/客人按 E 交互');
     this.homeGift();
     this.maybeShowIntro(p);
     this.maybeAudit(p);
     this.time.delayedCall(2200, () => this.maybeVisitor());
+    this.time.addEvent({ delay: 7600, loop: true, callback: () => this.spawnDrop() });
   }
 
   // ============================================================
@@ -630,6 +633,7 @@ export default class AssetsScene extends Phaser.Scene {
       moving = true;
     }
     this.playerShadow.x = this.player.x;
+    this.collectDrops();
     if (moving && !this.runAnim) {
       this.runAnim = true;
       if (this.anims.exists('home-run')) this.player.play('home-run');
@@ -837,6 +841,59 @@ export default class AssetsScene extends Phaser.Scene {
   // ============================================================
   // 离线 / 审查 / 引导 / 名人堂 / 分享
   // ============================================================
+
+  // ---- 地上的钱:走动就能捡,主动玩比干等着赚得快 ----
+  private moneyPerDrop(): number {
+    return Math.max(25, Math.round(incomePerMinWithWind(this.holdings, this.wind) * 0.08));
+  }
+
+  private spawnDrop() {
+    if (this.overlayOpenCount() > 0) return;
+    if (this.drops.length >= 5) return;
+    if (incomePerMinWithWind(this.holdings, this.wind) <= 0) return;
+    const x = Phaser.Math.Between(70, GAME_WIDTH - 70);
+    const y = 508;
+    const glow = this.add.image(x, y, 'spark').setDepth(10).setTint(0xffd43b)
+      .setDisplaySize(34, 22).setAlpha(0.32);
+    const img = this.add.image(x, y, 'coin').setDisplaySize(18, 18).setDepth(11);
+    this.tweens.add({ targets: [img, glow], y: y - 4, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    this.drops.push({ img, glow, amount: this.moneyPerDrop() });
+  }
+
+  private collectDrops() {
+    for (let i = this.drops.length - 1; i >= 0; i--) {
+      const d = this.drops[i];
+      if (Math.abs(d.img.x - this.player.x) > 24) continue;
+      this.corrupt += d.amount;
+      this.drops.splice(i, 1);
+      this.tweens.killTweensOf([d.img, d.glow]);
+      this.tweens.add({
+        targets: [d.img, d.glow], y: d.img.y - 26, alpha: 0, duration: 320,
+        onComplete: () => { d.img.destroy(); d.glow.destroy(); }
+      });
+      const pop = this.add.text(d.img.x, d.img.y - 18, `+${formatValue(d.amount)}`, {
+        fontFamily: FONT, fontSize: '13px', color: '#ffe066', fontStyle: 'bold',
+        resolution: 2, stroke: '#08131f', strokeThickness: 4
+      }).setOrigin(0.5).setDepth(60);
+      this.tweens.add({ targets: pop, y: pop.y - 26, alpha: 0, duration: 700, onComplete: () => pop.destroy() });
+      playSfx(this, 'coin', 0.3, 1.25);
+      this.persistLight();
+    }
+  }
+
+  /** 轻量存档:只写黑金,不整页刷新(捡钱太频繁) */
+  private persistLight() {
+    const p = loadProgress();
+    p.coins = this.coins;
+    p.corrupt = this.corrupt;
+    p.assets = this.holdings.assets;
+    p.network = this.holdings.network;
+    p.laundered = this.holdings.laundered ?? 0;
+    p.lastAccrualAt = Date.now();
+    saveProgress(p);
+    this.hudCoins.setText(String(Math.round(this.coins)));
+    this.hudCorrupt.setText(formatValue(this.corrupt));
+  }
 
   // ---- 随机事件:上门送礼的老板(赌一把) ----
   private maybeVisitor() {
@@ -1147,7 +1204,7 @@ export default class AssetsScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '26px', color: '#ffe066', fontStyle: 'bold', resolution: 2
     }).setOrigin(0.5));
     const steps: [string, string][] = [
-      ['① 走动与交互', 'A/D 或方向键走动,靠近家具或客人按 E 交互'],
+      ['① 走动、捡钱、谈事', 'A/D 走动,地上的黑金走过去自动捡;靠近家具或客人按 E 交互'],
       ['② 两套钱', '银币(跑酷挣)置办新产业/结交人脉;黑金(产业产出)升级产业'],
       ['③ 别被查', '风险高了就洗白:花黑金降风险,还能洗出一笔明面银币']
     ];
