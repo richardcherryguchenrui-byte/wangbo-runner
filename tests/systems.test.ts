@@ -26,7 +26,7 @@ import {
   assetPerks, totalAssetValue, ASSET_PERK_TEXT, EMPTY_PERKS,
   WINDS, WIND_WINDOW_MS, currentWind, incomePerMinWithWind, netRiskWithWind,
   ASSET_TITLES, assetTitle, newsFor, RIVALS, assetLeaderboard, nextRival,
-  quoteCost, canAfford, bribeCost,
+  quoteCost, canAfford, bribeCost, launderYield, assetTier,
   type Holdings
 } from '../src/systems/assets';
 import {
@@ -1478,5 +1478,26 @@ describe('双货币体系', () => {
     expect(bribeCost(0)).toBe(80);      // 最低 80
     const h: Holdings = { assets: { estate: 2 }, network: {}, laundered: 0 };
     expect(launderCost(h)).toBeGreaterThan(0);
+  });
+
+  it('洗白能把一部分赃款洗成明面银币', () => {
+    const h: Holdings = { assets: { mine: 3 }, network: {}, laundered: 0 };
+    const cost = launderCost(h);
+    expect(launderYield(h)).toBe(Math.round(cost * 0.45));
+    // 风险越高,洗一次能洗出来的银子也越多,但成本涨得更快
+    const hot: Holdings = { assets: { mine: 6 }, network: {}, laundered: 0 };
+    expect(launderYield(hot)).toBeGreaterThan(launderYield(h));
+    expect(launderCost(hot)).toBeGreaterThan(launderCost(h));
+    // 干净账目没有可洗的东西
+    expect(launderYield({ assets: {}, network: {}, laundered: 0 })).toBe(0);
+  });
+
+  it('头衔档位随家产总值单调上升', () => {
+    expect(assetTier(0)).toBe(0);
+    expect(assetTier(3000)).toBe(1);
+    expect(assetTier(15000)).toBe(2);
+    expect(assetTier(60000)).toBe(3);
+    expect(assetTier(200000)).toBe(4);
+    expect(assetTier(-5)).toBe(0);
   });
 });

@@ -233,6 +233,11 @@ export function bribeCost(risk: number): number {
   return Math.max(80, Math.round(risk * 20));
 }
 
+/** 洗白能「洗干净」多少银币:赃款过一道壳公司,变成看得见的合法收入 */
+export function launderYield(h: Holdings): number {
+  return Math.round(launderCost(h) * 0.45);
+}
+
 /** 洗白效果:抵掉当前净风险的 30%(至少 1 点) */
 export function launderEffect(h: Holdings): number {
   const risk = netRisk(h);
@@ -383,6 +388,13 @@ export const ASSET_TITLES: AssetTitle[] = [
   { name: '一方诸侯', color: '#b197fc', minValue: 60000 },
   { name: '隐形富豪', color: '#ffd43b', minValue: 150000 }
 ];
+
+/** 头衔档位 0~4:用来驱动房间豪华度(越有钱,屋子越讲究) */
+export function assetTier(value: number): number {
+  let tier = 0;
+  ASSET_TITLES.forEach((t, i) => { if (value >= t.minValue) tier = i; });
+  return tier;
+}
 
 export function assetTitle(value: number): AssetTitle {
   let out = ASSET_TITLES[0];

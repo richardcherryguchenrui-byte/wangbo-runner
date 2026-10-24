@@ -23,8 +23,10 @@ import {
   resolveAudit,
   launderCost,
   launderEffect,
+  launderYield,
   currentWind,
   assetTitle,
+  assetTier,
   totalAssetValue,
   formatValue,
   newsFor,
@@ -139,7 +141,7 @@ export default class AssetsScene extends Phaser.Scene {
     this.wind = currentWind(Date.now()).wind;
 
     buildMenuBackdrop(this, { mood: 'night' });
-    this.buildRoom();
+    this.buildRoom(assetTier(totalAssetValue(this.holdings)));
     this.buildHud();
     this.buildFurniture();
     this.buildNpcs();
@@ -159,20 +161,27 @@ export default class AssetsScene extends Phaser.Scene {
   // 房间
   // ============================================================
 
-  private buildRoom() {
+  private buildRoom(tier: number) {
     const g = this.add.graphics().setDepth(-20);
     const wallH = FLOOR_TOP - WALL_TOP;
     for (let i = 0; i < 12; i++) {
       g.fillStyle(this.mix(0x1c2436, 0x0b1119, i / 11), 1);
       g.fillRect(0, WALL_TOP + (wallH / 12) * i, GAME_WIDTH, wallH / 12 + 1);
     }
-    // 地板:近深远浅,拉出一点透视
-    g.fillStyle(0x2c1f12, 1);
+    // 地板:近深远浅,拉出一点透视(家产越高,地板越讲究)
+    const floorA = this.mix(0x2c1f12, 0x3d2a12, tier / 4);
+    const floorB = this.mix(0x4d3821, 0x6b4a1c, tier / 4);
+    g.fillStyle(floorA, 1);
     g.fillRect(0, FLOOR_TOP, GAME_WIDTH, FLOOR_BOTTOM - FLOOR_TOP);
-    g.fillStyle(0x4d3821, 1);
+    g.fillStyle(floorB, 1);
     g.fillRect(0, FLOOR_TOP, GAME_WIDTH, 4);
-    g.fillStyle(0x3a2a18, 1);
+    g.fillStyle(floorA, 1);
     g.fillRect(0, FLOOR_TOP + 4, GAME_WIDTH, 26);
+    if (tier >= 3) {
+      // 高级木地板:打蜡反光
+      g.fillStyle(0xffd43b, 0.05);
+      g.fillEllipse(GAME_WIDTH / 2, FLOOR_TOP + 46, 700, 40);
+    }
     g.lineStyle(1, 0x221708, 0.55);
     for (let x = -40; x < GAME_WIDTH + 40; x += 64) {
       g.lineBetween(x, FLOOR_TOP, x + 14, FLOOR_BOTTOM);
@@ -196,7 +205,8 @@ export default class AssetsScene extends Phaser.Scene {
       g.fillRect(bx, wy + wh - bh - 6, bw, bh);
       g.fillStyle(0xffe066, 0.4);
       for (let r = 0; r < Math.floor(bh / 14); r++) {
-        if ((i + r) % 3 === 0) continue;
+        // 越有钱,窗外的楼越亮(城市在你脚下)
+        if ((i + r) % (5 - Math.min(3, tier)) === 0) continue;
         g.fillRect(bx + 3, wy + wh - bh - 2 + r * 14, 4, 5);
       }
     }
@@ -259,11 +269,41 @@ export default class AssetsScene extends Phaser.Scene {
       g.fillEllipse(912 + Math.cos(a) * 16, 422 + Math.sin(a) * 12, 16, 22);
     }
 
-    // 地毯(角色活动区)
-    g.fillStyle(0x5a2230, 0.34);
+    // 地毯(角色活动区):家产越高越红金
+    g.fillStyle(this.mix(0x5a2230, 0x7a1f24, tier / 4), 0.34 + tier * 0.03);
     g.fillEllipse(GAME_WIDTH / 2, 500, 640, 46);
-    g.fillStyle(0x6b2a3a, 0.2);
+    g.fillStyle(0x6b2a3a, 0.18 + tier * 0.02);
     g.fillEllipse(GAME_WIDTH / 2, 500, 560, 34);
+    if (tier >= 1) {
+      g.lineStyle(2, 0xffd43b, 0.18 + tier * 0.04);
+      g.strokeEllipse(GAME_WIDTH / 2, 500, 640, 46);
+    }
+    if (tier >= 3) {
+      g.lineStyle(2, 0xffd43b, 0.22);
+      g.strokeEllipse(GAME_WIDTH / 2, 500, 520, 32);
+    }
+
+    // 壁灯:幕后老板以上才装得起
+    if (tier >= 2) {
+      [372, 574].forEach(sx => {
+        g.fillStyle(0x3a2a18, 1);
+        g.fillRoundedRect(sx - 6, 150, 12, 34, 4);
+        g.fillStyle(0xffe066, 0.85);
+        g.fillRoundedRect(sx - 14, 182, 28, 8, 4);
+        const halo = this.add.image(sx, 190, 'spark').setDepth(-18).setTint(0xffe066)
+          .setAlpha(0.16).setDisplaySize(120, 130);
+        this.tweens.add({ targets: halo, alpha: 0.08, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      });
+    }
+    // 水晶吊灯:一方诸侯以上
+    if (tier >= 4) {
+      g.fillStyle(0xffe066, 0.9);
+      g.fillRect(456, 94, 36, 4);
+      for (let i = 0; i < 5; i++) {
+        g.fillStyle(0xfff3bf, 0.85);
+        g.fillTriangle(462 + i * 6, 98, 466 + i * 6, 112 + (i % 2) * 4, 458 + i * 6, 112 + (i % 2) * 4);
+      }
+    }
   }
 
   private mix(a: number, b: number, k: number): number {
@@ -456,6 +496,8 @@ export default class AssetsScene extends Phaser.Scene {
     mkBtn(GAME_WIDTH - 46, y, 30, 'E', () => this.interact());
   }
 
+  private washLabel!: Phaser.GameObjects.Text;
+
   private drawRoomButtons() {
     // 墙面左侧竖排三个功能入口
     const items: [string, number, () => void][] = [
@@ -473,9 +515,10 @@ export default class AssetsScene extends Phaser.Scene {
       g.fillRoundedRect(x - 56, y - 12, 112, 24, 12);
       g.lineStyle(1.2, 0xffffff, 0.2);
       g.strokeRoundedRect(x - 58, y - 14, 116, 28, 14);
-      this.add.text(x, y, label, {
+      const txt = this.add.text(x, y, label, {
         fontFamily: FONT, fontSize: '12px', color: '#ffffff', fontStyle: 'bold', resolution: 2
       }).setOrigin(0.5).setDepth(25);
+      if (i === 0) this.washLabel = txt;
       const hit = this.add.rectangle(x, y, 116, 28, 0xffffff, 0.001).setDepth(26).setInteractive({ useHandCursor: true });
       hit.on('pointerdown', () => { playSfx(this, 'click', 0.3); fn(); });
     });
@@ -567,6 +610,22 @@ export default class AssetsScene extends Phaser.Scene {
     showToast(this, GAME_WIDTH / 2, 300, msg, color, icon);
   }
 
+  /** 在某个交互物头上冒一句话 */
+  private sayAbove(it: Interactable, line: string) {
+    const bubble = this.add.text(it.x, it.y - (it.kind === 'asset' ? 76 : 56), line, {
+      fontFamily: FONT, fontSize: '11px', color: '#0b1220', fontStyle: 'bold', resolution: 2,
+      backgroundColor: '#ffe8a3', padding: { x: 7, y: 4 }
+    }).setOrigin(0.5, 1).setDepth(50).setAlpha(0);
+    this.tweens.add({ targets: bubble, alpha: 1, y: bubble.y - 6, duration: 200 });
+    this.time.delayedCall(1800, () => {
+      this.tweens.add({ targets: bubble, alpha: 0, duration: 260, onComplete: () => bubble.destroy() });
+    });
+  }
+
+  private itemAt(kind: Interactable['kind'], id: string): Interactable | undefined {
+    return this.interactables.find(it => it.kind === kind && it.id === id);
+  }
+
   private buyAsset(id: string) {
     const a = ASSETS.find(x => x.id === id);
     if (!a) return;
@@ -588,12 +647,24 @@ export default class AssetsScene extends Phaser.Scene {
     this.pendingBuilds += 1;
     playSfx(this, cur === 0 ? 'unlock' : 'coin', 0.45, cur === 0 ? 1 : 1.12);
     const idx = ASSETS.indexOf(a);
+    const it = this.itemAt('asset', id);
     if (cur === 0) {
       confettiBurst(this, FURNITURE_X[idx], FURNITURE_BASE, 16);
       this.toast(`置办了「${a.name}」· 开始产黑金`, '#ffe066', 'ui-shop');
+      if (it) {
+        // 家具从天上落地
+        const targetY = it.icon.y;
+        it.icon.setY(targetY - 60).setAlpha(1);
+        this.tweens.add({ targets: it.icon, y: targetY, duration: 420, ease: 'Bounce.out' });
+        this.sayAbove(it, a.desc);
+      }
     } else {
       confettiBurst(this, FURNITURE_X[idx], FURNITURE_BASE, 8);
       this.toast(`「${a.name}」升到 Lv.${cur + 1} · 产出更高`, '#ffe066', ASSET_ICONS[id]);
+      if (it) {
+        this.tweens.add({ targets: it.icon, scale: it.icon.scale * 1.18, duration: 110, yoyo: true, ease: 'Quad.out' });
+        this.sayAbove(it, ASSET_PERK_SHORT[id] ? `干得更大了 · ${ASSET_PERK_SHORT[id]}` : a.desc);
+      }
     }
     this.persist();
   }
@@ -617,6 +688,12 @@ export default class AssetsScene extends Phaser.Scene {
     this.pendingBuilds += 1;
     playSfx(this, 'unlock', 0.4);
     this.toast(`和「${n.name}」吃上了饭 · Lv.${cur + 1}`, '#b197fc', 'ui-person');
+    const it = this.itemAt('network', id);
+    if (it) {
+      const lines = ['有事您说话', '这不算什么,应该的', '我记着您的好', '下回还得请您喝酒', '放心,我嘴严'];
+      this.sayAbove(it, lines[Math.min(lines.length - 1, cur)]);
+      this.tweens.add({ targets: it.icon, y: it.icon.y - 6, duration: 160, yoyo: true, ease: 'Quad.out' });
+    }
     this.persist();
   }
 
@@ -629,10 +706,13 @@ export default class AssetsScene extends Phaser.Scene {
       return;
     }
     const eff = launderEffect(this.holdings);
+    const clean = launderYield(this.holdings);
     this.corrupt -= cost;
+    this.coins += clean;
     this.holdings.laundered = (this.holdings.laundered ?? 0) + eff;
     playSfx(this, 'shield', 0.45);
-    this.toast(`账做平了 · 被查风险 -${eff}`, '#8ce99a', 'ui-check');
+    playSfx(this, 'coin', 0.35, 1.2);
+    this.toast(`账做平了 · 风险 -${eff} · 洗出 ${clean} 银币`, '#8ce99a', 'ui-check');
     this.persist();
   }
 
@@ -661,6 +741,10 @@ export default class AssetsScene extends Phaser.Scene {
     this.hudCorrupt.setText(formatValue(this.corrupt));
     this.hudIncome.setText(`${this.wind.name} · 黑金 +${incomePerMinWithWind(this.holdings, this.wind)}/分`);
     this.hudTitle.setText(`${title.name} · 家产 ${formatValue(value)}`);
+    if (this.washLabel) {
+      const risk0 = netRisk(this.holdings);
+      this.washLabel.setText(risk0 > 0 ? `洗白 -${formatValue(launderCost(this.holdings))} 黑金` : '洗白账目');
+    }
 
     const risk = netRiskWithWind(this.holdings, this.wind);
     this.hudRisk.setText(`被查风险 ${risk}/100`);
@@ -678,7 +762,14 @@ export default class AssetsScene extends Phaser.Scene {
       const lv = isAsset ? (this.holdings.assets[it.id] ?? 0) : (this.holdings.network[it.id] ?? 0);
       const q = quoteCost(def, lv);
       const money = q ? (q.currency === 'coin' ? `${q.amount} 银币` : `${formatValue(q.amount)} 黑金`) : '';
-      it.label.setText(lv > 0 ? `${def.name} Lv.${lv}` : def.name);
+      if (isAsset) {
+        const a = def as typeof ASSETS[number];
+        const per = Math.round(a.incomePerMin * lv * (1 + NETWORK.reduce((sum, n) => sum + n.incomeBonus * (this.holdings.network[n.id] ?? 0), 0) / 100));
+        it.label.setText(lv > 0 ? `${def.name} Lv.${lv} · ${per}/分` : def.name);
+      } else {
+        const n = def as typeof NETWORK[number];
+        it.label.setText(lv > 0 ? `${def.name} Lv.${lv} · 护${n.protection * lv}` : def.name);
+      }
       it.label.setColor(lv > 0 ? (isAsset ? '#ffe066' : '#b197fc') : '#66788f');
       it.icon.setAlpha(lv > 0 ? 1 : 0.28);
       const size = lv > 0 ? (isAsset ? 54 : 28) : (isAsset ? 30 : 20);
