@@ -68,6 +68,8 @@ export interface Progress {
   assetsIntroDone: boolean;         // 家产界面首次引导是否看过
   /** 黑金(赃款):产业产出,用于升级产业、打点、洗白;与跑酷的银币完全分开 */
   corrupt: number;
+  /** 上次回家领「进屋红包」的时间戳(每天一次) */
+  lastHomeGiftAt: number;
 }
 
 const KEY = 'wangboProgress';
@@ -103,7 +105,7 @@ function defaults(): Progress {
     levelStars: {}, levelClears: 0, perfectSlides: 0, starMilestones: [], dungeonCleared: {}, redeemBonus: 0,
     assets: {}, network: {}, laundered: 0,
     lastAccrualAt: 0, lastAuditAt: 0, auditsSurvived: 0, assetsSeized: 0,
-    assetsIntroDone: false, corrupt: 0
+    assetsIntroDone: false, corrupt: 0, lastHomeGiftAt: 0
   };
 }
 

@@ -183,6 +183,7 @@ export default class TitleScene extends Phaser.Scene {
     const bestRank = RUN_RANKS[Math.min(p.bestRankIndex || 0, RUN_RANKS.length - 1)];
     const items: { icon: string; text: string; color: string; tint?: number }[] = [
       { icon: 'coin', text: `${p.coins}`, color: '#ffe066' },
+      { icon: 'as-purse', text: formatValue(p.corrupt ?? 0), color: '#ffd43b' },
       { icon: 'ui-clock', text: best ? (best / 1000).toFixed(1) + 's' : '—', color: '#ffffff' },
       { icon: 'ui-rank', text: bestRank.short, color: bestRank.color, tint: parseInt(bestRank.color.slice(1), 16) }
     ];

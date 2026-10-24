@@ -40,7 +40,7 @@ import {
 import { buildAssetShareCard, downloadCanvas } from '../systems/sharecard';
 import { isWx, wxShare } from '../systems/wxapi';
 import { collectOfflineIncome } from '../systems/offline';
-import { noteAssetBuild, noteAuditHandled } from '../systems/daily';
+import { noteAssetBuild, noteAuditHandled, getDaily, dailyCompletedCount, DAILY_TASKS } from '../systems/daily';
 
 const ASSET_ICONS: Record<string, string> = {
   purse: 'as-purse', villa: 'as-villa', shell: 'as-shell',
@@ -148,10 +148,12 @@ export default class AssetsScene extends Phaser.Scene {
     this.buildPlayer(p);
     this.buildInput();
     this.drawRoomButtons();
+    this.buildDailyPanel();
 
     this.collectOffline();
     this.refreshAll();
     addMenuFooter(this, 'A/D 走动 · 靠近家具或客人按 E 交互 · 银币置办,黑金升级');
+    this.homeGift();
     this.maybeShowIntro(p);
     this.maybeAudit(p);
     this.time.delayedCall(2200, () => this.maybeVisitor());
@@ -497,6 +499,8 @@ export default class AssetsScene extends Phaser.Scene {
   }
 
   private washLabel!: Phaser.GameObjects.Text;
+  private dailyText!: Phaser.GameObjects.Text;
+  private dailyBar!: Phaser.GameObjects.Graphics;
 
   private drawRoomButtons() {
     // 墙面左侧竖排三个功能入口
@@ -522,6 +526,46 @@ export default class AssetsScene extends Phaser.Scene {
       const hit = this.add.rectangle(x, y, 116, 28, 0xffffff, 0.001).setDepth(26).setInteractive({ useHandCursor: true });
       hit.on('pointerdown', () => { playSfx(this, 'click', 0.3); fn(); });
     });
+  }
+
+  /** 房间里的小目标面板:今天该干什么,一眼看见 */
+  private buildDailyPanel() {
+    const cx = 80;
+    const top = 190;
+    const g = this.add.graphics().setDepth(24);
+    g.fillStyle(0x060d16, 0.72);
+    g.fillRoundedRect(cx - 58, top, 116, 94, 12);
+    g.lineStyle(1.2, 0xffffff, 0.14);
+    g.strokeRoundedRect(cx - 58, top, 116, 94, 12);
+    this.add.text(cx, top + 13, '今日任务', {
+      fontFamily: FONT, fontSize: '11px', color: '#8ba9c7', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0.5).setDepth(25);
+    this.dailyBar = this.add.graphics().setDepth(25);
+    this.dailyText = this.add.text(cx, top + 30, '', {
+      fontFamily: FONT, fontSize: '11px', color: '#ffe066', fontStyle: 'bold', resolution: 2,
+      align: 'center', lineSpacing: 5
+    }).setOrigin(0.5, 0).setDepth(25);
+    const hit = this.add.rectangle(cx, top + 47, 116, 94, 0xffffff, 0.001).setDepth(26)
+      .setInteractive({ useHandCursor: true });
+    hit.on('pointerdown', () => { playSfx(this, 'click', 0.3); this.scene.start('Quest'); });
+    this.refreshDailyPanel();
+  }
+
+  private refreshDailyPanel() {
+    if (!this.dailyText) return;
+    const p = loadProgress();
+    const d = getDaily(p);
+    const build = DAILY_TASKS.find(t => t.id === 'build')!;
+    const audit = DAILY_TASKS.find(t => t.id === 'audit')!;
+    const bHave = Math.min(build.get(d), build.target);
+    const aHave = Math.min(audit.get(d), audit.target);
+    const done = dailyCompletedCount(d);
+    this.dailyText.setText(`添置 ${bHave}/${build.target}\n摆平 ${aHave}/${audit.target}\n完成 ${done}/${DAILY_TASKS.length}`);
+    this.dailyBar.clear();
+    this.dailyBar.fillStyle(0x1b2b3d, 0.95);
+    this.dailyBar.fillRoundedRect(32, 274, 96, 4, 2);
+    this.dailyBar.fillStyle(done >= DAILY_TASKS.length ? 0x69db7c : 0xffd43b, 0.95);
+    this.dailyBar.fillRoundedRect(32, 274, Math.max(3, 96 * (done / DAILY_TASKS.length)), 4, 2);
   }
 
   // ============================================================
@@ -732,6 +776,7 @@ export default class AssetsScene extends Phaser.Scene {
     if (this.pendingAudits > 0) { noteAuditHandled(p, this.pendingAudits); this.pendingAudits = 0; }
     saveProgress(p);
     this.refreshAll();
+    this.refreshDailyPanel();
   }
 
   private refreshAll() {
@@ -1067,6 +1112,25 @@ export default class AssetsScene extends Phaser.Scene {
     });
   }
 
+  /** 每天第一次进屋:门口的快递箱里有点东西 */
+  private homeGift() {
+    const p = loadProgress();
+    const now = Date.now();
+    const last = p.lastHomeGiftAt || 0;
+    if (last > 0 && now - last < 20 * 3600 * 1000) return;
+    p.lastHomeGiftAt = now;
+    const gift = Math.max(200, Math.round(incomePerMinWithWind(this.holdings, this.wind) * 12));
+    p.corrupt = (p.corrupt ?? 0) + gift;
+    saveProgress(p);
+    this.coins = p.coins;
+    this.corrupt = p.corrupt;
+    this.time.delayedCall(900, () => {
+      this.toast(`门口快递箱:今天的「土特产」 +${formatValue(gift)} 黑金`, '#ffd43b', 'ui-gift');
+      playSfx(this, 'coin', 0.45, 1.1);
+      confettiBurst(this, GAME_WIDTH / 2, FLOOR_TOP - 10, 12);
+    });
+  }
+
   private maybeShowIntro(p: Progress) {
     if (p.assetsIntroDone) return;
     p.assetsIntroDone = true;
@@ -1084,8 +1148,8 @@ export default class AssetsScene extends Phaser.Scene {
     }).setOrigin(0.5));
     const steps: [string, string][] = [
       ['① 走动与交互', 'A/D 或方向键走动,靠近家具或客人按 E 交互'],
-      ['② 两套钱', '银币(跑酷挣)用来置办新产业和人脉;黑金(产业产出)用来升级'],
-      ['③ 别被查', '产业越肥风险越高:养人脉、花黑金洗白,或临时打点']
+      ['② 两套钱', '银币(跑酷挣)置办新产业/结交人脉;黑金(产业产出)升级产业'],
+      ['③ 别被查', '风险高了就洗白:花黑金降风险,还能洗出一笔明面银币']
     ];
     steps.forEach(([title, body], i) => {
       const y = 182 + i * 72;
