@@ -367,3 +367,49 @@ export function chapterMoodAt(level: LevelDef, elapsedMs: number): { sky: number
     nightness: m.nightStart + (m.nightEnd - m.nightStart) * t
   };
 }
+
+// ============================================================
+// 终局双结局:跑完 18 关后才揭晓 ——「全身而退」还是「人赃俱获」
+// 取决于一路上攒下的星级(干净程度),这是全程努力的最终结算
+// ============================================================
+
+export type EndingId = 'clean' | 'caught';
+
+export interface EndingDef {
+  id: EndingId;
+  title: string;
+  subtitle: string;
+  body: string;
+  color: string;
+  /** 触发该结局所需的最低总星数 */
+  minStars: number;
+}
+
+export const ENDING_CLEAN: EndingDef = {
+  id: 'clean',
+  title: '全身而退',
+  subtitle: '查无此人 · 干净落袋',
+  body: '账本烧得干干净净,退休那天没人来送,也没人来查。',
+  color: '#ffe066',
+  minStars: 40
+};
+
+export const ENDING_CAUGHT: EndingDef = {
+  id: 'caught',
+  title: '人赃俱获',
+  subtitle: '十八关跑完,还是进去了',
+  body: '账本从保险柜里翻了出来,十八年的路,一句话就问完了。',
+  color: '#ff8787',
+  minStars: 0
+};
+
+/** 通关全部 18 关后的结局:星级够高才能「全身而退」 */
+export function finalEnding(starTotal: number): EndingDef {
+  return starTotal >= ENDING_CLEAN.minStars ? ENDING_CLEAN : ENDING_CAUGHT;
+}
+
+/** 是否已经跑完整条主线(最后一关通关) */
+export function isCampaignFinished(levelStars: Record<string, number>): boolean {
+  const last = LEVELS[LEVELS.length - 1];
+  return (levelStars[last.id] ?? 0) > 0;
+}

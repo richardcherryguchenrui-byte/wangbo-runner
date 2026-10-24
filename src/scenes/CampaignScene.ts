@@ -16,6 +16,8 @@ import {
   totalStars,
   nextMilestone,
   STAR_MILESTONES,
+  isCampaignFinished,
+  ENDING_CLEAN,
   type LevelDef
 } from '../systems/levels';
 
@@ -128,7 +130,15 @@ export default class CampaignScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setDepth(24);
 
-    if (nextMile) {
+    // 页脚:优先提示终局目标,再提示下一个里程碑 —— 始终给玩家一个「下一步」
+    if (isCampaignFinished(stars)) {
+      const need = ENDING_CLEAN.minStars - sum;
+      if (need > 0) {
+        addMenuFooter(this, `主线已跑完 · 再拿 ${need} 星才能「全身而退」,否则人赃俱获`);
+      } else {
+        addMenuFooter(this, '已达成「全身而退」· 查无此人,把星星刷满吧');
+      }
+    } else if (nextMile) {
       const gain = nextMile.bribeMoon ? `+${nextMile.coins} 银币 + 贿月×${nextMile.bribeMoon}` : `+${nextMile.coins} 银币`;
       addMenuFooter(this, `再拿 ${nextMile.stars - sum} 星 →「${nextMile.label}」${gain}`);
     } else {

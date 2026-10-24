@@ -22,7 +22,8 @@ import {
   LEVELS, CHAPTERS, starCount, goalDone, isLevelUnlocked, isChapterUnlocked,
   levelSpeedAt, levelReward, nextLevelId, totalStars, MAX_STARS_PER_LEVEL,
   STAR_MILESTONES, TOTAL_STARS, newlyReachedMilestones, nextMilestone, clearLine, landfallLine,
-  CHAPTER_MOODS, chapterMoodAt
+  CHAPTER_MOODS, chapterMoodAt,
+  finalEnding, isCampaignFinished, ENDING_CLEAN, ENDING_CAUGHT
 } from '../src/systems/levels';
 import { gradeRun } from '../src/systems/grade';
 import {
@@ -792,5 +793,32 @@ describe('章节氛围', () => {
   it('后面几章比第一章暗,营造递进压迫感', () => {
     expect(CHAPTER_MOODS[5].nightStart).toBeGreaterThan(CHAPTER_MOODS[0].nightStart);
     expect(CHAPTER_MOODS[5].nightEnd).toBeGreaterThan(CHAPTER_MOODS[0].nightEnd);
+  });
+});
+
+// 终局双结局
+describe('终局双结局', () => {
+  it('星级够高才「全身而退」,否则「人赃俱获」', () => {
+    expect(finalEnding(TOTAL_STARS).id).toBe('clean');
+    expect(finalEnding(ENDING_CLEAN.minStars).id).toBe('clean');
+    expect(finalEnding(ENDING_CLEAN.minStars - 1).id).toBe('caught');
+    expect(finalEnding(0).id).toBe('caught');
+  });
+
+  it('两个结局的文案与配色完整', () => {
+    [ENDING_CLEAN, ENDING_CAUGHT].forEach(e => {
+      expect(e.title.length).toBeGreaterThan(0);
+      expect(e.subtitle.length).toBeGreaterThan(0);
+      expect(e.body.length).toBeGreaterThan(0);
+      expect(e.color).toMatch(/^#[0-9a-f]{6}$/i);
+    });
+    expect(ENDING_CLEAN.color).not.toBe(ENDING_CAUGHT.color);
+  });
+
+  it('跑完最后一关才算跑完主线', () => {
+    const last = LEVELS[LEVELS.length - 1];
+    expect(isCampaignFinished({})).toBe(false);
+    expect(isCampaignFinished({ [last.id]: 1 })).toBe(true);
+    expect(isCampaignFinished({ 'l1-1': 3 })).toBe(false);
   });
 });

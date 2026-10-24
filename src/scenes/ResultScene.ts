@@ -8,7 +8,7 @@ import { isWx, wxShare } from '../systems/wxapi';
 import { buildShareCard, buildLevelShareCard, downloadCanvas } from '../systems/sharecard';
 import { rankProgress } from '../systems/ranks';
 import { gradeRun } from '../systems/grade';
-import { CHAPTERS, TOTAL_STARS } from '../systems/levels';
+import { CHAPTERS, TOTAL_STARS, finalEnding } from '../systems/levels';
 
 interface ResultData {
   timeMs?: number;
@@ -452,12 +452,21 @@ export default class ResultScene extends Phaser.Scene {
       })
       .setDepth(21);
 
+    // 跑完整条主线:揭晓终局双结局
+    const ending = isFinalLevel ? finalEnding(this.levelStarTotal) : null;
+
     // 结论
-    const verdict = this.levelCleared
-      ? this.levelStars >= 3 ? '完美通关!' : '仕途通关!'
-      : '落马了…';
-    const verdictColor = this.levelCleared ? '#ffe066' : '#ff8787';
-    const verdictSub = this.levelEndingLine
+    const verdict = ending
+      ? ending.title
+      : this.levelCleared
+        ? this.levelStars >= 3 ? '完美通关!' : '仕途通关!'
+        : '落马了…';
+    const verdictColor = ending
+      ? ending.color
+      : this.levelCleared ? '#ffe066' : '#ff8787';
+    const verdictSub = ending
+      ? ending.subtitle
+      : this.levelEndingLine
       || (this.levelCleared
         ? isFinalLevel ? '全书终 · 这一路都走过来了' : '下一关已解锁'
         : '账本还差最后一页,再来一次');
@@ -537,8 +546,20 @@ export default class ResultScene extends Phaser.Scene {
         .setDepth(22);
     });
 
+    // 终局正文(只有跑完 18 关才出现)
+    if (ending) {
+      playSfx(this, ending.id === 'clean' ? 'promote' : 'fail', 0.6);
+      this.add
+        .text(GAME_WIDTH / 2, starY + 52 + this.levelGoals.length * 34 + 6, ending.body, {
+          fontFamily: FONT, fontSize: '15px', color: '#dbe9ff',
+          resolution: 2, stroke: '#08131f', strokeThickness: 3
+        })
+        .setOrigin(0.5)
+        .setDepth(22);
+    }
+
     // 奖励
-    if (this.levelReward > 0) {
+    if (!ending && this.levelReward > 0) {
       const rewardText = this.levelFirstClear
         ? `首通奖励 +${this.levelReward} 银币`
         : `星级奖励 +${this.levelReward} 银币`;
@@ -549,7 +570,7 @@ export default class ResultScene extends Phaser.Scene {
         })
         .setOrigin(0.5)
         .setDepth(22);
-    } else if (!this.levelCleared) {
+    } else if (!this.levelCleared && !ending) {
       this.add
         .text(GAME_WIDTH / 2, starY + 52 + this.levelGoals.length * 34 + 6, '通关才有星级奖励,先活到最后', {
           fontFamily: FONT, fontSize: '13px', color: '#93b5d6', resolution: 2
