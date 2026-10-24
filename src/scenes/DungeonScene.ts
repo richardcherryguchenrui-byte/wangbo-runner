@@ -411,12 +411,15 @@ export default class DungeonScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    const hintW = 340;
+    const hintBg = this.add.graphics();
+    hintBg.fillStyle(0x060d16, 0.66);
+    hintBg.fillRoundedRect(GAME_WIDTH / 2 - hintW / 2, GAME_HEIGHT - 106, hintW, 26, 13);
     this.hudHint = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT - 92, 'A/D 移动 · 空格跳 · J 攻击 · K 冲刺', {
-        fontFamily: FONT, fontSize: '12px', color: '#8ba9c7', resolution: 2
+      .text(GAME_WIDTH / 2, GAME_HEIGHT - 93, 'A/D 移动 · 空格跳 · J 攻击 · K 冲刺', {
+        fontFamily: FONT, fontSize: '12px', color: '#b7cfe8', resolution: 2
       })
-      .setOrigin(0.5)
-      .setAlpha(0.9);
+      .setOrigin(0.5);
     if (loadControls().virtualButtons) this.hudHint.setVisible(false);
 
     // BOSS 血条
@@ -429,7 +432,7 @@ export default class DungeonScene extends Phaser.Scene {
       this.hudBossBar = this.add.graphics();
     }
 
-    this.ui.add([hudBg, ...this.hudHearts, coinIcon, this.hudCoinText, this.hudLevelText, this.hudHint]);
+    this.ui.add([hudBg, ...this.hudHearts, coinIcon, this.hudCoinText, this.hudLevelText, hintBg, this.hudHint]);
     if (this.hudBossBar) this.ui.add(this.hudBossBar);
     if (this.hudBossLabel) this.ui.add(this.hudBossLabel);
 
