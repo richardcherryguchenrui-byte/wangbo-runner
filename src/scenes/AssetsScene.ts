@@ -37,8 +37,8 @@ import { isWx, wxShare } from '../systems/wxapi';
 import { collectOfflineIncome } from '../systems/offline';
 
 const ASSET_ICONS: Record<string, string> = {
-  purse: 'coin', villa: 'bg-hotel', shell: 'ui-shop',
-  mine: 'ui-bolt', offshore: 'ui-share', estate: 'bg-tower'
+  purse: 'as-purse', villa: 'as-villa', shell: 'as-shell',
+  mine: 'as-mine', offshore: 'as-offshore', estate: 'as-estate'
 };
 const NETWORK_ICONS: Record<string, string> = {
   mentor: 'ui-person', secretary: 'ui-clipboard', accountant: 'ui-save',
@@ -237,8 +237,9 @@ export default class AssetsScene extends Phaser.Scene {
 
   // 晒家产:生成竖版战绩卡
   private drawShareButton() {
-    const x = GAME_WIDTH - 96;
-    const y = 74;
+    // 放左下角,避开顶部风向横幅上的称号文字
+    const x = 96;
+    const y = GAME_HEIGHT - 26;
     const g = this.add.graphics().setDepth(24);
     g.fillStyle(0x1d3350, 0.95);
     g.fillRoundedRect(x - 62, y - 14, 124, 30, 15);
