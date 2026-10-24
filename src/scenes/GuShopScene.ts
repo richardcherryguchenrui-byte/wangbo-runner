@@ -19,7 +19,7 @@ export default class GuShopScene extends Phaser.Scene {
     const p = loadProgress();
     const maxCarry = bribeCarryLimit(p);
     buildMenuBackdrop(this, { mood: 'purple' });
-    buildMenuHeader(this, '🌙 顾哥神秘商铺', '顾教授的贿月 · 只收银币,不问来路', { coins: p.coins });
+    buildMenuHeader(this, '顾哥神秘商铺', '顾教授的贿月 · 只收银币,不问来路', { coins: p.coins });
 
     // 商品大卡
     addPanel(this, 150, 110, 660, 330, {
@@ -57,7 +57,7 @@ export default class GuShopScene extends Phaser.Scene {
     const stats: [string, string][] = [
       ['免伤', '1 次'],
       ['库存', `${p.bribeMoon}/${maxCarry} 个`],
-      ['价格', `🪙${BRIBE_MOON_PRICE}`]
+      ['价格', `${BRIBE_MOON_PRICE} 银币`]
     ];
     stats.forEach(([label, value], i) => {
       const x = 300 + i * 180;
@@ -77,7 +77,7 @@ export default class GuShopScene extends Phaser.Scene {
     });
 
     const full = p.bribeMoon >= maxCarry;
-    const buy = makeHeroButton(this, 480, 400, 264, 50, full ? '库存已满' : `🪙${BRIBE_MOON_PRICE} 购买一个`, () => {
+    const buy = makeHeroButton(this, 480, 400, 300, 50, full ? '库存已满' : `${BRIBE_MOON_PRICE} 银币购买`, () => {
       if (full) {
         showToast(this, GAME_WIDTH / 2, 486, `最多持有 ${maxCarry} 个贿月,先用掉再来`);
         return;
@@ -92,12 +92,12 @@ export default class GuShopScene extends Phaser.Scene {
         cur.totalSpent += BRIBE_MOON_PRICE;
         cur.bribeMoon += 1;
         saveProgress(cur);
-        showToast(this, GAME_WIDTH / 2, 486, `购买成功!贿月库存 +1(共 ${cur.bribeMoon} 个)`);
+        showToast(this, GAME_WIDTH / 2, 486, `购买成功!贿月库存 +1(共 ${cur.bribeMoon} 个)`, '#ffe066', 'ui-moon');
         this.time.delayedCall(650, () => this.scene.restart());
       } else {
         showToast(this, GAME_WIDTH / 2, 486, '银币不足!多翻越障碍赚银币吧');
       }
-    }, { icon: full ? '' : '🌙', fontSize: 20 });
+    }, { iconKey: full ? undefined : 'ui-moon', iconSize: 22, fontSize: 20 });
     buy.g.setDepth(26);
     buy.text.setDepth(27);
     buy.hit.setDepth(28);

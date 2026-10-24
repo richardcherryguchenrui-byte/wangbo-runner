@@ -35,7 +35,7 @@ export default class CustomCharScene extends Phaser.Scene {
   private drawPreview() {
     const custom = hasCustomHead();
     buildMenuBackdrop(this, { mood: 'night' });
-    buildMenuHeader(this, '🎨 自定义人物', '上传一张照片,把主角的脸换成你的', {});
+    buildMenuHeader(this, '自定义人物', '上传一张照片,把主角的脸换成你的', {});
 
     // 左侧舞台
     addMenuCard(this, 120, 120, 360, 340, { depth: 21, radius: 22 });
@@ -77,13 +77,13 @@ export default class CustomCharScene extends Phaser.Scene {
       })
       .setDepth(22);
 
-    makeHeroButton(this, 715, 372, 300, 56, '上传照片', () => this.pickFile(), { icon: '📷', fontSize: 19, depth: 22 });
+    makeHeroButton(this, 715, 372, 300, 56, '上传照片', () => this.pickFile(), { iconKey: 'ui-camera', iconSize: 23, fontSize: 19, depth: 22 });
     if (custom) {
-      makeButton(this, 715, 440, 300, 42, '↩ 恢复默认主角', () => {
+      makeButton(this, 715, 440, 300, 42, '恢复默认主角', () => {
         clearCustomHead();
         showToast(this, GAME_WIDTH / 2, 500, '已恢复默认主角');
         this.scene.restart();
-      }, 14, { depth: 22 });
+      }, 14, { depth: 22, iconKey: 'ui-restart', iconSize: 15 });
     } else {
       this.add
         .text(715, 440, '只有你自己能看到这个头像,本机保存', {
@@ -142,14 +142,14 @@ export default class CustomCharScene extends Phaser.Scene {
       };
       input.click();
     } catch {
-      showToast(this, GAME_WIDTH / 2, 120, '当前环境不支持上传');
+      showToast(this, GAME_WIDTH / 2, 120, '当前环境不支持上传', '#ff9999', 'ui-close');
     }
   }
 
   // ---- 裁剪模式 ----
   private drawCropMode() {
     buildMenuBackdrop(this, { mood: 'night' });
-    buildMenuHeader(this, '✂️ 调整头像', '拖动选框框住头部 · 右下角手柄缩放', {});
+    buildMenuHeader(this, '调整头像', '拖动选框框住头部 · 右下角手柄缩放', {});
 
     const tex = this.textures.get(UPLOAD_TEX);
     const dispW = 480;
@@ -200,8 +200,8 @@ export default class CustomCharScene extends Phaser.Scene {
     });
     this.input.on('pointerup', () => { this.dragging = false; this.resizing = false; });
 
-    makeButton(this, GAME_WIDTH / 2 - 130, 480, 200, 48, '✓ 确认替换头部', () => this.confirm(), 17, { depth: 40 });
-    makeButton(this, GAME_WIDTH / 2 + 130, 480, 200, 48, '✗ 取消', () => this.scene.restart(), 17, { depth: 40 });
+    makeButton(this, GAME_WIDTH / 2 - 130, 480, 200, 48, '确认替换头部', () => this.confirm(), 17, { depth: 40, iconKey: 'ui-check', iconSize: 16 });
+    makeButton(this, GAME_WIDTH / 2 + 130, 480, 200, 48, '取消', () => this.scene.restart(), 17, { depth: 40, iconKey: 'ui-close', iconSize: 16 });
     addMenuFooter(this, '建议只框住头部 · 可随时重新上传');
   }
 
@@ -244,7 +244,7 @@ export default class CustomCharScene extends Phaser.Scene {
 
     saveCustomHead(dataUrl);
     rebuildCustomTextures(this);
-    showToast(this, GAME_WIDTH / 2, 120, '✅ 已替换主角头部!');
+    showToast(this, GAME_WIDTH / 2, 120, '已替换主角头部!', '#8ce99a', 'ui-check');
     this.scene.restart();
   }
 }

@@ -14,6 +14,7 @@ import {
 } from '../systems/progress';
 import { showToast } from '../systems/ui';
 import { startBgm } from '../systems/audio';
+import { ensureSkinTextures } from '../systems/skins';
 import { buildMenuBackdrop, buildMenuHeader, addMenuCard, addMenuFooter } from '../systems/menu';
 
 const FONT = "PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif";
@@ -34,12 +35,12 @@ export default class ShopScene extends Phaser.Scene {
 
   private draw(p: Progress) {
     buildMenuBackdrop(this, { mood: 'dawn' });
-    buildMenuHeader(this, '🛒 晋升商店', '皮肤 · 挂件 · 装备,一次购买永久生效', { coins: p.coins });
+    buildMenuHeader(this, '晋升商店', '皮肤 · 挂件 · 装备,一次购买永久生效', { coins: p.coins });
     addMenuFooter(this, `累计翻越 ${p.totalDodged} 个障碍 · 每翻越一个都能攒银币`);
 
     // 顶部信息条
     this.add
-      .text(38, 102, `已拥有 ${p.owned.length} 件 · 累计消费 🪙${p.totalSpent}`, {
+      .text(38, 102, `已拥有 ${p.owned.length} 件 · 累计消费 ${p.totalSpent} 银币`, {
         fontFamily: FONT, fontSize: '11px', color: '#93b5d6', resolution: 2
       })
       .setOrigin(0, 0.5)
@@ -59,42 +60,42 @@ export default class ShopScene extends Phaser.Scene {
     });
   }
 
-  private rowStatus(item: ShopItem, p: Progress): { text: string; color: string } {
+  private rowStatus(item: ShopItem, p: Progress): { text: string; color: string; iconKey?: string } {
     const owned = p.owned.includes(item.id);
     if (item.kind === 'life') {
       const threshold = nextLifeThreshold(p);
-      if (p.extraLives >= MAX_EXTRA_LIVES) return { text: '已满级 ✓', color: '#7dffa8' };
+      if (p.extraLives >= MAX_EXTRA_LIVES) return { text: '已满级', color: '#7dffa8', iconKey: 'ui-check' };
       if (threshold !== null && p.totalDodged >= threshold) return { text: '可升级!点击解锁', color: '#ffe066' };
       return { text: `需累计翻越 ${threshold}(当前 ${p.totalDodged})`, color: '#ff9999' };
     }
     if (item.kind === 'skin' && item.skin === 'qitongwei') {
       const unlocked = p.totalDodged >= SKIN_QITONGWEI_REQUIREMENT;
-      if (p.skin === 'qitongwei') return { text: '使用中 ✓', color: '#7dffa8' };
-      if (unlocked) return { text: '已解锁 · 点击使用', color: '#ffe066' };
+      if (p.skin === 'qitongwei') return { text: '使用中', color: '#7dffa8', iconKey: 'ui-check' };
+      if (unlocked) return { text: '已解锁 · 点击使用', color: '#ffe066', iconKey: 'ui-check' };
       return { text: `需累计翻越 ${SKIN_QITONGWEI_REQUIREMENT}(当前 ${p.totalDodged})`, color: '#ff9999' };
     }
     if (item.kind === 'pistolup') {
       if (!p.owned.includes('pistol')) return { text: '需先购买手枪', color: '#ff9999' };
       const level = p.pistolLevel;
-      if (level >= PISTOL_UPGRADE_PRICES.length) return { text: '已满级 ✓', color: '#7dffa8' };
+      if (level >= PISTOL_UPGRADE_PRICES.length) return { text: '已满级', color: '#7dffa8', iconKey: 'ui-check' };
       const price = PISTOL_UPGRADE_PRICES[level];
-      return p.coins >= price ? { text: `🪙${price} 升级`, color: '#ffe066' } : { text: `🪙${price} 不足`, color: '#ff9999' };
+      return p.coins >= price ? { text: `${price} 升级`, color: '#ffe066', iconKey: 'coin' } : { text: `${price} 不足`, color: '#ff9999', iconKey: 'coin' };
     }
     if (item.kind === 'bribeup') {
-      if (p.bribeCarryLevel >= BRIBE_UPGRADE_PRICES.length) return { text: '已满级 ✓', color: '#7dffa8' };
+      if (p.bribeCarryLevel >= BRIBE_UPGRADE_PRICES.length) return { text: '已满级', color: '#7dffa8', iconKey: 'ui-check' };
       const price = BRIBE_UPGRADE_PRICES[0];
-      return p.coins >= price ? { text: `🪙${price} 升级`, color: '#ffe066' } : { text: `🪙${price} 不足`, color: '#ff9999' };
+      return p.coins >= price ? { text: `${price} 升级`, color: '#ffe066', iconKey: 'coin' } : { text: `${price} 不足`, color: '#ff9999', iconKey: 'coin' };
     }
     if (item.kind === 'skin') {
-      if (p.skin === item.skin) return { text: '使用中 ✓', color: '#7dffa8' };
-      if (owned) return { text: '已拥有 · 点击装备', color: '#ffe066' };
-      return p.coins >= item.price ? { text: `🪙${item.price} 购买`, color: '#ffe066' } : { text: `🪙${item.price} 不足`, color: '#ff9999' };
+      if (p.skin === item.skin) return { text: '使用中', color: '#7dffa8', iconKey: 'ui-check' };
+      if (owned) return { text: '已拥有 · 点击装备', color: '#ffe066', iconKey: 'ui-check' };
+      return p.coins >= item.price ? { text: `${item.price} 购买`, color: '#ffe066', iconKey: 'coin' } : { text: `${item.price} 不足`, color: '#ff9999', iconKey: 'coin' };
     }
     // pistol / pendant
-    if (item.kind === 'pistol' && owned) return { text: '已解锁 ✓', color: '#7dffa8' };
-    if (item.kind === 'pendant' && p.pendant === item.pendant) return { text: '装备中 ✓', color: '#7dffa8' };
+    if (item.kind === 'pistol' && owned) return { text: '已解锁', color: '#7dffa8', iconKey: 'ui-check' };
+    if (item.kind === 'pendant' && p.pendant === item.pendant) return { text: '装备中', color: '#7dffa8', iconKey: 'ui-check' };
     if (owned) return { text: '点击装备', color: '#ffe066' };
-    return p.coins >= item.price ? { text: `🪙${item.price} 购买`, color: '#ffe066' } : { text: `🪙${item.price} 不足`, color: '#ff9999' };
+    return p.coins >= item.price ? { text: `${item.price} 购买`, color: '#ffe066', iconKey: 'coin' } : { text: `${item.price} 不足`, color: '#ff9999', iconKey: 'coin' };
   }
 
   private drawRow(item: ShopItem, index: number, x: number, y: number, p: Progress) {
@@ -102,30 +103,62 @@ export default class ShopScene extends Phaser.Scene {
     const using = status.text.includes('使用中') || status.text.includes('装备中') || status.text.includes('已解锁') || status.text.includes('已满级');
     addMenuCard(this, x, y, CARD_W, CARD_H, { highlight: using });
 
+    // 商品图标:皮肤直接使用角色贴图,其余使用手绘图标
+    const icon = this.itemIcon(item);
+    const iconSize = icon.w;
     this.add
-      .text(x + 14, y + 12, item.name, {
+      .image(x + 24, y + CARD_H / 2, icon.key)
+      .setDisplaySize(iconSize, icon.h)
+      .setDepth(12)
+      .setAlpha(0.96);
+
+    this.add
+      .text(x + 42, y + 12, item.name, {
         fontFamily: FONT, fontSize: '14px', color: '#ffffff', fontStyle: 'bold', resolution: 2
       })
       .setOrigin(0, 0.5)
       .setDepth(12);
     this.add
-      .text(x + 14, y + 33, item.desc, {
+      .text(x + 42, y + 33, item.desc, {
         fontFamily: FONT, fontSize: '10px', color: '#7f9cbd', resolution: 2
       })
       .setOrigin(0, 0.5)
       .setDepth(12);
-    this.add
+    const statusText = this.add
       .text(x + CARD_W - 14, y + CARD_H / 2, status.text, {
         fontFamily: FONT, fontSize: '12px', color: status.color, fontStyle: 'bold', resolution: 2
       })
       .setOrigin(1, 0.5)
       .setDepth(12);
+    if (status.iconKey) {
+      const sIcon = 12;
+      const sGap = 5;
+      this.add
+        .image(statusText.x - statusText.width - sGap - sIcon / 2, y + CARD_H / 2, status.iconKey)
+        .setDisplaySize(sIcon, sIcon)
+        .setDepth(12);
+    }
 
     const hit = this.add
       .rectangle(x + CARD_W / 2, y + CARD_H / 2, CARD_W, CARD_H, 0xffffff, 0.001)
       .setInteractive({ useHandCursor: true })
       .setDepth(13);
     hit.on('pointerdown', () => this.handleClick(item, p, index));
+  }
+
+  private itemIcon(item: ShopItem): { key: string; w: number; h: number } {
+    if (item.kind === 'life') return { key: 'ui-heart', w: 20, h: 19 };
+    if (item.kind === 'pistol' || item.kind === 'pistolup') return { key: 'ui-pistol', w: 22, h: 15 };
+    if (item.kind === 'bribeup') return { key: 'ui-moon', w: 20, h: 20 };
+    if (item.kind === 'pendant' && item.pendant) return { key: `pendant-${item.pendant}`, w: 21, h: 21 };
+    if (item.kind === 'skin') {
+      if (item.skin === 'qitongwei') return { key: 'player-qi', w: 17, h: 24 };
+      if (item.skin) {
+        ensureSkinTextures(this, item.skin);
+        return { key: `player-${item.skin}-run-1`, w: 17, h: 24 };
+      }
+    }
+    return { key: 'ui-person', w: 20, h: 20 };
   }
 
   private handleClick(item: ShopItem, p: Progress, index: number) {
@@ -219,7 +252,7 @@ export default class ShopScene extends Phaser.Scene {
       } else if (owned) {
         p.skin = item.skin!;
         saveProgress(p);
-        showToast(this, GAME_WIDTH / 2, 486, `已装备「${item.name.replace('👤 皮肤·', '')}」!`);
+        showToast(this, GAME_WIDTH / 2, 486, `已装备「${item.name.replace('皮肤 · ', '')}」!`, '#ffe066', 'ui-check');
       } else if (p.coins >= item.price) {
         p.coins -= item.price;
         p.totalSpent += item.price;

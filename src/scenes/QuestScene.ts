@@ -23,12 +23,12 @@ export default class QuestScene extends Phaser.Scene {
     startBgm(this);
     const p = loadProgress();
     buildMenuBackdrop(this, { mood: 'night' });
-    buildMenuHeader(this, '📋 任务 · 成就 · 排行', '每天都有新目标,别让仕途停下来', { coins: p.coins });
+    buildMenuHeader(this, '任务 · 成就 · 排行', '每天都有新目标,别让仕途停下来', { coins: p.coins });
 
-    const tabs: { id: Tab; label: string }[] = [
-      { id: 'daily', label: '📅 每日任务' },
-      { id: 'achieve', label: '🏆 成就' },
-      { id: 'rank', label: '🏅 排行' }
+    const tabs: { id: Tab; label: string; icon: string }[] = [
+      { id: 'daily', label: '每日任务', icon: 'ui-calendar' },
+      { id: 'achieve', label: '成就', icon: 'ui-trophy' },
+      { id: 'rank', label: '排行', icon: 'ui-rank' }
     ];
     tabs.forEach((t, i) => {
       const x = GAME_WIDTH / 2 + (i - 1) * 168;
@@ -40,13 +40,22 @@ export default class QuestScene extends Phaser.Scene {
       g.fillRoundedRect(x - w / 2, 106 - h / 2, w, h, h / 2);
       g.lineStyle(1.6, active ? 0xfff3c4 : 0xffffff, active ? 0.9 : 0.18);
       g.strokeRoundedRect(x - w / 2, 106 - h / 2, w, h, h / 2);
-      this.add
-        .text(x, 106, t.label, {
+      const label = this.add
+        .text(0, 106, t.label, {
           fontFamily: FONT, fontSize: '15px', color: active ? '#3d2a00' : '#cfe3ff',
           fontStyle: 'bold', resolution: 2
         })
         .setOrigin(0.5)
         .setDepth(22);
+      const iconSize = 16;
+      const gap = 6;
+      const total = iconSize + gap + label.width;
+      this.add
+        .image(x - total / 2 + iconSize / 2, 106, t.icon)
+        .setDisplaySize(iconSize, iconSize)
+        .setAlpha(active ? 1 : 0.72)
+        .setDepth(22);
+      label.setX(x - total / 2 + iconSize + gap + label.width / 2);
       const hit = this.add
         .rectangle(x, 106, w, h, 0xffffff, 0.001)
         .setInteractive({ useHandCursor: true })
@@ -66,12 +75,20 @@ export default class QuestScene extends Phaser.Scene {
     saveProgress(p); // 跨天翻转写回
 
     addMenuCard(this, 170, 136, 620, 30, { depth: 21 });
-    this.add
-      .text(GAME_WIDTH / 2, 151, `🔥 连续签到 ${p.loginStreak} 天 · 每天首次打开 +20🪙 · 连续 7 天 +100🪙`, {
+    const streakText = this.add
+      .text(0, 151, `连续签到 ${p.loginStreak} 天 · 每日 +20 银币 · 连签 7 天 +100`, {
         fontFamily: FONT, fontSize: '12px', color: '#ffe066', resolution: 2
       })
       .setOrigin(0.5)
       .setDepth(22);
+    const streakIcon = 14;
+    const streakGap = 6;
+    const streakTotal = streakIcon + streakGap + streakText.width;
+    this.add
+      .image(GAME_WIDTH / 2 - streakTotal / 2 + streakIcon / 2, 151, 'ui-calendar')
+      .setDisplaySize(streakIcon, streakIcon)
+      .setDepth(22);
+    streakText.setX(GAME_WIDTH / 2 - streakTotal / 2 + streakIcon + streakGap + streakText.width / 2);
 
     DAILY_TASKS.forEach((task, i) => {
       const x = 170;
@@ -83,8 +100,15 @@ export default class QuestScene extends Phaser.Scene {
       const pct = Math.min(1, value / task.target);
       addMenuCard(this, x, y, w, h, { highlight: done, depth: 21 });
 
+      const taskIcon: Record<string, string> = {
+        dodge: 'mi-dodge', survive: 'mi-survive', kill: 'mi-kill', pickup: 'mi-pickup'
+      };
       this.add
-        .text(x + 18, y + 16, `${done ? '✅' : '🎯'} ${task.name}`, {
+        .image(x + 20, y + 25, done ? 'ui-check' : (taskIcon[task.id] ?? 'ui-target'))
+        .setDisplaySize(17, 17)
+        .setDepth(22);
+      this.add
+        .text(x + 40, y + 16, task.name, {
           fontFamily: FONT, fontSize: '14px', color: done ? '#8ce99a' : '#ffffff', fontStyle: 'bold', resolution: 2
         })
         .setDepth(22);
@@ -109,29 +133,39 @@ export default class QuestScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setDepth(22);
 
-      this.add
-        .text(x + w - 18, y + h / 2, `${done ? '已达成' : `+${task.reward}🪙`}`, {
+      const rewardText = this.add
+        .text(x + w - 18, y + h / 2, done ? '已达成' : `+${task.reward}`, {
           fontFamily: FONT, fontSize: '14px', color: done ? '#8ce99a' : '#ffe066', fontStyle: 'bold', resolution: 2
         })
         .setOrigin(1, 0.5)
         .setDepth(22);
+      if (!done) {
+        this.add
+          .image(rewardText.x - rewardText.width - 12, y + h / 2, 'coin')
+          .setDisplaySize(14, 14)
+          .setDepth(22);
+      }
     });
 
     const allDone = dailyAllDone(d);
     const total = DAILY_TASKS.reduce((s, t) => s + t.reward, 0) + DAILY_ALL_BONUS;
     const doneCount = dailyCompletedCount(d);
-    const label = d.claimed ? '✅ 今日已领取' : allDone ? `🎁 领取全部奖励 ${total}🪙` : `完成 ${doneCount}/${DAILY_TASKS.length} · 全完成领 ${total}🪙`;
-    const btn = makeHeroButton(this, GAME_WIDTH / 2, 446, 360, 56, label, () => {
+    const label = d.claimed
+      ? '今日已领取'
+      : allDone
+        ? `领取全部奖励 ${total} 银币`
+        : `完成 ${doneCount}/${DAILY_TASKS.length} · 全完成领 ${total} 银币`;
+    const btn = makeHeroButton(this, GAME_WIDTH / 2, 446, 400, 56, label, () => {
       const cur = loadProgress();
       const reward = claimDailyReward(cur);
       if (reward > 0) {
         saveProgress(cur);
-        showToast(this, GAME_WIDTH / 2, 504, `🎉 领取成功 +${reward}🪙!`);
+        showToast(this, GAME_WIDTH / 2, 504, `领取成功 +${reward} 银币!`, '#ffe066', 'ui-gift');
         this.scene.restart({ tab: 'daily' });
       } else {
-        showToast(this, GAME_WIDTH / 2, 504, d.claimed ? '今天已领取过啦,明天再来!' : '还有任务未完成,继续加油!');
+        showToast(this, GAME_WIDTH / 2, 504, d.claimed ? '今天已领取过啦,明天再来!' : '还有任务未完成,继续加油!', '#ffe066', d.claimed ? 'ui-check' : 'ui-tips');
       }
-    }, { fontSize: 20, icon: d.claimed ? '' : '🎁' });
+    }, { fontSize: 19, iconKey: d.claimed ? undefined : 'ui-gift', iconSize: 24 });
     if (d.claimed) {
       btn.g.setAlpha(0.45);
       btn.text.setAlpha(0.7);
@@ -149,7 +183,7 @@ export default class QuestScene extends Phaser.Scene {
     saveProgress(p);
     if (newAch.length > 0) {
       this.time.delayedCall(400, () => {
-        showToast(this, GAME_WIDTH / 2, 500, `🏆 解锁 ${newAch.length} 项新成就!银币已入账`);
+        showToast(this, GAME_WIDTH / 2, 500, `解锁 ${newAch.length} 项新成就!银币已入账`, '#ffe066', 'ui-trophy');
       });
     }
 
@@ -169,19 +203,29 @@ export default class QuestScene extends Phaser.Scene {
       const got = unlocked.has(a.id);
       addMenuCard(this, x, y, 300, 38, { highlight: got, depth: 21 });
       this.add
-        .text(x + 12, y + 12, `${got ? '✅' : '🔒'} ${a.name}`, {
+        .image(x + 14, y + 19, got ? 'ui-check' : 'ui-lock')
+        .setDisplaySize(14, 14)
+        .setDepth(22);
+      this.add
+        .text(x + 30, y + 12, a.name, {
           fontFamily: FONT, fontSize: '12px', color: got ? '#8ce99a' : '#ffffff', fontStyle: 'bold', resolution: 2
         })
         .setDepth(22);
-      this.add
-        .text(x + 288, y + 12, got ? '已获得' : `+${a.reward}🪙`, {
+      const achReward = this.add
+        .text(x + 288, y + 12, got ? '已获得' : `+${a.reward}`, {
           fontFamily: FONT, fontSize: '11px', color: got ? '#69db7c' : '#ffe066', resolution: 2
         })
         .setOrigin(1, 0)
         .setDepth(22);
+      if (!got) {
+        this.add
+          .image(x + 288 - achReward.width - 10, y + 18, 'coin')
+          .setDisplaySize(11, 11)
+          .setDepth(22);
+      }
       this.add
-        .text(x + 12, y + 27, a.desc, {
-          fontFamily: FONT, fontSize: '9px', color: '#7f9cbd', resolution: 2
+        .text(x + 30, y + 27, a.desc, {
+          fontFamily: FONT, fontSize: '10px', color: '#8faecb', resolution: 2
         })
         .setDepth(22);
     });
@@ -224,27 +268,40 @@ export default class QuestScene extends Phaser.Scene {
   }
 
   private drawLocalRank(p: ReturnType<typeof loadProgress>) {
-    this.add
-      .text(GAME_WIDTH / 2, 138, '🏅 本机战绩', {
+    const rankTitle = this.add
+      .text(0, 138, '本机战绩', {
         fontFamily: FONT, fontSize: '16px', color: '#ffe066', fontStyle: 'bold', resolution: 2
       })
       .setOrigin(0.5)
       .setDepth(21);
-    const rows: [string, string][] = [
-      ['最佳存活', p.bestTimeMs ? `${(p.bestTimeMs / 1000).toFixed(1)} 秒` : '—'],
-      ['单局最多翻越', p.bestDodged ? `${p.bestDodged} 个` : '—'],
-      ['最高连击', p.bestCombo ? `×${p.bestCombo}` : '—'],
-      ['累计局数', `${p.totalRuns} 局`],
-      ['累计游玩', `${Math.floor(p.totalTimeMs / 60000)} 分钟`],
-      ['累计翻越', `${p.totalDodged} 个`],
-      ['累计击毁', `${p.totalKills} 个`],
-      ['巡视通过', `${p.inspectionsSurvived} 次`]
+    const rankIcon = 18;
+    const rankGap = 7;
+    const rankTotal = rankIcon + rankGap + rankTitle.width;
+    this.add
+      .image(GAME_WIDTH / 2 - rankTotal / 2 + rankIcon / 2, 138, 'ui-rank')
+      .setDisplaySize(rankIcon, rankIcon)
+      .setDepth(21);
+    rankTitle.setX(GAME_WIDTH / 2 - rankTotal / 2 + rankIcon + rankGap + rankTitle.width / 2);
+    const rows: [string, string, string][] = [
+      ['最佳存活', p.bestTimeMs ? `${(p.bestTimeMs / 1000).toFixed(1)} 秒` : '—', 'ui-clock'],
+      ['单局最多翻越', p.bestDodged ? `${p.bestDodged} 个` : '—', 'mi-dodge'],
+      ['最高连击', p.bestCombo ? `×${p.bestCombo}` : '—', 'mi-combo'],
+      ['累计局数', `${p.totalRuns} 局`, 'ui-play'],
+      ['累计游玩', `${Math.floor(p.totalTimeMs / 60000)} 分钟`, 'ui-clock'],
+      ['累计翻越', `${p.totalDodged} 个`, 'ui-arrow-up'],
+      ['累计击毁', `${p.totalKills} 个`, 'mi-kill'],
+      ['巡视通过', `${p.inspectionsSurvived} 次`, 'ui-siren']
     ];
-    rows.forEach(([name, val], i) => {
+    rows.forEach(([name, val, icon], i) => {
       const y = 160 + i * 36;
       addMenuCard(this, 230, y, 500, 30, { depth: 21 });
       this.add
-        .text(250, y + 15, name, { fontFamily: FONT, fontSize: '13px', color: '#cfe3ff', resolution: 2 })
+        .image(250, y + 15, icon)
+        .setDisplaySize(16, 16)
+        .setDepth(22)
+        .setAlpha(0.9);
+      this.add
+        .text(268, y + 15, name, { fontFamily: FONT, fontSize: '13px', color: '#cfe3ff', resolution: 2 })
         .setOrigin(0, 0.5)
         .setDepth(22);
       this.add

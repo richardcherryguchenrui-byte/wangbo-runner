@@ -120,9 +120,12 @@ export function makeHeroButton(
   h: number,
   label: string,
   onClick: () => void,
-  options: { color1?: number; color2?: number; fontSize?: number; icon?: string; depth?: number } = {}
+  options: {
+    color1?: number; color2?: number; fontSize?: number; icon?: string;
+    iconKey?: string; iconSize?: number; depth?: number;
+  } = {}
 ) {
-  const { color1 = 0xffb703, color2 = 0xe8590c, fontSize = 27, icon = '', depth = 20 } = options;
+  const { color1 = 0xffb703, color2 = 0xe8590c, fontSize = 27, icon = '', iconKey, iconSize = 24, depth = 20 } = options;
   const g = scene.add.graphics().setDepth(depth);
   const r = h / 2;
   const draw = (lift = 0) => {
@@ -149,17 +152,34 @@ export function makeHeroButton(
     .setStroke('#ffecb3', 3)
     .setShadow(0, 2, 'rgba(80,35,0,0.4)', 2, false, true)
     .setDepth(depth + 1);
+  let iconImage: Phaser.GameObjects.Image | undefined;
+  if (iconKey) {
+    iconImage = scene.add
+      .image(0, y + 1, iconKey)
+      .setDisplaySize(iconSize, iconSize)
+      .setDepth(depth + 1);
+    const gap = 10;
+    const total = iconSize + gap + text.width;
+    iconImage.setX(x - total / 2 + iconSize / 2);
+    text.setX(x - total / 2 + iconSize + gap + text.width / 2);
+  }
   const hit = scene.add.rectangle(x, y, w, h, 0xffffff, 0.001).setInteractive({ useHandCursor: true }).setDepth(depth + 2);
   hit.on('pointerdown', () => {
     playSfx(scene, 'click', 0.45);
     draw(3);
     text.setY(y + 3);
-    scene.time.delayedCall(80, () => { draw(0); text.setY(y + 1); });
-    scene.tweens.add({ targets: [g, text], scale: 0.97, duration: 80, yoyo: true });
+    iconImage?.setY(y + 3);
+    scene.time.delayedCall(80, () => { draw(0); text.setY(y + 1); iconImage?.setY(y + 1); });
+    scene.tweens.add({
+      targets: iconImage ? [g, text, iconImage] : [g, text],
+      scale: 0.97,
+      duration: 80,
+      yoyo: true
+    });
     onClick();
   });
   scene.tweens.add({ targets: g, alpha: { from: 0.92, to: 1 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-  return { g, text, hit };
+  return { g, text, hit, icon: iconImage };
 }
 
 // 短暂提示:深色药丸底 + 浮起渐隐;可选左侧图标,避免依赖 emoji
@@ -177,8 +197,10 @@ export function showToast(scene: Phaser.Scene, x: number, y: number, msg: string
   const w = Math.max(120, totalW + padX * 2);
   const h = Math.max(text.height + 18, iconKey ? 40 : 0);
   const bg = scene.add.graphics();
-  bg.fillStyle(0x081525, 0.82);
+  bg.fillStyle(0x081525, 0.93);
   bg.fillRoundedRect(-w / 2, -h / 2, w, h, h / 2);
+  bg.fillStyle(0xffffff, 0.07);
+  bg.fillRoundedRect(-w / 2 + 3, -h / 2 + 3, w - 6, h * 0.42, h * 0.3);
   bg.lineStyle(1.5, 0xffffff, 0.2);
   bg.strokeRoundedRect(-w / 2, -h / 2, w, h, h / 2);
   const children: Phaser.GameObjects.GameObject[] = [bg];

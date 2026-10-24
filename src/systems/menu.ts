@@ -124,10 +124,10 @@ export function buildMenuHeader(
 ) {
   const depth = opts.depth ?? 20;
   if (opts.back !== false) {
-    makeButton(scene, 68, 35, 104, 38, '← 返回', () => {
+    makeButton(scene, 68, 35, 104, 38, '返回', () => {
       scene.cameras.main.fadeOut(160, 7, 20, 42);
       scene.time.delayedCall(170, () => scene.scene.start('Title'));
-    }, 15, { depth: depth + 2 });
+    }, 15, { depth: depth + 2, iconKey: 'ui-back', iconSize: 15 });
   }
 
   scene.add
@@ -157,19 +157,25 @@ export function buildMenuHeader(
 }
 
 export function addCoinChip(scene: Phaser.Scene, rightX: number, centerY: number, coins: number, depth = 20) {
-  const label = `🪙 ${coins}`;
   const t = scene.add
-    .text(0, 0, label, {
+    .text(0, 0, `${coins}`, {
       fontFamily: FONT, fontSize: '15px', color: '#ffe066', fontStyle: 'bold', resolution: 2
     })
     .setDepth(depth + 2);
-  const w = t.width + 30;
+  const iconSize = 18;
+  const gap = 7;
+  const w = iconSize + gap + t.width + 28;
   const h = 34;
-  const g = addPanel(scene, rightX - w, centerY - h / 2, w, h, {
+  const left = rightX - w;
+  const g = addPanel(scene, left, centerY - h / 2, w, h, {
     fill: 0x0b1a2e, fillAlpha: 0.85, stroke: 0xffd43b, strokeAlpha: 0.3, radius: h / 2
   }).setDepth(depth + 1);
-  t.setPosition(rightX - w / 2, centerY).setOrigin(0.5);
-  return { g, text: t };
+  const icon = scene.add
+    .image(left + 14 + iconSize / 2, centerY, 'coin')
+    .setDisplaySize(iconSize, iconSize)
+    .setDepth(depth + 2);
+  t.setPosition(left + 14 + iconSize + gap + t.width / 2, centerY).setOrigin(0.5);
+  return { g, text: t, icon };
 }
 
 /** 内容卡:统一圆角、描边和轻微内高光 */
@@ -196,9 +202,22 @@ export function addMenuCard(
   return g;
 }
 
-export function addSectionTitle(scene: Phaser.Scene, x: number, y: number, text: string, color = '#ffe066', depth = 20) {
+export function addSectionTitle(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  text: string,
+  color = '#ffe066',
+  depth = 20,
+  iconKey?: string
+) {
+  let textX = x;
+  if (iconKey) {
+    scene.add.image(x + 8, y, iconKey).setDisplaySize(17, 17).setDepth(depth);
+    textX = x + 22;
+  }
   scene.add
-    .text(x, y, text, {
+    .text(textX, y, text, {
       fontFamily: FONT, fontSize: '15px', color, fontStyle: 'bold',
       resolution: 2, stroke: '#08131f', strokeThickness: 4
     })
@@ -207,11 +226,20 @@ export function addSectionTitle(scene: Phaser.Scene, x: number, y: number, text:
 }
 
 export function addMenuFooter(scene: Phaser.Scene, text: string) {
-  scene.add
-    .text(GAME_WIDTH / 2, GAME_HEIGHT - 14, text, {
-      fontFamily: FONT, fontSize: '10px', color: '#9db8d8', resolution: 2
+  const t = scene.add
+    .text(GAME_WIDTH / 2, GAME_HEIGHT - 10, text, {
+      fontFamily: FONT, fontSize: '10px', color: '#b7cfe8', resolution: 2,
+      stroke: '#08131f', strokeThickness: 3
     })
     .setOrigin(0.5, 1)
-    .setDepth(20)
-    .setAlpha(0.75);
+    .setDepth(21);
+  const w = t.width + 26;
+  addPanel(scene, GAME_WIDTH / 2 - w / 2, GAME_HEIGHT - 25, w, 18, {
+    fill: 0x08131f,
+    fillAlpha: 0.55,
+    stroke: 0xffffff,
+    strokeAlpha: 0.07,
+    radius: 9,
+    shadow: false
+  }).setDepth(20);
 }

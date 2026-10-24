@@ -143,6 +143,31 @@ export default class TitleScene extends Phaser.Scene {
       : `当前称号:${getTitle(p.totalDodged)} · 已到顶!`, {
       fontFamily: FONT, fontSize: '13px', color: '#e6f0ff'
     }).setOrigin(0, 0).setDepth(10).setAlpha(0.8);
+
+    // 生涯进度条:把「再翻 N 个」变成看得见的进度
+    if (next) {
+      const idx = TITLE_MILESTONES.indexOf(next);
+      const prev = idx > 0 ? TITLE_MILESTONES[idx - 1][0] : 0;
+      const span = next[0] - prev;
+      const ratio = span > 0 ? Math.min(1, Math.max(0, (p.totalDodged - prev) / span)) : 0;
+      const barX = 36;
+      const barY = 274;
+      const barW = 240;
+      const bar = this.add.graphics().setDepth(10);
+      bar.fillStyle(0x08131f, 0.55);
+      bar.fillRoundedRect(barX, barY, barW, 7, 3.5);
+      if (ratio > 0) {
+        bar.fillStyle(0xffd43b, 0.95);
+        bar.fillRoundedRect(barX, barY, Math.max(5, barW * ratio), 7, 3.5);
+        bar.fillStyle(0xffffff, 0.25);
+        bar.fillRoundedRect(barX + 1, barY + 1, Math.max(3, barW * ratio - 2), 2, 1);
+      }
+      bar.lineStyle(1, 0xffffff, 0.12);
+      bar.strokeRoundedRect(barX, barY, barW, 7, 3.5);
+      this.add.text(barX + barW + 8, barY + 3.5, `${p.totalDodged}/${next[0]}`, {
+        fontFamily: FONT, fontSize: '10px', color: '#ffe066', resolution: 2
+      }).setOrigin(0, 0.5).setDepth(10).setAlpha(0.9);
+    }
   }
 
   // ---- 顶部右侧数据 ----
@@ -249,7 +274,7 @@ export default class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(10);
 
     // 开始游戏:主按钮
-    makeHeroButton(this, px + pw / 2, 168, 276, 66, '开始游戏', () => this.startGame(false), { icon: '▶', fontSize: 27 });
+    makeHeroButton(this, px + pw / 2, 168, 276, 66, '开始游戏', () => this.startGame(false), { iconKey: 'ui-play', iconSize: 24, fontSize: 27 });
 
     // 每日挑战卡
     const dy = 226;
@@ -294,9 +319,9 @@ export default class TitleScene extends Phaser.Scene {
     });
 
     // 底部提示
-    this.add.text(px + pw / 2, 450, '空格开始 · D 每日挑战 · ↓ 滑铲', {
-      fontFamily: FONT, fontSize: '10px', color: '#9db8d8'
-    }).setOrigin(0.5).setDepth(10);
+    this.add.text(px + pw / 2, 449, '空格开始 · D 每日挑战 · ↓ 滑铲', {
+      fontFamily: FONT, fontSize: '11px', color: '#cfe3ff'
+    }).setOrigin(0.5).setDepth(10).setAlpha(0.92);
   }
 
   private buildFooter(p: ReturnType<typeof loadProgress>) {
@@ -304,7 +329,7 @@ export default class TitleScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '11px', color: '#dce8f5', stroke: '#10233d', strokeThickness: 2
     }).setOrigin(1, 1).setDepth(20).setAlpha(0.8);
     this.add.text(14, GAME_HEIGHT - 7, '无限生存 · 越跑越快 · 官阶越升越高', {
-      fontFamily: FONT, fontSize: '11px', color: '#cfe3ff'
-    }).setOrigin(0, 1).setDepth(20).setAlpha(0.55);
+      fontFamily: FONT, fontSize: '11px', color: '#cfe3ff', stroke: '#10233d', strokeThickness: 2
+    }).setOrigin(0, 1).setDepth(20).setAlpha(0.82);
   }
 }

@@ -18,7 +18,6 @@ interface ResultData {
   newAchievements?: string[];
   rankIndex?: number;
   rankName?: string;
-  rankEmoji?: string;
   rankColor?: string;
   missionTitle?: string;
   missionDone?: boolean;
@@ -183,13 +182,26 @@ export default class ResultScene extends Phaser.Scene {
       shadow: false
     }).setDepth(21);
     this.add.image(168, 198, 'ui-target').setDisplaySize(17, 17).setDepth(22);
-    this.add
+    const nextLabel = this.add
       .text(183, 198, nextText, {
         fontFamily: FONT, fontSize: '12px', color: nearNext ? '#ffe066' : '#cfe3ff',
         fontStyle: nearNext ? 'bold' : 'normal', resolution: 2
       })
       .setOrigin(0, 0.5)
       .setDepth(22);
+    if (rp.next) {
+      const barX = nextLabel.x + nextLabel.width + 14;
+      const barW = Math.min(96, 502 - barX);
+      if (barW >= 30) {
+        const bar = this.add.graphics().setDepth(22);
+        bar.fillStyle(0x000000, 0.38);
+        bar.fillRoundedRect(barX, 195, barW, 6, 3);
+        if (rp.ratio > 0) {
+          bar.fillStyle(nearNext ? 0xffd43b : 0x74c0fc, 1);
+          bar.fillRoundedRect(barX, 195, Math.max(4, barW * rp.ratio), 6, 3);
+        }
+      }
+    }
 
     // 主角
     const hero = this.add
@@ -323,7 +335,7 @@ export default class ResultScene extends Phaser.Scene {
     }
 
     // 按钮
-    const replay = makeHeroButton(this, 300, 438, 224, 54, '再来一局', () => this.replay(), { icon: '▶', fontSize: 23 });
+    const replay = makeHeroButton(this, 300, 438, 224, 54, '再来一局', () => this.replay(), { iconKey: 'ui-play', iconSize: 21, fontSize: 23 });
     replay.g.setDepth(24);
     replay.text.setDepth(25);
     replay.hit.setDepth(26);
@@ -345,12 +357,20 @@ export default class ResultScene extends Phaser.Scene {
     homeBtn.text.setDepth(25);
     homeBtn.icon?.setDepth(25);
 
-    this.add
-      .text(GAME_WIDTH / 2, 476, this.daily ? '空格再来一局(保持今日挑战) · ESC 回主菜单' : '空格再来一局 · ESC 回主菜单', {
-        fontFamily: FONT, fontSize: '9px', color: '#7f9cbd', resolution: 2
+    const hint = this.add
+      .text(GAME_WIDTH / 2, 499, this.daily ? '空格再来一局(保持今日挑战) · ESC 回主菜单' : '空格再来一局 · ESC 回主菜单', {
+        fontFamily: FONT, fontSize: '10px', color: '#9db8d8', resolution: 2
       })
       .setOrigin(0.5)
       .setDepth(22);
+    addPanel(this, GAME_WIDTH / 2 - hint.width / 2 - 13, 489, hint.width + 26, 20, {
+      fill: 0x08131f,
+      fillAlpha: 0.55,
+      stroke: 0xffffff,
+      strokeAlpha: 0.08,
+      radius: 10,
+      shadow: false
+    }).setDepth(21);
 
     this.add
       .text(GAME_WIDTH - 14, GAME_HEIGHT - 8, 'nmjdzmy 反弹工作室', {

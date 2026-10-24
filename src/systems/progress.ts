@@ -127,24 +127,25 @@ export interface ShopItem {
 }
 
 export const SHOP_ITEMS: ShopItem[] = [
-  { id: 'life', name: '❤️ 初始生命 +1', desc: '每级需更多累计翻越', price: 0, kind: 'life' },
-  { id: 'skin-qitongwei', name: '👤 皮肤·祁同伟', desc: '累计翻越 1000 解锁', price: 0, kind: 'skin', skin: 'qitongwei' },
-  { id: 'pistol', name: '🔫 反腐手枪', desc: '每局 3 发子弹,射击摧毁障碍', price: 30, kind: 'pistol' },
-  { id: 'pistol-up', name: '🔫 弹容量升级', desc: '每级 +2 发子弹', price: 0, kind: 'pistolup' },
-  { id: 'bribe-up', name: '🌙 贿月扩容', desc: '每局携带上限 3→5 个', price: 0, kind: 'bribeup' },
-  { id: 'skin-night', name: '👤 皮肤·夜行侠', desc: '深蓝染色,夜间潜行', price: 200, kind: 'skin', skin: 'night' },
-  { id: 'skin-gold', name: '👤 皮肤·金身王博', desc: '金光护体,富贵逼人', price: 400, kind: 'skin', skin: 'gold' },
-  { id: 'skin-inferno', name: '👤 皮肤·赤焰王博', desc: '赤焰加身,火力全开', price: 800, kind: 'skin', skin: 'inferno' },
-  { id: 'pendant-star', name: '反弹之星', desc: '头顶 ⭐', price: 25, kind: 'pendant', pendant: 'star' },
-  { id: 'pendant-medal', name: '勋章挂件', desc: '头顶 🎖️', price: 45, kind: 'pendant', pendant: 'medal' },
-  { id: 'pendant-briefcase', name: '连结之包', desc: '头顶 💼', price: 35, kind: 'pendant', pendant: 'briefcase' },
-  { id: 'pendant-crown', name: '反复之官', desc: '头顶 👑', price: 60, kind: 'pendant', pendant: 'crown' },
-  { id: 'pendant-scale', name: '天平挂件', desc: '头顶 ⚖️', price: 120, kind: 'pendant', pendant: 'scale' },
-  { id: 'pendant-trophy', name: '冠军奖杯', desc: '头顶 🏆', price: 300, kind: 'pendant', pendant: 'trophy' }
+  { id: 'life', name: '初始生命 +1', desc: '每级需更多累计翻越', price: 0, kind: 'life' },
+  { id: 'skin-qitongwei', name: '皮肤 · 祁同伟', desc: '累计翻越 1000 解锁', price: 0, kind: 'skin', skin: 'qitongwei' },
+  { id: 'pistol', name: '反腐手枪', desc: '每局 3 发子弹,射击摧毁障碍', price: 30, kind: 'pistol' },
+  { id: 'pistol-up', name: '弹容量升级', desc: '每级 +2 发子弹', price: 0, kind: 'pistolup' },
+  { id: 'bribe-up', name: '贿月扩容', desc: '每局携带上限 3→5 个', price: 0, kind: 'bribeup' },
+  { id: 'skin-night', name: '皮肤 · 夜行侠', desc: '深蓝染色,夜间潜行', price: 200, kind: 'skin', skin: 'night' },
+  { id: 'skin-gold', name: '皮肤 · 金身王博', desc: '金光护体,富贵逼人', price: 400, kind: 'skin', skin: 'gold' },
+  { id: 'skin-inferno', name: '皮肤 · 赤焰王博', desc: '赤焰加身,火力全开', price: 800, kind: 'skin', skin: 'inferno' },
+  { id: 'pendant-star', name: '反弹之星', desc: '头顶显示星星挂件', price: 25, kind: 'pendant', pendant: 'star' },
+  { id: 'pendant-medal', name: '勋章挂件', desc: '头顶显示勋章挂件', price: 45, kind: 'pendant', pendant: 'medal' },
+  { id: 'pendant-briefcase', name: '连结之包', desc: '头顶显示公文包挂件', price: 35, kind: 'pendant', pendant: 'briefcase' },
+  { id: 'pendant-crown', name: '反复之官', desc: '头顶显示皇冠挂件', price: 60, kind: 'pendant', pendant: 'crown' },
+  { id: 'pendant-scale', name: '天平挂件', desc: '头顶显示天平挂件', price: 120, kind: 'pendant', pendant: 'scale' },
+  { id: 'pendant-trophy', name: '冠军奖杯', desc: '头顶显示奖杯挂件', price: 300, kind: 'pendant', pendant: 'trophy' }
 ];
 
-export const PENDANT_EMOJI: Record<PendantId, string> = {
-  '': '', star: '⭐', crown: '👑', briefcase: '💼', medal: '🎖️', scale: '⚖️', trophy: '🏆'
+export const PENDANT_TEXTURE: Record<PendantId, string> = {
+  '': '', star: 'pendant-star', crown: 'pendant-crown', briefcase: 'pendant-briefcase',
+  medal: 'pendant-medal', scale: 'pendant-scale', trophy: 'pendant-trophy'
 };
 
 export function hasPistol(p: Progress): boolean {

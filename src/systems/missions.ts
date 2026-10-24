@@ -6,7 +6,6 @@ export type MissionId = 'dodge' | 'combo' | 'pickup' | 'survive' | 'kill' | 'nea
 
 export interface RunMission {
   id: MissionId;
-  icon: string;
   title: string;
   desc: string;
   target: number;
@@ -25,13 +24,13 @@ export interface MissionState {
 }
 
 const ALL: RunMission[] = [
-  { id: 'dodge', icon: '🏃', title: '稳步高升', desc: '翻越 15 个诱惑', target: 15, unit: '个', reward: 30 },
-  { id: 'survive', icon: '⏱️', title: '稳坐钓鱼台', desc: '存活 30 秒', target: 30, unit: '秒', reward: 30 },
-  { id: 'pickup', icon: '🎁', title: '雁过拔毛', desc: '拾取 3 个道具', target: 3, unit: '个', reward: 35 },
-  { id: 'combo', icon: '🔥', title: '一气呵成', desc: '达成 ×10 连击', target: 10, unit: '连', reward: 45 },
-  { id: 'kill', icon: '🔫', title: '反腐先锋', desc: '击毁 3 个障碍', target: 3, unit: '个', reward: 40 },
-  { id: 'nearmiss', icon: '😱', title: '有惊无险', desc: '擦身而过 4 次', target: 4, unit: '次', reward: 50 },
-  { id: 'flawless', icon: '🛡️', title: '两袖清风', desc: '无伤存活 20 秒', target: 20, unit: '秒', reward: 50 }
+  { id: 'dodge', title: '稳步高升', desc: '翻越 15 个诱惑', target: 15, unit: '个', reward: 30 },
+  { id: 'survive', title: '稳坐钓鱼台', desc: '存活 30 秒', target: 30, unit: '秒', reward: 30 },
+  { id: 'pickup', title: '雁过拔毛', desc: '拾取 3 个道具', target: 3, unit: '个', reward: 35 },
+  { id: 'combo', title: '一气呵成', desc: '达成 ×10 连击', target: 10, unit: '连', reward: 45 },
+  { id: 'kill', title: '反腐先锋', desc: '击毁 3 个障碍', target: 3, unit: '个', reward: 40 },
+  { id: 'nearmiss', title: '有惊无险', desc: '擦身而过 4 次', target: 4, unit: '次', reward: 50 },
+  { id: 'flawless', title: '两袖清风', desc: '无伤存活 20 秒', target: 20, unit: '秒', reward: 50 }
 ];
 
 export function missionValue(m: RunMission, s: MissionState): number {

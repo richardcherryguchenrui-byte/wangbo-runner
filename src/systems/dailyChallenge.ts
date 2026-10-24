@@ -7,7 +7,6 @@ export interface DailyModifier {
   id: string;
   name: string;
   desc: string;
-  icon: string;
   speedMul: number;
   coinMul: number;
   livesDelta: number;
@@ -15,10 +14,10 @@ export interface DailyModifier {
 }
 
 const MODIFIERS: DailyModifier[] = [
-  { id: 'speed', name: '极速晋升', desc: '跑速 +10%,银币 +15%', icon: '⚡', speedMul: 1.1, coinMul: 1.15, livesDelta: 0, inspectionFast: false },
-  { id: 'redpacket', name: '红包雨', desc: '本局银币翻倍', icon: '🧧', speedMul: 1, coinMul: 2, livesDelta: 0, inspectionFast: false },
-  { id: 'inspection', name: '巡视风暴', desc: '巡视组提前来袭,银币 +30%', icon: '🚨', speedMul: 1, coinMul: 1.3, livesDelta: 0, inspectionFast: true },
-  { id: 'fragile', name: '一命通关', desc: '少一条命,银币 +50%', icon: '💔', speedMul: 1, coinMul: 1.5, livesDelta: -1, inspectionFast: false }
+  { id: 'speed', name: '极速晋升', desc: '跑速 +10%,银币 +15%', speedMul: 1.1, coinMul: 1.15, livesDelta: 0, inspectionFast: false },
+  { id: 'redpacket', name: '红包雨', desc: '本局银币翻倍', speedMul: 1, coinMul: 2, livesDelta: 0, inspectionFast: false },
+  { id: 'inspection', name: '巡视风暴', desc: '巡视组提前来袭,银币 +30%', speedMul: 1, coinMul: 1.3, livesDelta: 0, inspectionFast: true },
+  { id: 'fragile', name: '一命通关', desc: '少一条命,银币 +50%', speedMul: 1, coinMul: 1.5, livesDelta: -1, inspectionFast: false }
 ];
 
 export interface DailyState {

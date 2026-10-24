@@ -61,7 +61,7 @@ import {
   hasPistol,
   bulletsPerRun,
   bribeCarryLimit,
-  PENDANT_EMOJI
+  PENDANT_TEXTURE
 } from '../systems/progress';
 import { addPanel, drawBar, showToast, FONT } from '../systems/ui';
 import { startBgm, playSfx, crossfadeToBgm2, pauseBgm, resumeBgm } from '../systems/audio';
@@ -167,7 +167,7 @@ export default class GameScene extends Phaser.Scene {
   private playerTex = (n: string) => `player-${n}`;
   private shareTexture = 'player-idle';
   private bobTween?: Phaser.Tweens.Tween;
-  private pendantText?: Phaser.GameObjects.Text;
+  private pendantIcon?: Phaser.GameObjects.Image;
   private shieldRing!: Phaser.GameObjects.Image;
   private hypeAura!: Phaser.GameObjects.Image;
   private airborne = false;
@@ -556,10 +556,11 @@ export default class GameScene extends Phaser.Scene {
       .setScale(1.1, 0.8)
       .setAlpha(0.72);
 
-    if (PENDANT_EMOJI[this.progress.pendant]) {
-      this.pendantText = this.add
-        .text(this.player.x, this.player.y - 74, PENDANT_EMOJI[this.progress.pendant], { fontSize: '24px', resolution: 2 })
-        .setOrigin(0.5)
+    const pendantTex = PENDANT_TEXTURE[this.progress.pendant];
+    if (pendantTex) {
+      this.pendantIcon = this.add
+        .image(this.player.x, this.player.y - 74, pendantTex)
+        .setDisplaySize(26, 26)
         .setDepth(7);
     }
 
@@ -1006,7 +1007,7 @@ export default class GameScene extends Phaser.Scene {
     const btn = this.makeOverlayButton(
       GAME_WIDTH / 2,
       GAME_HEIGHT / 2 + 154,
-      this.tutorialStep >= steps.length - 1 ? '开始跑! ▶' : '知道了 →',
+      this.tutorialStep >= steps.length - 1 ? '开始跑!' : '知道了 →',
       () => {
         playSfx(this, 'click', 0.4);
         if (this.tutorialStep >= steps.length - 1) {
@@ -1022,7 +1023,8 @@ export default class GameScene extends Phaser.Scene {
           this.showTutorial();
         }
       },
-      302
+      302,
+      this.tutorialStep >= steps.length - 1 ? 'ui-arrow-up' : undefined
     );
 
     this.tutorialObjects = [dim, panel, tag, icon, title, body, ...dots, ...btn];
@@ -1095,22 +1097,42 @@ export default class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(302);
-    this.pauseObjects = [dim, panel, titleIcon, titleText, stats];
-    this.pauseObjects.push(...this.makeOverlayButton(GAME_WIDTH / 2, 216, '▶ 继续', () => this.resumeGame()));
+
+    // 本局考核进度:暂停时也能看到离目标还差多少
+    const missionProgress = this.missionCompleted
+      ? `已完成 +${this.mission.reward} 银币`
+      : `${missionProgressText(this.mission, this.getMissionState())} · 完成 +${this.mission.reward} 银币`;
+    const missionText = this.add
+      .text(0, 0, `本局考核「${this.mission.title}」 ${missionProgress}`, {
+        fontFamily: FONT, fontSize: '12px',
+        color: this.missionCompleted ? '#8ce99a' : '#cfe3ff', resolution: 2
+      })
+      .setOrigin(0.5)
+      .setDepth(302);
+    const missionIcon = this.add
+      .image(0, 0, `mi-${this.mission.id}`)
+      .setDisplaySize(15, 15)
+      .setDepth(302);
+    const missionW = 15 + 7 + missionText.width;
+    missionIcon.setPosition(GAME_WIDTH / 2 - missionW / 2 + 7.5, 186);
+    missionText.setPosition(GAME_WIDTH / 2 - missionW / 2 + 22 + missionText.width / 2, 186);
+
+    this.pauseObjects = [dim, panel, titleIcon, titleText, stats, missionIcon, missionText];
+    this.pauseObjects.push(...this.makeOverlayButton(GAME_WIDTH / 2, 224, '继续', () => this.resumeGame(), 302, 'ui-play'));
     this.pauseObjects.push(
-      ...this.makeOverlayButton(GAME_WIDTH / 2, 278, '重新开始', () => {
+      ...this.makeOverlayButton(GAME_WIDTH / 2, 284, '重新开始', () => {
         this.scene.restart({ daily: this.daily });
       }, 302, 'ui-restart')
     );
     this.pauseObjects.push(
-      ...this.makeOverlayButton(GAME_WIDTH / 2, 340, '主菜单', () => {
+      ...this.makeOverlayButton(GAME_WIDTH / 2, 344, '主菜单', () => {
         this.scene.start('Title');
       }, 302, 'ui-home')
     );
     this.pauseObjects.push(
       ...this.makeOverlayButton(
         GAME_WIDTH / 2,
-        402,
+        404,
         this.daily ? '今日挑战规则' : '操作提示',
         () => {
           if (this.daily && this.challenge) {
@@ -1402,7 +1424,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private updatePlayerFx(dt: number) {
-    if (this.pendantText) this.pendantText.setPosition(this.player.x, this.player.y - 74 * this.player.scaleY);
+    if (this.pendantIcon) this.pendantIcon.setPosition(this.player.x, this.player.y - 74 * this.player.scaleY);
 
     const feetY = this.player.y + (this.frameH * this.player.scaleY) / 2;
     const lift = Math.max(0, GROUND_TOP - feetY);
@@ -1710,23 +1732,32 @@ export default class GameScene extends Phaser.Scene {
   private showFlyerWarn() {
     if (this.time.now - this.lastFlyerWarnAt < 500) return;
     this.lastFlyerWarnAt = this.time.now;
-    const t = this.add
-      .text(GAME_WIDTH - 22, 176, '⚠ 低空!\n↓ 滑铲', {
-        fontFamily: FONT, fontSize: '18px', color: '#ff8787', fontStyle: 'bold',
-        align: 'center', lineSpacing: 2, resolution: 2, stroke: '#08131f', strokeThickness: 5
+    const label = this.add
+      .text(0, 14, '低空来袭 · 下滑滑铲', {
+        fontFamily: FONT, fontSize: '14px', color: '#ff8787', fontStyle: 'bold',
+        resolution: 2, stroke: '#08131f', strokeThickness: 4
       })
-      .setOrigin(1, 0.5)
+      .setOrigin(0.5);
+    const bg = this.add.graphics();
+    const w = Math.max(160, label.width + 34);
+    bg.fillStyle(0x1a0b12, 0.82);
+    bg.fillRoundedRect(-w / 2, -25, w, 52, 14);
+    bg.lineStyle(1.4, 0xff8787, 0.45);
+    bg.strokeRoundedRect(-w / 2, -25, w, 52, 14);
+    const icon = this.add.image(0, -10, 'ui-arrow-down').setDisplaySize(22, 22);
+    const c = this.add
+      .container(GAME_WIDTH - 108, 178, [bg, icon, label])
       .setDepth(84)
       .setAlpha(0)
       .setScale(0.7);
-    this.tweens.add({ targets: t, alpha: 1, scale: 1, duration: 180, ease: 'Back.out' });
+    this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 180, ease: 'Back.out' });
     this.tweens.add({
-      targets: t,
+      targets: c,
       alpha: 0,
-      x: GAME_WIDTH - 44,
+      x: GAME_WIDTH - 130,
       delay: FLYER_WARN_MS - 260,
       duration: 300,
-      onComplete: () => t.destroy()
+      onComplete: () => c.destroy()
     });
     playSfx(this, 'warn', 0.42);
   }
@@ -1851,7 +1882,7 @@ export default class GameScene extends Phaser.Scene {
     impactBurst(this, this.player.x + 20, this.player.y - 24);
     shake(this, 0.012, 210);
     wxVibrate('medium');
-    this.floatText(this.player.x, this.player.y - 60, '-1 ❤', '#ff8787');
+    this.floatText(this.player.x, this.player.y - 60, '-1 生命', '#ff8787');
     // 80ms 顿帧:命中瞬间世界静止,再恢复,打击更实
     this.hitFreezeUntil = this.time.now + 85;
     this.physics.pause();
@@ -2023,7 +2054,7 @@ export default class GameScene extends Phaser.Scene {
     this.overdriveCount += 1;
     this.hype = HYPE_MAX;
     this.player.setTint(0xffe066);
-    this.showBanner('⚡ 高光时刻!', '#ffe066', 44);
+    this.showBanner('高光时刻!', '#ffe066', 44, 'ui-bolt');
     playSfx(this, 'hype', 0.6);
     wxVibrate('medium');
     shake(this, 0.005, 220);
@@ -2207,7 +2238,7 @@ export default class GameScene extends Phaser.Scene {
     alarmPulse(this);
     playSfx(this, 'wave_start', 0.5);
     wxVibrate('medium');
-    this.showBanner('⚠ 巡视组来了!', '#ff8787', 42);
+    this.showBanner('巡视组来了!', '#ff8787', 42, 'ui-siren');
     this.spawnPatrol();
   }
 
@@ -2526,7 +2557,6 @@ export default class GameScene extends Phaser.Scene {
       newAchievements: newAch.map(a => a.name),
       rankIndex: rankInfo.current.index,
       rankName: rankInfo.current.name,
-      rankEmoji: rankInfo.current.emoji,
       rankColor: rankInfo.current.color,
       missionTitle: this.mission.title,
       missionDone: this.missionCompleted,
@@ -2630,7 +2660,7 @@ export default class GameScene extends Phaser.Scene {
     this.pauseObjects = [];
     this.tutorialObjects = [];
     this.reviveObjects = [];
-    this.pendantText = undefined;
+    this.pendantIcon = undefined;
     this.heartIcon = undefined;
     this.rankIcon = undefined;
   }
