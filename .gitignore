@@ -23,3 +23,6 @@ dist-minigame/
 
 .shots
 .src-backup-*
+
+# 本地浏览器验证产物(截图/脚本)
+output/
