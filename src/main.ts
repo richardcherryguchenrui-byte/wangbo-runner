@@ -1,3 +1,11 @@
+
+declare global {
+  interface Window {
+    __bootSetProgress?: (pct: number, text?: string) => void;
+    __bootDone?: () => void;
+    __bootFail?: (text?: string) => void;
+  }
+}
 import Phaser from 'phaser';
 import BootScene from './scenes/BootScene';
 import SplashScene from './scenes/SplashScene';

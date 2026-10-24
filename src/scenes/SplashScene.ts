@@ -7,6 +7,8 @@ export default class SplashScene extends Phaser.Scene {
   constructor() { super('Splash'); }
 
   create() {
+    // 游戏首帧已经能画出来了,收起 HTML 加载页
+    window.__bootDone?.();
     const bg = this.add.graphics();
     bg.fillGradientStyle(0x07142a, 0x0b1d36, 0x16324f, 0x2b1e3a, 1);
     bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);

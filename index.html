@@ -25,6 +25,72 @@
         touch-action: none;
         overscroll-behavior: none;
       }
+      /* ---- 启动加载页:纯 HTML/CSS,不依赖 JS,首帧就能看到 ---- */
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 10001;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background:
+          radial-gradient(circle at 50% 34%, rgba(29, 53, 87, 0.96), rgba(4, 11, 22, 0.99) 70%),
+          #040b16;
+        color: #fff;
+        text-align: center;
+        font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      }
+      #boot-splash.hidden { display: none !important; }
+      .boot-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 30px 34px 26px;
+        border: 1px solid rgba(255, 212, 59, 0.26);
+        border-radius: 22px;
+        background: rgba(8, 21, 37, 0.86);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+        min-width: 260px;
+      }
+      .boot-logo {
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: 3px;
+        color: #ffd43b;
+        text-shadow: 0 2px 12px rgba(255, 212, 59, 0.35);
+      }
+      .boot-sub { font-size: 11px; letter-spacing: 2px; color: #8ba9c7; }
+      .boot-bar {
+        width: 220px;
+        height: 8px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.12);
+        overflow: hidden;
+        margin-top: 4px;
+      }
+      .boot-bar > i {
+        display: block;
+        height: 100%;
+        width: 12%;
+        border-radius: 4px;
+        background: linear-gradient(90deg, #74c0fc, #ffd43b);
+        transition: width 0.25s ease;
+      }
+      .boot-status { font-size: 12px; color: #b7cfe8; min-height: 18px; }
+      .boot-tip { font-size: 11px; color: #7a8fa6; max-width: 260px; line-height: 1.6; }
+      #boot-retry {
+        display: none;
+        margin-top: 6px;
+        padding: 9px 26px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 999px;
+        background: #16324f;
+        color: #cfe3ff;
+        font: inherit;
+        font-size: 13px;
+      }
+      #boot-retry.show { display: inline-block; }
       #rotate-hint {
         display: none;
         position: fixed;
@@ -81,6 +147,16 @@
   </head>
   <body>
     <div id="app"></div>
+    <div id="boot-splash">
+      <div class="boot-card">
+        <div class="boot-logo">王博晋升之路</div>
+        <div class="boot-sub">反弹工作室 · REBOUND STUDIO</div>
+        <div class="boot-bar"><i id="boot-bar-fill"></i></div>
+        <div class="boot-status" id="boot-status">正在启动…</div>
+        <div class="boot-tip" id="boot-tip">首次打开需要下载约 4MB 资源,请稍等</div>
+        <button id="boot-retry" type="button">重新加载</button>
+      </div>
+    </div>
     <div id="rotate-hint" role="dialog" aria-label="横屏提示">
       <div class="rotate-card">
         <div class="rotate-icon">↻</div>
@@ -89,6 +165,51 @@
         <button id="rotate-dismiss" type="button">继续竖屏</button>
       </div>
     </div>
+    <script>
+      // 启动加载页控制:即使主程序还没下载完 / 网络卡住,用户也能看到状态并能重试
+      (function () {
+        var splash = document.getElementById('boot-splash');
+        var fill = document.getElementById('boot-bar-fill');
+        var status = document.getElementById('boot-status');
+        var tip = document.getElementById('boot-tip');
+        var retry = document.getElementById('boot-retry');
+        var done = false;
+
+        window.__bootSetProgress = function (pct, text) {
+          if (done || !fill) return;
+          if (typeof pct === 'number') fill.style.width = Math.max(6, Math.min(100, pct)) + '%';
+          if (text && status) status.textContent = text;
+        };
+        window.__bootDone = function () {
+          if (done) return;
+          done = true;
+          if (splash) splash.classList.add('hidden');
+        };
+        window.__bootFail = function (text) {
+          if (done) return;
+          if (status) status.textContent = text || '加载失败';
+          if (retry) retry.classList.add('show');
+          if (tip) tip.textContent = '网络似乎不通。GitHub Pages 在国内常被限制,可换用镜像地址(见群公告)或挂 VPN。';
+        };
+
+        if (retry) retry.addEventListener('click', function () { location.reload(); });
+
+        // 慢网提示
+        setTimeout(function () {
+          if (done) return;
+          if (status) status.textContent = '网络较慢,仍在加载…';
+          if (tip) tip.textContent = '资源较大,移动网络下可能需要 10~30 秒';
+        }, 12000);
+        // 超时兜底:让用户有出路,而不是干等一片空白
+        setTimeout(function () { window.__bootFail('加载超时'); }, 35000);
+        // 主程序脚本自身的错误也要能看见
+        window.addEventListener('error', function (e) {
+          if (!done && e && e.target && e.target.tagName === 'SCRIPT') {
+            window.__bootFail('主程序加载失败');
+          }
+        }, true);
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
   </html>

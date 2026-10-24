@@ -6,6 +6,24 @@ export default class PreloadScene extends Phaser.Scene {
   constructor() { super('Preload'); }
 
   preload() {
+    // 把真实加载进度喂给 HTML 加载页,避免「一片蓝屏干等」
+    const failList: string[] = [];
+    this.load.on('progress', (p: number) => {
+      window.__bootSetProgress?.(Math.round(p * 100), `正在加载资源 ${Math.round(p * 100)}%`);
+    });
+    this.load.on('loaderror', (file: { key?: string }) => {
+      failList.push(file?.key ?? 'unknown');
+    });
+    this.load.on('complete', () => {
+      if (failList.length > 0) {
+        // 个别资源挂掉不影响进游戏,但要让用户知道
+        console.warn('[preload] 资源加载失败:', failList.join(', '));
+        window.__bootSetProgress?.(100, `资源部分缺失(${failList.length} 个),正在进入…`);
+      } else {
+        window.__bootSetProgress?.(100, '资源就绪,正在生成画面…');
+      }
+    });
+
     // 主角素材包:站立/跑步×2/跳跃 四帧
     this.load.image('player-idle', 'assets/player-idle.png');
     this.load.image('player-run-1', 'assets/player-run-1.png');
