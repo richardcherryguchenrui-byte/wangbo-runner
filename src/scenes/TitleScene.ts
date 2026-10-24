@@ -5,6 +5,7 @@ import { makeHeroButton, showToast, FONT, addPanel } from '../systems/ui';
 import { startBgm, playSfx } from '../systems/audio';
 import { ensureSkinTextures, playerFrameKey } from '../systems/skins';
 import { loadControls } from '../systems/controls';
+import { LEVELS, totalStars } from '../systems/levels';
 import { checkIn } from '../systems/daily';
 import { hasCustomHead } from '../systems/customhead';
 import { RUN_RANKS } from '../systems/ranks';
@@ -274,11 +275,38 @@ export default class TitleScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '14px', color: '#a9c7e8', fontStyle: 'bold'
     }).setOrigin(0.5).setDepth(10);
 
-    // 开始游戏:主按钮
-    makeHeroButton(this, px + pw / 2, 168, 276, 66, '开始游戏', () => this.startGame(false), { iconKey: 'ui-play', iconSize: 24, fontSize: 27 });
+    // 主入口:闯关模式(贪官隐喻的十八关主线)
+    const clearedCount = LEVELS.filter(l => (p.levelStars[l.id] ?? 0) > 0).length;
+    const starSum = totalStars(p.levelStars);
+    makeHeroButton(this, px + pw / 2, 150, 276, 60, '闯关模式', () => {
+      playSfx(this, 'click', 0.45);
+      this.scene.start('Campaign');
+    }, { iconKey: 'ui-play', iconSize: 22, fontSize: 25 });
+
+    this.add.text(px + pw / 2, 186, `官场现形记 · 已通关 ${clearedCount}/${LEVELS.length} 关 · ★${starSum}`, {
+      fontFamily: FONT, fontSize: '11px', color: '#ffe066'
+    }).setOrigin(0.5).setDepth(10).setAlpha(0.95);
+
+    // 无尽模式:老玩法保留
+    {
+      const bx = px + 18;
+      const by = 200;
+      const bw = pw - 36;
+      const bg = this.add.graphics().setDepth(10);
+      bg.fillStyle(0x16324f, 0.85);
+      bg.fillRoundedRect(bx, by, bw, 32, 10);
+      bg.lineStyle(1.2, 0xffffff, 0.12);
+      bg.strokeRoundedRect(bx, by, bw, 32, 10);
+      this.add.image(bx + 20, by + 16, 'ui-clock').setDisplaySize(15, 15).setDepth(11);
+      this.add.text(bx + 36, by + 16, '无尽模式 · 能撑多久算多久', {
+        fontFamily: FONT, fontSize: '13px', color: '#cfe3ff', fontStyle: 'bold'
+      }).setOrigin(0, 0.5).setDepth(11);
+      const hit = this.add.rectangle(bx + bw / 2, by + 16, bw, 32, 0xffffff, 0.001).setDepth(12).setInteractive({ useHandCursor: true });
+      hit.on('pointerdown', () => { playSfx(this, 'click', 0.4); this.startGame(false); });
+    }
 
     // 每日挑战卡
-    const dy = 226;
+    const dy = 240;
     const dcBg = this.add.graphics().setDepth(10);
     dcBg.fillStyle(0x2a1b4a, 0.9);
     dcBg.fillRoundedRect(px + 18, dy, pw - 36, 66, 14);
@@ -321,7 +349,7 @@ export default class TitleScene extends Phaser.Scene {
 
     // 底部提示
     const pad = loadControls().virtualButtons;
-    this.add.text(px + pw / 2, 449, pad ? '点开始游戏 · D 每日挑战' : '空格开始 · D 每日挑战 · ↓ 滑铲', {
+    this.add.text(px + pw / 2, 449, pad ? '点闯关模式开始 · D 每日挑战' : '空格进无尽模式 · D 每日挑战 · ↓ 滑铲', {
       fontFamily: FONT, fontSize: '11px', color: '#cfe3ff'
     }).setOrigin(0.5).setDepth(10).setAlpha(0.92);
   }

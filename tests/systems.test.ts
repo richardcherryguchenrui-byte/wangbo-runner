@@ -18,6 +18,10 @@ import {
 } from '../src/systems/missions';
 import { generatePattern, stageFor, FLYER_Y } from '../src/systems/patterns';
 import { isPerfectSlideTiming, tightSlideIndex } from '../src/systems/slideJudge';
+import {
+  LEVELS, CHAPTERS, starCount, goalDone, isLevelUnlocked, isChapterUnlocked,
+  levelSpeedAt, levelReward, nextLevelId, totalStars, MAX_STARS_PER_LEVEL
+} from '../src/systems/levels';
 import { gradeRun } from '../src/systems/grade';
 import {
   getDailyChallenge, recordDailyRun, peekDailyState, mulberry32, DAILY_MODIFIERS
@@ -596,5 +600,105 @@ describe('完美滑铲时机判定', () => {
     // 全是远处的障碍:这次起滑不算卡点
     expect(tightSlideIndex([far], SPEED)).toBe(null);
     expect(tightSlideIndex([], SPEED)).toBe(null);
+  });
+});
+
+// 闯关模式:星级、解锁链、速度曲线与关卡数据自洽
+describe('闯关模式 · 官场现形记', () => {
+  const baseStats = {
+    cleared: true, timeMs: 25000, dodged: 0, nearMisses: 0,
+    perfectSlides: 0, comboMax: 0, hits: 0, coins: 0
+  };
+
+  it('没通关一颗星都没有', () => {
+    const l = LEVELS[0];
+    expect(starCount(l, { ...baseStats, cleared: false, dodged: 999, nearMisses: 99 })).toBe(0);
+  });
+
+  it('通关 1 星,两个目标各加 1 星', () => {
+    const l = LEVELS[0]; // dodge 8 + nearmiss 1
+    expect(starCount(l, { ...baseStats })).toBe(1);
+    expect(starCount(l, { ...baseStats, dodged: 8 })).toBe(2);
+    expect(starCount(l, { ...baseStats, dodged: 8, nearMisses: 1 })).toBe(3);
+    // 只达成第二个目标也是 2 星
+    expect(starCount(l, { ...baseStats, nearMisses: 1 })).toBe(2);
+  });
+
+  it('无伤目标看受击次数', () => {
+    const l = LEVELS.find(x => x.goals.some(g => g.kind === 'noHit'))!;
+    const goal = l.goals.find(g => g.kind === 'noHit')!;
+    expect(goalDone(goal, { ...baseStats, hits: 0 })).toBe(true);
+    expect(goalDone(goal, { ...baseStats, hits: 1 })).toBe(false);
+  });
+
+  it('关卡按顺序解锁,第一章第一关永远开放', () => {
+    expect(isLevelUnlocked('l1-1', {})).toBe(true);
+    expect(isLevelUnlocked('l1-2', {})).toBe(false);
+    expect(isLevelUnlocked('l1-2', { 'l1-1': 1 })).toBe(true);
+    expect(isLevelUnlocked('l2-1', { 'l1-1': 3, 'l1-2': 3, 'l1-3': 1 })).toBe(true);
+  });
+
+  it('章节按累计星数解锁', () => {
+    // 第一章不要星
+    expect(isChapterUnlocked(0, {})).toBe(true);
+    // 第二章需要 2 星,且必须打通第一章最后一关
+    expect(isChapterUnlocked(1, {})).toBe(false);
+    expect(isChapterUnlocked(1, { 'l1-1': 2 })).toBe(false); // 星够但没打通 l1-3
+    expect(isChapterUnlocked(1, { 'l1-1': 1, 'l1-2': 1 })).toBe(false);
+    expect(isChapterUnlocked(1, { 'l1-1': 1, 'l1-2': 1, 'l1-3': 1 })).toBe(true);
+    // 最后一章门槛最高
+    expect(isChapterUnlocked(5, { 'l1-1': 3, 'l1-2': 3, 'l1-3': 3 })).toBe(false);
+  });
+
+  it('速度曲线从起点线性升到终点', () => {
+    const l = LEVELS[3];
+    expect(levelSpeedAt(l, 0)).toBe(l.speedStart);
+    expect(Math.round(levelSpeedAt(l, l.durationMs))).toBe(Math.round(l.speedEnd));
+    const mid = levelSpeedAt(l, l.durationMs / 2);
+    expect(mid).toBeGreaterThan(l.speedStart);
+    expect(mid).toBeLessThan(l.speedEnd);
+    // 超出时长不越界
+    expect(Math.round(levelSpeedAt(l, l.durationMs * 3))).toBe(Math.round(l.speedEnd));
+  });
+
+  it('奖励:首次通关额外给一笔,重复刷只给星钱', () => {
+    const l = LEVELS[0];
+    const first = levelReward(l, 3, true);
+    const again = levelReward(l, 3, false);
+    expect(first).toBe(again + l.rewardFirst);
+    expect(again).toBe(3 * l.rewardStar);
+    expect(levelReward(l, 0, true)).toBe(l.rewardFirst);
+  });
+
+  it('下一关与进度统计', () => {
+    expect(nextLevelId(LEVELS[LEVELS.length - 1].id)).toBe(null);
+    expect(nextLevelId('l1-1')).toBe('l1-2');
+    expect(totalStars({})).toBe(0);
+    expect(totalStars({ 'l1-1': 3, 'l1-2': 2 })).toBe(5);
+  });
+
+  it('关卡数据自洽:id 唯一、章节连续、目标合法、首领不超时', () => {
+    const ids = new Set<string>();
+    LEVELS.forEach((l, i) => {
+      expect(ids.has(l.id)).toBe(false);
+      ids.add(l.id);
+      expect(l.id).toBe(`l${l.chapter + 1}-${l.index + 1}`);
+      expect(l.durationMs).toBeGreaterThan(10000);
+      expect(l.speedEnd).toBeGreaterThan(l.speedStart);
+      expect(l.goals[0].target).toBeGreaterThan(0);
+      expect(l.goals[1].target).toBeGreaterThan(0);
+      if (l.bossAtMs !== undefined) {
+        expect(l.bossAtMs).toBeLessThan(l.durationMs);
+      }
+      // 章节内顺序应与全局顺序一致
+      if (i > 0) {
+        const prev = LEVELS[i - 1];
+        expect(l.chapter >= prev.chapter).toBe(true);
+      }
+    });
+    // 每章 3 关
+    CHAPTERS.forEach(c => {
+      expect(LEVELS.filter(l => l.chapter === c.index).length).toBe(3);
+    });
   });
 });

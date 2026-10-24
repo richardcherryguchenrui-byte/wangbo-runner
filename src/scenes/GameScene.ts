@@ -98,6 +98,17 @@ import { generatePattern, FLYER_Y, type RunPattern } from '../systems/patterns';
 import { tightSlideIndex } from '../systems/slideJudge';
 import { loadControls, type ControlSettings } from '../systems/controls';
 import {
+  levelById,
+  levelSpeedAt,
+  starCount,
+  goalValue,
+  remainingMs,
+  levelReward,
+  nextLevelId,
+  type LevelDef,
+  type LevelStats
+} from '../systems/levels';
+import {
   getDailyChallenge,
   recordDailyRun,
   mulberry32,
@@ -107,6 +118,8 @@ import {
 
 interface GameData {
   daily?: boolean;
+  /** 闯关模式:指定关卡 id(不带则进无尽模式) */
+  levelId?: string;
 }
 
 interface HudButton {
@@ -160,6 +173,11 @@ export default class GameScene extends Phaser.Scene {
   private rng: () => number = () => Math.random();
   private dailySpeedMul = 1;
   private dailyCoinMul = 1;
+
+  // ---- 闯关模式 ----
+  private level?: LevelDef;
+  private levelFinishing = false;   // 通关演出中:世界停下等结算
+  private runPerfectSlides = 0;
 
   // ---- 玩家 ----
   private player!: Phaser.Physics.Arcade.Sprite;
@@ -304,6 +322,7 @@ export default class GameScene extends Phaser.Scene {
 
   init(data: GameData) {
     this.daily = !!data?.daily;
+    this.level = data?.levelId ? levelById(data.levelId) : undefined;
     if (this.daily) {
       this.challenge = getDailyChallenge();
       this.rng = mulberry32(this.challenge.seed);
@@ -342,10 +361,11 @@ export default class GameScene extends Phaser.Scene {
     this.setupLifecycle();
 
     this.mission = pickRunMission(this.progress, this.rng);
-    this.nextInspectionAt = this.daily && this.challenge?.modifier.inspectionFast ? 15000 : INSPECTION_FIRST_MS;
-    this.hud.missionTitle.setText(this.mission.title);
-    this.hud.missionIcon.setTexture(`mi-${this.mission.id}`);
-    this.hud.missionDesc.setText(`0/${this.mission.target}${this.mission.unit} · 完成 +${this.mission.reward} 银币`);
+    // 关卡模式:巡视组按关卡配置来袭;无尽/每日按默认节奏
+    this.nextInspectionAt =
+      this.level?.bossAtMs ??
+      (this.daily && this.challenge?.modifier.inspectionFast ? 15000 : INSPECTION_FIRST_MS);
+    this.refreshLevelHud();
     this.refreshRankHud(true);
     this.refreshLivesHud();
 
@@ -358,13 +378,67 @@ export default class GameScene extends Phaser.Scene {
 
     startBgm(this);
 
-    if (!this.progress.tutorialDone) {
+    // 关卡模式只有第一关弹新手引导,免得每关都来一遍
+    const needTutorial = !this.progress.tutorialDone && (!this.level || this.level.id === 'l1-1');
+    if (needTutorial) {
       this.tutorialStep = 0;
       this.physics.pause();
       this.showTutorial();
     } else {
       this.announceStart();
     }
+  }
+
+  // ============================================================
+  // 闯关模式
+  // ============================================================
+
+  private levelStats(cleared: boolean): LevelStats {
+    return {
+      cleared,
+      timeMs: Math.round(this.elapsedMs),
+      dodged: this.dodged,
+      nearMisses: this.runNearMisses,
+      perfectSlides: this.runPerfectSlides,
+      comboMax: this.comboMax,
+      hits: this.hits,
+      coins: this.runCoins
+    };
+  }
+
+  private levelGoalText(): string {
+    if (!this.level) return '';
+    const stats = this.levelStats(false);
+    return this.level.goals
+      .map(g => `${g.label} ${Math.min(goalValue(g, stats), g.target)}/${g.target}`)
+      .join(' · ');
+  }
+
+  private refreshLevelHud() {
+    if (!this.level) {
+      this.hud.missionTitle.setText(this.mission.title);
+      this.hud.missionIcon.setTexture(`mi-${this.mission.id}`);
+      this.hud.missionDesc.setText(`0/${this.mission.target}${this.mission.unit} · 完成 +${this.mission.reward} 银币`);
+      return;
+    }
+    this.hud.missionTitle.setText(this.level.name);
+    this.hud.missionIcon.setTexture('mi-survive');
+    this.hud.missionDesc.setText(this.levelGoalText());
+  }
+
+  // 活到关卡时长 = 通关:停世界、放演出,再结算
+  private finishLevel() {
+    if (!this.level || this.levelFinishing) return;
+    this.levelFinishing = true;
+    this.player.setVelocity(0, 0);
+    this.physics.pause();
+    this.hud.combo.setVisible(false);
+    this.hud.comboBg.setVisible(false);
+    this.showBanner('仕途通关!', '#ffe066', 44, 'ui-rank');
+    confettiBurst(this, GAME_WIDTH / 2, 150, 40);
+    playSfx(this, 'promote', 0.6);
+    wxVibrate('medium');
+    this.time.delayedCall(1400, () => this.endRun(true));
   }
 
   // ============================================================
@@ -1242,7 +1316,7 @@ export default class GameScene extends Phaser.Scene {
     this.pauseObjects.push(...this.makeOverlayButton(GAME_WIDTH / 2, 224, '继续', () => this.resumeGame(), 302, 'ui-play'));
     this.pauseObjects.push(
       ...this.makeOverlayButton(GAME_WIDTH / 2, 284, '重新开始', () => {
-        this.scene.restart({ daily: this.daily });
+        this.scene.restart({ daily: this.daily, levelId: this.level?.id });
       }, 302, 'ui-restart')
     );
     this.pauseObjects.push(
@@ -1307,10 +1381,23 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
+    // 通关演出:世界停下,只留背景缓缓后退
+    if (this.levelFinishing) {
+      this.updateBackdrop(dt, 60);
+      return;
+    }
+
     // 命中顿帧:画面完全静止约 85ms
     if (time < this.hitFreezeUntil) return;
 
     this.elapsedMs += dt;
+
+    // 关卡模式:活到时长上限就算通关
+    if (this.level && this.elapsedMs >= this.level.durationMs) {
+      this.elapsedMs = this.level.durationMs;
+      this.finishLevel();
+      return;
+    }
     this.timeSinceHitMs += dt;
 
     // 追平生涯最佳:局内即时庆祝,不用等到结算
@@ -1335,8 +1422,10 @@ export default class GameScene extends Phaser.Scene {
       crossfadeToBgm2(this);
     }
 
-    // 速度:基础加速 + 每日规则 + 受击/缓刑/高光
-    let speed = Math.min(RUN_SPEED_BASE + this.elapsedMs * RUN_SPEED_ACCEL, RUN_SPEED_MAX);
+    // 速度:关卡按配置曲线,无尽/每日按基础加速;再叠加各种修正
+    let speed = this.level
+      ? levelSpeedAt(this.level, this.elapsedMs)
+      : Math.min(RUN_SPEED_BASE + this.elapsedMs * RUN_SPEED_ACCEL, RUN_SPEED_MAX);
     speed *= this.dailySpeedMul;
     if (this.invulnerable) speed *= 0.82;
     if (this.elapsedMs < this.slowUntil) speed *= PICKUP_SLOW_FACTOR;
@@ -1783,7 +1872,8 @@ export default class GameScene extends Phaser.Scene {
   private spawnPattern() {
     const p: RunPattern = generatePattern({
       rng: this.rng,
-      elapsedMs: this.elapsedMs,
+      // 关卡短(20-48 秒),用 stageSpeed 压缩节奏,让低空美女/组合障碍按设计登场
+      elapsedMs: this.level ? this.elapsedMs * this.level.stageSpeed : this.elapsedMs,
       speed: this.runSpeed,
       lastPattern: this.lastPattern,
       actionStreak: this.actionStreak
@@ -2124,6 +2214,7 @@ export default class GameScene extends Phaser.Scene {
     this.addRunCoins(value);
     this.gainHype(HYPE_PER_DODGE + (perfectSlide ? PERFECT_SLIDE_HYPE : 0));
     if (perfectSlide) {
+      this.runPerfectSlides += 1;
       this.floatText(this.player.x + 34, this.player.y - 76, `完美滑铲! +${value} 银币`, '#b2f2bb');
       nearMissStreak(this, this.player.x + 58, this.player.y + 4);
       playSfx(this, 'near', 0.4);
@@ -2417,6 +2508,16 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private updateMission() {
+    if (this.level) {
+      // 关卡模式:进度条改成整体的星级目标完成度,文案由 updateHud 负责
+      if (this.elapsedMs - this.lastMissionTick < 120) return;
+      this.lastMissionTick = this.elapsedMs;
+      const stats = this.levelStats(false);
+      const hit = this.level.goals.filter(g => goalValue(g, stats) >= g.target).length;
+      const missionY = this.daily ? 132 : 104;
+      drawBar(this.hud.missionBar, 24, missionY + 52, 228, 4, hit / this.level.goals.length, hit > 0 ? 0x69db7c : 0x74c0fc);
+      return;
+    }
     if (this.missionCompleted) return;
     if (this.elapsedMs - this.lastMissionTick < 120) return;
     this.lastMissionTick = this.elapsedMs;
@@ -2481,8 +2582,17 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private updateHud() {
-    const timeStr = `${(this.elapsedMs / 1000).toFixed(1)}s`;
+    // 关卡模式显示倒计时,让「还剩几秒」成为持续压力
+    const timeStr = this.level
+      ? `${(remainingMs(this.level, this.elapsedMs) / 1000).toFixed(1)}s`
+      : `${(this.elapsedMs / 1000).toFixed(1)}s`;
     if (this.hud.time.text !== timeStr) this.hud.time.setText(timeStr);
+
+    // 关卡目标进度(擦身 / 完美滑铲 / 连击…)实时刷新
+    if (this.level) {
+      const goal = this.levelGoalText();
+      if (this.hud.missionDesc.text !== goal) this.hud.missionDesc.setText(goal);
+    }
 
     if (this.combo >= 5) {
       const comboStr = `连翻 ×${this.combo}`;
@@ -2646,7 +2756,7 @@ export default class GameScene extends Phaser.Scene {
     showToast(this, GAME_WIDTH / 2, GROUND_TOP - 220, '原地复活!再撑一轮', '#ffe066', 'ui-heart');
   }
 
-  private endRun() {
+  private endRun(cleared = false) {
     if (this.ended) return;
     this.ended = true;
     const timeMs = Math.round(this.elapsedMs);
@@ -2689,6 +2799,50 @@ export default class GameScene extends Phaser.Scene {
       kills: this.runKills,
       picked: this.runPickups
     });
+
+    // ---- 闯关模式结算:星级、解锁、奖励 ----
+    let levelData: {
+      levelId: string;
+      levelCleared: boolean;
+      levelStars: number;
+      levelPrevStars: number;
+      levelGoals: { label: string; done: boolean; value: number; target: number }[];
+      levelNextId: string | null;
+      levelFirstClear: boolean;
+      levelReward: number;
+      levelName: string;
+      levelChapter: number;
+    } | undefined;
+    if (this.level) {
+      const stats = this.levelStats(cleared);
+      const stars = starCount(this.level, stats);
+      const prevStars = this.progress.levelStars[this.level.id] ?? 0;
+      const firstClear = cleared && prevStars === 0;
+      const reward = cleared ? levelReward(this.level, stars, firstClear) : 0;
+      if (cleared) {
+        this.progress.levelStars[this.level.id] = Math.max(prevStars, stars);
+        this.progress.levelClears += 1;
+        this.progress.coins += reward;
+      }
+      levelData = {        levelId: this.level.id,
+        levelCleared: cleared,
+        levelStars: stars,
+        levelPrevStars: prevStars,
+        levelGoals: this.level.goals.map(g => ({
+          label: g.label,
+          done: goalValue(g, stats) >= g.target,
+          value: goalValue(g, stats),
+          target: g.target
+        })),
+        levelNextId: cleared ? nextLevelId(this.level.id) : this.level.id,
+        levelFirstClear: firstClear,
+        levelReward: reward,
+        levelName: this.level.name,
+        levelChapter: this.level.chapter
+      };
+    }
+    this.progress.perfectSlides += this.runPerfectSlides;
+
     const newAch = claimNewAchievements(this.progress);
     saveProgress(this.progress);
     wxUploadBestScore(timeMs);
@@ -2717,7 +2871,8 @@ export default class GameScene extends Phaser.Scene {
       dailyFirst,
       dailyModifier: this.daily && this.challenge ? this.challenge.modifier.name : '',
       bestMs: this.progress.bestTimeMs,
-      playerTexture: this.shareTexture
+      playerTexture: this.shareTexture,
+      ...levelData
     });
   }
 
@@ -2733,6 +2888,8 @@ export default class GameScene extends Phaser.Scene {
     this.ended = false;
     this.invulnerable = false;
     this.elapsedMs = 0;
+    this.levelFinishing = false;
+    this.runPerfectSlides = 0;
     this.distanceSinceSpawn = 0;
     this.nextGapPx = 540;
     this.lastPattern = '';

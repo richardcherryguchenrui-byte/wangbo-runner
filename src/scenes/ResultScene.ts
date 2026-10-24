@@ -8,6 +8,7 @@ import { isWx, wxShare } from '../systems/wxapi';
 import { buildShareCard, downloadCanvas } from '../systems/sharecard';
 import { rankProgress } from '../systems/ranks';
 import { gradeRun } from '../systems/grade';
+import { CHAPTERS } from '../systems/levels';
 
 interface ResultData {
   timeMs?: number;
@@ -34,6 +35,17 @@ interface ResultData {
   dailyModifier?: string;
   bestMs?: number;
   playerTexture?: string;
+  // ---- 闯关模式 ----
+  levelId?: string;
+  levelCleared?: boolean;
+  levelStars?: number;
+  levelPrevStars?: number;
+  levelGoals?: { label: string; done: boolean; value: number; target: number }[];
+  levelNextId?: string | null;
+  levelFirstClear?: boolean;
+  levelReward?: number;
+  levelName?: string;
+  levelChapter?: number;
 }
 
 export default class ResultScene extends Phaser.Scene {
@@ -61,6 +73,17 @@ export default class ResultScene extends Phaser.Scene {
   private bestMs = 0;
   private playerTexture = 'player-idle';
   private leaving = false;
+  // ---- 闯关模式 ----
+  private levelId: string | null = null;
+  private levelCleared = false;
+  private levelStars = 0;
+  private levelPrevStars = 0;
+  private levelGoals: { label: string; done: boolean; value: number; target: number }[] = [];
+  private levelNextId: string | null = null;
+  private levelFirstClear = false;
+  private levelReward = 0;
+  private levelName = '';
+  private levelChapter = 0;
 
   constructor() {
     super('Result');
@@ -90,12 +113,28 @@ export default class ResultScene extends Phaser.Scene {
     this.dailyModifier = data?.dailyModifier ?? '';
     this.bestMs = data?.bestMs ?? 0;
     this.playerTexture = data?.playerTexture ?? 'player-idle';
+    this.levelId = data?.levelId ?? null;
+    this.levelCleared = !!data?.levelCleared;
+    this.levelStars = data?.levelStars ?? 0;
+    this.levelPrevStars = data?.levelPrevStars ?? 0;
+    this.levelGoals = data?.levelGoals ?? [];
+    this.levelNextId = data?.levelNextId ?? null;
+    this.levelFirstClear = !!data?.levelFirstClear;
+    this.levelReward = data?.levelReward ?? 0;
+    this.levelName = data?.levelName ?? '';
+    this.levelChapter = data?.levelChapter ?? 0;
   }
 
   create() {
     stopBgm(this);
     const p = loadProgress();
     this.buildBackdrop();
+
+    // 闯关模式:走专属结算(星级 + 目标清单 + 下一关)
+    if (this.levelId) {
+      this.createLevelResult();
+      return;
+    }
 
     if (this.isRecord && this.timeMs > 0) {
       playSfx(this, 'record', 0.6);
@@ -383,6 +422,207 @@ export default class ResultScene extends Phaser.Scene {
     this.input.keyboard?.once('keydown-SPACE', () => this.replay());
     this.input.keyboard?.once('keydown-ESC', () => this.scene.start('Title'));
     this.cameras.main.fadeIn(240, 8, 18, 34);
+  }
+
+  // ============================================================
+  // 闯关结算:星级 + 目标清单 + 下一关
+  // ============================================================
+
+  private createLevelResult() {
+    const chapterName = CHAPTERS[this.levelChapter]?.name ?? '';
+    const hasNext = !!this.levelNextId && this.levelNextId !== this.levelId;
+    const isFinalLevel = this.levelCleared && !hasNext;
+
+    addPanel(this, 120, 46, 720, 448, {
+      fill: 0x0a1930, fillAlpha: 0.96, stroke: 0xffffff, strokeAlpha: 0.14, radius: 24
+    }).setDepth(20);
+
+    this.add
+      .text(150, 64, `${chapterName} · ${this.levelName}`, {
+        fontFamily: FONT, fontSize: '13px', color: '#9db8d8', fontStyle: 'bold', resolution: 2
+      })
+      .setDepth(21);
+
+    // 结论
+    const verdict = this.levelCleared
+      ? this.levelStars >= 3 ? '完美通关!' : '仕途通关!'
+      : '落马了…';
+    const verdictColor = this.levelCleared ? '#ffe066' : '#ff8787';
+    const verdictSub = this.levelCleared
+      ? isFinalLevel ? '全书终 · 这一路都走过来了' : '下一关已解锁'
+      : '账本还差最后一页,再来一次';
+
+    if (this.levelCleared) {
+      playSfx(this, 'promote', 0.55);
+      confettiBurst(this, GAME_WIDTH / 2, 96, this.levelStars >= 3 ? 44 : 26);
+      if (this.levelStars >= 3) {
+        this.time.delayedCall(500, () => confettiBurst(this, GAME_WIDTH / 2, 40, 24));
+        playSfx(this, 'record', 0.5);
+      }
+    } else {
+      playSfx(this, 'fail', 0.45);
+    }
+
+    this.add
+      .text(GAME_WIDTH / 2, 104, verdict, {
+        fontFamily: FONT, fontSize: '40px', color: verdictColor, fontStyle: 'bold',
+        resolution: 2, stroke: '#08131f', strokeThickness: 6
+      })
+      .setOrigin(0.5)
+      .setDepth(22);
+    this.add
+      .text(GAME_WIDTH / 2, 138, verdictSub, {
+        fontFamily: FONT, fontSize: '13px', color: this.levelCleared ? '#8ce99a' : '#b7cfe8', resolution: 2
+      })
+      .setOrigin(0.5)
+      .setDepth(21);
+
+    // 星级:亮起的逐颗弹出
+    const starY = 186;
+    const starSrc = this.textures.get('pendant-star').getSourceImage() as HTMLImageElement;
+    const starScale = 46 / Math.max(1, starSrc.width);
+    for (let i = 0; i < 3; i++) {
+      const earned = i < this.levelStars;
+      const star = this.add
+        .image(GAME_WIDTH / 2 + (i - 1) * 84, starY, 'pendant-star')
+        .setDepth(22);
+      if (!earned) {
+        star.setScale(starScale * 0.66);
+        star.setTint(0x33465e);
+        star.setAlpha(0.85);
+      } else {
+        star.setScale(0);
+        this.tweens.add({
+          targets: star,
+          scaleX: starScale,
+          scaleY: starScale,
+          duration: 320,
+          delay: 200 + i * 170,
+          ease: 'Back.out',
+          onStart: () => playSfx(this, 'coin', 0.3)
+        });
+      }
+    }
+
+    // 目标清单
+    this.levelGoals.forEach((g, i) => {
+      const y = starY + 52 + i * 34;
+      if (g.done) {
+        this.add.image(268, y, 'ui-check').setDisplaySize(16, 16).setDepth(22);
+      } else {
+        this.add.image(268, y, 'ui-close').setDisplaySize(16, 16).setDepth(22).setAlpha(0.75);
+      }
+      this.add
+        .text(292, y, g.label, {
+          fontFamily: FONT, fontSize: '14px',
+          color: g.done ? '#8ce99a' : '#93b5d6', fontStyle: g.done ? 'bold' : 'normal', resolution: 2
+        })
+        .setOrigin(0, 0.5)
+        .setDepth(22);
+      this.add
+        .text(720, y, `${Math.min(g.value, g.target)}/${g.target}`, {
+          fontFamily: FONT, fontSize: '13px', color: g.done ? '#8ce99a' : '#93b5d6', resolution: 2
+        })
+        .setOrigin(1, 0.5)
+        .setDepth(22);
+    });
+
+    // 奖励
+    if (this.levelReward > 0) {
+      const rewardText = this.levelFirstClear
+        ? `首通奖励 +${this.levelReward} 银币`
+        : `星级奖励 +${this.levelReward} 银币`;
+      this.add
+        .text(GAME_WIDTH / 2, starY + 52 + this.levelGoals.length * 34 + 6, rewardText, {
+          fontFamily: FONT, fontSize: '15px', color: '#ffe066', fontStyle: 'bold',
+          resolution: 2, stroke: '#08131f', strokeThickness: 4
+        })
+        .setOrigin(0.5)
+        .setDepth(22);
+    } else if (!this.levelCleared) {
+      this.add
+        .text(GAME_WIDTH / 2, starY + 52 + this.levelGoals.length * 34 + 6, '通关才有星级奖励,先活到最后', {
+          fontFamily: FONT, fontSize: '13px', color: '#93b5d6', resolution: 2
+        })
+        .setOrigin(0.5)
+        .setDepth(22);
+    }
+
+    // 本局数据条:填补空白,也给「这一把到底干了什么」一个交代
+    const statsY = starY + 52 + this.levelGoals.length * 34 + 44;
+    const stats = [
+      `存活 ${(this.timeMs / 1000).toFixed(1)}s`,
+      `翻越 ${this.dodged}`,
+      `擦身 ${this.nearMisses}`,
+      `连击 ×${this.combo}`,
+      `银币 ${this.coins}`
+    ];
+    addPanel(this, GAME_WIDTH / 2 - 300, statsY - 20, 600, 40, {
+      fill: 0x0d1f33, fillAlpha: 0.8, stroke: 0xffffff, strokeAlpha: 0.1, radius: 12
+    }).setDepth(21);
+    stats.forEach((t, i) => {
+      this.add
+        .text(GAME_WIDTH / 2 - 240 + i * 120, statsY, t, {
+          fontFamily: FONT, fontSize: '12px', color: '#b7cfe8', resolution: 2
+        })
+        .setOrigin(0, 0.5)
+        .setDepth(22);
+    });
+
+    // 按钮
+    const btnY = 436;
+    makeButton(this, 268, btnY, 150, 46, '关卡列表', () => {
+      if (this.leaving) return;
+      this.leaving = true;
+      this.scene.start('Campaign');
+    }, 15, { depth: 22, iconKey: 'ui-clipboard', iconSize: 15 });
+    makeButton(this, 452, btnY, 150, 46, '重玩本关', () => {
+      if (this.leaving) return;
+      this.leaving = true;
+      this.scene.start('Game', { levelId: this.levelId });
+    }, 15, { depth: 22, iconKey: 'ui-restart', iconSize: 15 });
+
+    if (hasNext) {
+      const btn = makeHeroButton(
+        this,
+        660,
+        btnY,
+        190,
+        50,
+        '下一关',
+        () => {
+          if (this.leaving) return;
+          this.leaving = true;
+          this.scene.start('Game', { levelId: this.levelNextId });
+        },
+        { iconKey: 'ui-play', iconSize: 20, fontSize: 20, depth: 22 }
+      );
+      void btn;
+    } else if (this.levelCleared) {
+      makeHeroButton(
+        this,
+        660,
+        btnY,
+        190,
+        50,
+        '回主菜单',
+        () => {
+          if (this.leaving) return;
+          this.leaving = true;
+          this.scene.start('Title');
+        },
+        { iconKey: 'ui-home', iconSize: 20, fontSize: 20, depth: 22 }
+      );
+    }
+
+    this.add
+      .text(GAME_WIDTH / 2, 500, '按 R 重玩 · 按 ESC 回关卡列表', {
+        fontFamily: FONT, fontSize: '11px', color: '#93b5d6', resolution: 2
+      })
+      .setOrigin(0.5)
+      .setDepth(21);
+    this.input.keyboard?.once('keydown-R', () => this.scene.start('Game', { levelId: this.levelId }));
+    this.input.keyboard?.once('keydown-ESC', () => this.scene.start('Campaign'));
   }
 
   private replay() {
