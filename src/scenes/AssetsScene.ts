@@ -118,6 +118,7 @@ export default class AssetsScene extends Phaser.Scene {
   private overlayDepth = 120;
   private pendingAuditShow: (() => void) | null = null;
   private visitorUsed = false;
+  private reporterUsed = false;
   /** 客人用的主角贴图皮肤(默认就是 player-idle) */
   private npcSkin = '';
   /** 地上散落的黑金:产业每次进账会掉一点,走过去就捡起来 */
@@ -171,6 +172,7 @@ export default class AssetsScene extends Phaser.Scene {
     this.maybeShowIntro(p);
     this.maybeAudit(p);
     this.time.delayedCall(2200, () => this.maybeVisitor());
+    this.time.delayedCall(5200, () => this.maybeReporter());
     this.time.addEvent({ delay: 7600, loop: true, callback: () => this.spawnDrop() });
     this.time.addEvent({ delay: 13000, loop: true, callback: () => this.guestChatter() });
   }
@@ -1010,7 +1012,40 @@ export default class AssetsScene extends Phaser.Scene {
     this.hudCorrupt.setText(formatValue(this.corrupt));
   }
 
-  // ---- 随机事件:上门送礼的老板(赌一把) ----
+  // ---- 随机事件:上门的人(送礼的老板 / 拿着照片的记者) ----
+  private spawnVisitor(opts: {
+    id: string; icon: string; tint: number; label: string; prompt: string;
+    onInteract: () => void;
+  }): Interactable {
+    // 站在两件家具之间的空档里,别把家具挡住
+    const slots = [177, 315, 453, 591, 729];
+    const x = slots[Phaser.Math.Between(0, slots.length - 1)];
+    const base = 452;
+    this.add.graphics().setDepth(9).fillStyle(0x1a2233, 0.5).fillEllipse(x, base, 42, 10);
+    const glow = this.add.image(x, base - 20, 'spark')
+      .setDepth(9).setTint(opts.tint).setAlpha(0.32).setDisplaySize(64, 56);
+    this.tweens.add({ targets: glow, alpha: 0.14, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    const icon = this.add.image(x, base, opts.icon).setOrigin(0.5, 1).setDepth(10).setDisplaySize(36, 36);
+    this.tweens.add({ targets: icon, y: base - 3, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    const label = this.add.text(x, base - 44, opts.label, {
+      fontFamily: FONT, fontSize: '11px', color: '#ffd43b', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0.5, 1).setDepth(10);
+    const bang = this.add.text(x + 22, base - 54, '!', {
+      fontFamily: FONT, fontSize: '18px', color: '#ff8787', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0.5).setDepth(11);
+    this.tweens.add({ targets: bang, scale: 1.3, duration: 520, yoyo: true, repeat: -1 });
+    const highlight = this.add.graphics().setDepth(11);
+    const it: Interactable = {
+      kind: 'visitor', id: opts.id, x, y: base,
+      prompt: opts.prompt,
+      action: opts.onInteract,
+      label, highlight, glow, icon, maxLevel: 1
+    };
+    this.interactables.push(it);
+    playSfx(this, 'pickup', 0.4);
+    return it;
+  }
+
   private maybeVisitor() {
     if (this.visitorUsed) return;
     if (totalAssetValue(this.holdings) < 300) return;
@@ -1023,33 +1058,103 @@ export default class AssetsScene extends Phaser.Scene {
       ['隔壁市的王总', '带着一幅画,说是「朋友画的」']
     ];
     const [who, line] = names[Phaser.Math.Between(0, names.length - 1)];
-    // 站在两件家具之间的空档里,别把家具挡住
-    const slots = [177, 315, 453, 591, 729];
-    const x = slots[Phaser.Math.Between(0, slots.length - 1)];
-    const base = 452;
-    this.add.graphics().setDepth(9).fillStyle(0x1a2233, 0.5).fillEllipse(x, base, 42, 10);
-    const glow = this.add.image(x, base - 20, 'spark')
-      .setDepth(9).setTint(0xffd43b).setAlpha(0.32).setDisplaySize(64, 56);
-    this.tweens.add({ targets: glow, alpha: 0.14, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-    const icon = this.add.image(x, base, 'ui-gift').setOrigin(0.5, 1).setDepth(10).setDisplaySize(36, 36);
-    this.tweens.add({ targets: icon, y: base - 3, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-    const label = this.add.text(x, base - 44, `${who} · 送礼`, {
-      fontFamily: FONT, fontSize: '11px', color: '#ffd43b', fontStyle: 'bold', resolution: 2
-    }).setOrigin(0.5, 1).setDepth(10);
-    const bang = this.add.text(x + 22, base - 54, '!', {
-      fontFamily: FONT, fontSize: '18px', color: '#ff8787', fontStyle: 'bold', resolution: 2
-    }).setOrigin(0.5).setDepth(11);
-    this.tweens.add({ targets: bang, scale: 1.3, duration: 520, yoyo: true, repeat: -1 });
-    const highlight = this.add.graphics().setDepth(11);
-    const it: Interactable = {
-      kind: 'visitor', id: 'visitor', x, y: base,
+    const it = this.spawnVisitor({
+      id: 'gift', icon: 'ui-gift', tint: 0xffd43b, label: `${who} · 送礼`,
       prompt: `${who} 在门口等你 · E`,
-      action: () => this.showVisitorOffer(who, line, x, base),
-      label, highlight, glow, icon, maxLevel: 1
-    };
-    this.interactables.push(it);
+      onInteract: () => this.showVisitorOffer(who, line, it.x, it.y)
+    });
     this.time.delayedCall(260, () => this.toast(`「${who}」上门了 · 走过去按 E`, '#ffd43b', 'ui-gift'));
-    playSfx(this, 'pickup', 0.4);
+  }
+
+  /** 记者拿着照片上门:花钱封口,或者赌他不敢发 */
+  private maybeReporter() {
+    if (this.reporterUsed) return;
+    if (netRisk(this.holdings) < 25) return;
+    if (Math.random() > 0.55) return;
+    this.reporterUsed = true;
+    const it = this.spawnVisitor({
+      id: 'reporter', icon: 'ui-camera', tint: 0xff8787, label: '记者小刘 · 有照片',
+      prompt: '记者小刘拿着照片 · E',
+      onInteract: () => this.showReporterOffer(it.x, it.y)
+    });
+    this.time.delayedCall(320, () => this.toast('门口站着个拿相机的 · 走过去按 E', '#ff8787', 'ui-camera'));
+  }
+
+  private showReporterOffer(x: number, base: number) {
+    const risk = netRisk(this.holdings);
+    const cost = Math.max(120, Math.round(launderCost(this.holdings) * 0.55));
+    const eff = Math.max(4, Math.round(risk * 0.3));
+    const layer = this.markOverlay(this.add.container(0, 0).setDepth(this.overlayDepth + 20));
+    const backdrop = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x03070d, 0.82)
+      .setInteractive();
+    backdrop.on('pointerdown', () => layer.destroy(true));
+    layer.add(backdrop);
+    const panel = this.add.graphics();
+    panel.fillStyle(0x1c1210, 0.98);
+    panel.fillRoundedRect(GAME_WIDTH / 2 - 250, 120, 500, 286, 22);
+    panel.lineStyle(2, 0xff8787, 0.55);
+    panel.strokeRoundedRect(GAME_WIDTH / 2 - 250, 120, 500, 286, 22);
+    layer.add(panel);
+    layer.add(this.add.text(GAME_WIDTH / 2, 154, '记者小刘找上门', {
+      fontFamily: FONT, fontSize: '24px', color: '#ff8787', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0.5));
+    layer.add(this.add.text(GAME_WIDTH / 2, 194, '「我手里有照片,您看这事儿要不要先聊聊?」', {
+      fontFamily: FONT, fontSize: '13px', color: '#dce8f5', resolution: 2, align: 'center', wordWrap: { width: 440 }
+    }).setOrigin(0.5));
+    layer.add(this.add.text(GAME_WIDTH / 2, 236, `封口 → 花 ${formatValue(cost)} 黑金,风险 -${eff}`, {
+      fontFamily: FONT, fontSize: '15px', color: '#8ce99a', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0.5));
+    layer.add(this.add.text(GAME_WIDTH / 2, 264, '也可以赌一把:他未必敢发', {
+      fontFamily: FONT, fontSize: '12px', color: '#ffb4b4', resolution: 2
+    }).setOrigin(0.5));
+
+    const mk = (bx: number, label: string, primary: boolean, fn: () => void) => {
+      const w = 200; const h = 46; const by = 322;
+      const g = this.add.graphics();
+      g.fillStyle(primary ? 0xffb703 : 0x16324f, 0.95);
+      g.fillRoundedRect(bx - w / 2, by - h / 2, w, h, h / 2);
+      g.lineStyle(2, primary ? 0xffecb3 : 0xffffff, primary ? 0.9 : 0.2);
+      g.strokeRoundedRect(bx - w / 2, by - h / 2, w, h, h / 2);
+      layer.add(g);
+      layer.add(this.add.text(bx, by, label, {
+        fontFamily: FONT, fontSize: '15px', color: primary ? '#3a2400' : '#cfe3ff', fontStyle: 'bold', resolution: 2
+      }).setOrigin(0.5));
+      const hit = this.add.rectangle(bx, by, w, h, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
+      layer.add(hit);
+      hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); layer.destroy(true); fn(); });
+    };
+    mk(GAME_WIDTH / 2 - 112, `封口 ${formatValue(cost)}`, true, () => {
+      this.removeVisitor('reporter');
+      if (this.corrupt < cost) {
+        this.toast('黑金不够,他冷笑了一声走了', '#ff8787', 'coin');
+        this.time.delayedCall(700, () => {
+          const roll = Math.random();
+          if (roll < 0.45) this.showAuditOverlay(netRisk(this.holdings), roll, auditShield(this.holdings));
+        });
+        return;
+      }
+      this.corrupt -= cost;
+      this.holdings.laundered = (this.holdings.laundered ?? 0) + eff;
+      playSfx(this, 'coin', 0.45);
+      this.toast(`照片买断了 · 被查风险 -${eff}`, '#8ce99a', 'ui-check');
+      this.persist();
+    });
+    mk(GAME_WIDTH / 2 + 112, '让他发', false, () => {
+      this.removeVisitor('reporter');
+      const roll = Math.random();
+      if (roll < 0.4) {
+        this.toast('稿子还是见了报…', '#ff8787', 'ui-siren');
+        this.time.delayedCall(700, () => this.showAuditOverlay(Math.min(100, risk + 10), roll, auditShield(this.holdings)));
+      } else {
+        this.toast('主编把稿子压了 · 这次没事', '#8ce99a', 'ui-check');
+        playSfx(this, 'record', 0.35);
+      }
+    });
+    layer.add(this.add.text(GAME_WIDTH / 2, 380, '封口比洗白便宜,但降的风险也少', {
+      fontFamily: FONT, fontSize: '11px', color: '#8ba9c7', resolution: 2
+    }).setOrigin(0.5));
+    playSfx(this, 'warn', 0.4);
+    void x; void base;
   }
 
   private showVisitorOffer(who: string, line: string, x: number, base: number) {
@@ -1058,7 +1163,10 @@ export default class AssetsScene extends Phaser.Scene {
     const shieldNow = auditShield(this.holdings);
     const caught = Math.min(85, Math.round(risk + 8));
     const layer = this.markOverlay(this.add.container(0, 0).setDepth(this.overlayDepth + 20));
-    layer.add(this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x03070d, 0.82).setInteractive());
+    const backdrop = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x03070d, 0.82)
+      .setInteractive();
+    backdrop.on('pointerdown', () => layer.destroy(true));
+    layer.add(backdrop);
     const panel = this.add.graphics();
     panel.fillStyle(0x16210f, 0.98);
     panel.fillRoundedRect(GAME_WIDTH / 2 - 250, 120, 500, 286, 22);
@@ -1097,7 +1205,7 @@ export default class AssetsScene extends Phaser.Scene {
     };
     mk(GAME_WIDTH / 2 - 112, '收下', true, () => this.takeGift(amt, x, base));
     mk(GAME_WIDTH / 2 + 112, '推回去', false, () => {
-      this.removeVisitor(x);
+      this.removeVisitor('gift');
       this.toast('他把箱子提走了,楼道里骂了一句', '#8ce99a', 'ui-check');
       playSfx(this, 'click', 0.4);
     });
@@ -1107,7 +1215,7 @@ export default class AssetsScene extends Phaser.Scene {
   }
 
   private takeGift(amt: number, x: number, base: number) {
-    this.removeVisitor(x);
+    this.removeVisitor('gift');
     if (base > 0) confettiBurst(this, x, base - 20, 14);
     this.corrupt += amt;
     this.persist();
@@ -1127,15 +1235,14 @@ export default class AssetsScene extends Phaser.Scene {
     });
   }
 
-  private removeVisitor(x: number) {
-    const idx = this.interactables.findIndex(it => it.kind === 'visitor');
+  private removeVisitor(id: string) {
+    const idx = this.interactables.findIndex(it => it.kind === 'visitor' && it.id === id);
     if (idx < 0) return;
     const it = this.interactables[idx];
     [it.label, it.highlight, it.glow, it.icon].forEach(o => o.destroy());
     this.interactables.splice(idx, 1);
     if (this.activeIdx === idx) this.activeIdx = -1;
     else if (this.activeIdx > idx) this.activeIdx -= 1;
-    void x;
   }
 
   private collectOffline() {
