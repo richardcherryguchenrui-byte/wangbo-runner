@@ -328,3 +328,42 @@ export function landfallLine(level: LevelDef, ratio: number): string {
   const tier = ratio < 0.5 ? 0 : ratio < 0.85 ? 1 : 2;
   return lines[tier];
 }
+
+// ============================================================
+// 章节氛围:每章一套色调,并在关卡内随时间越来越暗
+// 「天色暗下去」= 倒计时快到了,不用文字也能感到压力
+// ============================================================
+
+export interface ChapterMood {
+  skyStart: number;   // 开场天空色
+  skyEnd: number;     // 关卡结束时的天空色
+  nightStart: number; // 开场夜色强度(0=白天,1=深夜)
+  nightEnd: number;
+}
+
+export const CHAPTER_MOODS: ChapterMood[] = [
+  { skyStart: 0x5ec8f8, skyEnd: 0x74b8e8, nightStart: 0, nightEnd: 0.12 },   // 秘书起步:清晨上班
+  { skyStart: 0x8fc0e8, skyEnd: 0xe8a878, nightStart: 0.05, nightEnd: 0.35 }, // 迎来送往:酒局散场
+  { skyStart: 0xa8b8c0, skyEnd: 0x7a8a98, nightStart: 0.15, nightEnd: 0.4 },  // 工程发包:工地灰霾
+  { skyStart: 0x8a94c8, skyEnd: 0x5c5a92, nightStart: 0.25, nightEnd: 0.55 }, // 人事任命:暮色压低
+  { skyStart: 0x5c6a80, skyEnd: 0x2e3a4e, nightStart: 0.4, nightEnd: 0.78 },  // 巡视风暴:阴云压城
+  { skyStart: 0x4a2a34, skyEnd: 0x1a0d14, nightStart: 0.62, nightEnd: 1 }     // 落马时刻:夜深了
+];
+
+function mixHex(a: number, b: number, k: number): number {
+  const t = Math.min(1, Math.max(0, k));
+  const r1 = (a >> 16) & 0xff, g1 = (a >> 8) & 0xff, b1 = a & 0xff;
+  const r2 = (b >> 16) & 0xff, g2 = (b >> 8) & 0xff, b2 = b & 0xff;
+  const f = (x: number, y: number) => Math.round(x + (y - x) * t);
+  return (f(r1, r2) << 16) | (f(g1, g2) << 8) | f(b1, b2);
+}
+
+/** 关卡内某一时刻的天空色与夜色强度 */
+export function chapterMoodAt(level: LevelDef, elapsedMs: number): { sky: number; nightness: number } {
+  const m = CHAPTER_MOODS[level.chapter] ?? CHAPTER_MOODS[0];
+  const t = Math.min(1, Math.max(0, elapsedMs / Math.max(1, level.durationMs)));
+  return {
+    sky: mixHex(m.skyStart, m.skyEnd, t),
+    nightness: m.nightStart + (m.nightEnd - m.nightStart) * t
+  };
+}

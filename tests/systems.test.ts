@@ -21,7 +21,8 @@ import { isPerfectSlideTiming, tightSlideIndex } from '../src/systems/slideJudge
 import {
   LEVELS, CHAPTERS, starCount, goalDone, isLevelUnlocked, isChapterUnlocked,
   levelSpeedAt, levelReward, nextLevelId, totalStars, MAX_STARS_PER_LEVEL,
-  STAR_MILESTONES, TOTAL_STARS, newlyReachedMilestones, nextMilestone, clearLine, landfallLine
+  STAR_MILESTONES, TOTAL_STARS, newlyReachedMilestones, nextMilestone, clearLine, landfallLine,
+  CHAPTER_MOODS, chapterMoodAt
 } from '../src/systems/levels';
 import { gradeRun } from '../src/systems/grade';
 import {
@@ -751,5 +752,45 @@ describe('星级里程碑与结局文案', () => {
       // 三档应当是三句不同的话
       expect(new Set([early, mid, late]).size).toBe(3);
     });
+  });
+});
+
+// 章节氛围:每章一套色调,关卡内逐渐变暗
+describe('章节氛围', () => {
+  it('每章都有独立配色,且都是合法色值', () => {
+    expect(CHAPTER_MOODS.length).toBe(CHAPTERS.length);
+    CHAPTER_MOODS.forEach(m => {
+      [m.skyStart, m.skyEnd].forEach(c => {
+        expect(c).toBeGreaterThanOrEqual(0);
+        expect(c).toBeLessThanOrEqual(0xffffff);
+      });
+      expect(m.nightStart).toBeGreaterThanOrEqual(0);
+      expect(m.nightEnd).toBeLessThanOrEqual(1);
+      // 关卡内只会越来越暗
+      expect(m.nightEnd).toBeGreaterThanOrEqual(m.nightStart);
+    });
+  });
+
+  it('关卡开场用起始色,结束时用结束色', () => {
+    LEVELS.forEach(l => {
+      const mood = CHAPTER_MOODS[l.chapter];
+      expect(chapterMoodAt(l, 0).sky).toBe(mood.skyStart);
+      expect(chapterMoodAt(l, l.durationMs).sky).toBe(mood.skyEnd);
+      expect(chapterMoodAt(l, 0).nightness).toBeCloseTo(mood.nightStart, 5);
+      expect(chapterMoodAt(l, l.durationMs).nightness).toBeCloseTo(mood.nightEnd, 5);
+    });
+  });
+
+  it('时间越久越暗,且超出时长不会爆掉', () => {
+    const l = LEVELS[15];
+    const early = chapterMoodAt(l, l.durationMs * 0.2).nightness;
+    const late = chapterMoodAt(l, l.durationMs * 0.8).nightness;
+    expect(late).toBeGreaterThan(early);
+    expect(chapterMoodAt(l, l.durationMs * 5).nightness).toBe(CHAPTER_MOODS[l.chapter].nightEnd);
+  });
+
+  it('后面几章比第一章暗,营造递进压迫感', () => {
+    expect(CHAPTER_MOODS[5].nightStart).toBeGreaterThan(CHAPTER_MOODS[0].nightStart);
+    expect(CHAPTER_MOODS[5].nightEnd).toBeGreaterThan(CHAPTER_MOODS[0].nightEnd);
   });
 });

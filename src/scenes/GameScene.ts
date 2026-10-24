@@ -109,6 +109,7 @@ import {
   newlyReachedMilestones,
   clearLine,
   landfallLine,
+  chapterMoodAt,
   type LevelDef,
   type LevelStats
 } from '../systems/levels';
@@ -1523,8 +1524,15 @@ export default class GameScene extends Phaser.Scene {
   // ============================================================
 
   private updateBackdrop(dt: number, driftSpeed = this.runSpeed) {
-    this.nightness = this.nightnessAt(this.elapsedMs);
-    this.skyRect.setFillStyle(this.skyColorAt(this.elapsedMs));
+    if (this.level) {
+      // 关卡模式:用章节色调,并在关卡内逐渐变暗(倒计时压力)
+      const mood = chapterMoodAt(this.level, this.elapsedMs);
+      this.nightness = mood.nightness;
+      this.skyRect.setFillStyle(mood.sky);
+    } else {
+      this.nightness = this.nightnessAt(this.elapsedMs);
+      this.skyRect.setFillStyle(this.skyColorAt(this.elapsedMs));
+    }
 
     const tint = (nightColor: number) => this.mixColor(0xffffff, nightColor, this.nightness);
     this.mountains.setTint(tint(0x8c9ac4));
