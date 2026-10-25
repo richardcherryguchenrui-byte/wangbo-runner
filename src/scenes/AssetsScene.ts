@@ -58,18 +58,56 @@ const NETWORK_TINT: Record<string, number> = {
 
 /** 房间几何:墙 58~440,地板 440~540 */
 const WALL_TOP = 58;
-const FLOOR_TOP = 440;
+const FLOOR_TOP = 440;   // 兼容旧逻辑:地板「后沿」附近
 const FLOOR_BOTTOM = 540;
-/** 家具(产业)沿地板前沿一字排开,纵向锚点在底边 */
-const FURNITURE_X = [108, 246, 384, 522, 660, 798];
-const FURNITURE_BASE = 470;
-/** 客人(人脉)站在靠里的地板上 */
-const NPC_X = [150, 300, 450, 600, 750];
-const NPC_BASE = 440;
+
+// ============================================================
+// 伪 3D 斜视角地板(类《饥荒》):地板是一个向后收窄的梯形,
+// 屋里所有东西都用「地板坐标」定位 —— fx ∈ [0,1] 左→右,fz ∈ [0,1] 后→前,
+// 投影后越靠前(y 越大)的东西越大、越晚绘制(遮挡越靠后的东西)。
+// ============================================================
+const FLOOR_BACK_Y = 300;     // 地板最靠里的那一排(贴着后墙)
+const FLOOR_FRONT_Y = 524;    // 最靠外(离镜头最近)
+const FLOOR_BACK_HALF = 250;  // 后沿半宽
+const FLOOR_FRONT_HALF = 500; // 前沿半宽(比后沿宽 → 有纵深感)
+const DEPTH_SCALE_BACK = 0.62;
+const DEPTH_SCALE_FRONT = 1.12;
+
+interface FloorPoint {
+  x: number;
+  y: number;
+  scale: number;
+}
+
+/** 地板坐标 → 屏幕坐标(含景深缩放) */
+function project(fx: number, fz: number): FloorPoint {
+  const t = Phaser.Math.Clamp(fz, 0, 1);
+  const ease = t * t * (3 - 2 * t); // smoothstep:前后移动更顺,近处变化更明显
+  const half = FLOOR_BACK_HALF + (FLOOR_FRONT_HALF - FLOOR_BACK_HALF) * ease;
+  const y = FLOOR_BACK_Y + (FLOOR_FRONT_Y - FLOOR_BACK_Y) * t;
+  const x = GAME_WIDTH / 2 + (Phaser.Math.Clamp(fx, -0.2, 1.2) - 0.5) * 2 * half;
+  const scale = DEPTH_SCALE_BACK + (DEPTH_SCALE_FRONT - DEPTH_SCALE_BACK) * ease;
+  return { x, y, scale };
+}
+
+/** 屋里东西的绘制层级:脚底越靠前(屏幕 y 越大)越后画 */
+function depthFor(y: number): number {
+  return 10 + (y - FLOOR_BACK_Y) * 0.1;
+}
+
+/** 家具(产业)排在中排,桩位用地板坐标 */
+const FURNITURE_SPOTS: [number, number][] = [
+  [0.13, 0.46], [0.284, 0.43], [0.438, 0.46],
+  [0.592, 0.43], [0.746, 0.46], [0.90, 0.43]
+];
+/** 客人(人脉)在靠里一排站着 */
+const NPC_SPOTS: [number, number][] = [
+  [0.14, 0.16], [0.33, 0.12], [0.52, 0.16], [0.71, 0.12], [0.90, 0.16]
+];
 /** 交互提示气泡的纵向位置 */
 const PROMPT_Y = 366;
-/** 角色站位(脚底) */
-const PLAYER_BASE = 500;
+/** 角色初始站位(脚底的地板坐标) */
+const PLAYER_START: [number, number] = [0.5, 0.8];
 
 interface Interactable {
   kind: 'asset' | 'network' | 'visitor';
@@ -100,10 +138,17 @@ export default class AssetsScene extends Phaser.Scene {
   private idleKey = 'player-idle';
   private moveLeft = false;
   private moveRight = false;
+  private moveBack = false;
+  private moveFront = false;
+  private keyW?: Phaser.Input.Keyboard.Key;
+  private keyS?: Phaser.Input.Keyboard.Key;
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyA?: Phaser.Input.Keyboard.Key;
   private keyD?: Phaser.Input.Keyboard.Key;
   private runAnim = false;
+  /** 角色在地板上的位置(fx 左→右,fz 后→前) */
+  private playerFx = 0.5;
+  private playerFz = 0.8;
 
   private interactables: Interactable[] = [];
   private activeIdx = -1;
@@ -151,6 +196,8 @@ export default class AssetsScene extends Phaser.Scene {
     this.runAnim = false;
     this.moveLeft = false;
     this.moveRight = false;
+    this.moveBack = false;
+    this.moveFront = false;
 
     this.wind = currentWind(Date.now()).wind;
 
@@ -167,7 +214,7 @@ export default class AssetsScene extends Phaser.Scene {
 
     this.collectOffline();
     this.refreshAll();
-    addMenuFooter(this, 'A/D 走动 · 地上掉的黑金走过去就捡 · 靠近家具/客人按 E 交互');
+    addMenuFooter(this, 'A/D 左右 · W/S 前后走动 · 地上的黑金走过去就捡 · 靠近家具/客人按 E');
     this.homeGift();
     this.maybeShowIntro(p);
     this.maybeAudit(p);
@@ -188,26 +235,90 @@ export default class AssetsScene extends Phaser.Scene {
       g.fillStyle(this.mix(0x1c2436, 0x0b1119, i / 11), 1);
       g.fillRect(0, WALL_TOP + (wallH / 12) * i, GAME_WIDTH, wallH / 12 + 1);
     }
-    // 地板:近深远浅,拉出一点透视(家产越高,地板越讲究)
+    // ---------- 伪 3D 地板:向后收窄的梯形 + 汇聚到灭点的地板缝 ----------
     const floorA = this.mix(0x2c1f12, 0x3d2a12, tier / 4);
     const floorB = this.mix(0x4d3821, 0x6b4a1c, tier / 4);
-    g.fillStyle(floorA, 1);
-    g.fillRect(0, FLOOR_TOP, GAME_WIDTH, FLOOR_BOTTOM - FLOOR_TOP);
-    g.fillStyle(floorB, 1);
-    g.fillRect(0, FLOOR_TOP, GAME_WIDTH, 4);
-    g.fillStyle(floorA, 1);
-    g.fillRect(0, FLOOR_TOP + 4, GAME_WIDTH, 26);
-    if (tier >= 3) {
-      // 高级木地板:打蜡反光
-      g.fillStyle(0xffd43b, 0.05);
-      g.fillEllipse(GAME_WIDTH / 2, FLOOR_TOP + 46, 700, 40);
+    const backL = project(0, 0), backR = project(1, 0);
+    const frontL = project(0, 1), frontR = project(1, 1);
+
+    // 地板本体(梯形):用多次横向切片做出渐变,接近真实地面的明暗
+    const SLICES = 16;
+    for (let i = 0; i < SLICES; i++) {
+      const t0 = i / SLICES;
+      const t1 = (i + 1) / SLICES;
+      const y0 = FLOOR_BACK_Y + (FLOOR_FRONT_Y - FLOOR_BACK_Y) * t0;
+      const y1 = FLOOR_BACK_Y + (FLOOR_FRONT_Y - FLOOR_BACK_Y) * t1 + 1;
+      const l0 = project(0, t0).x, r0 = project(1, t0).x;
+      const l1 = project(0, t1).x, r1 = project(1, t1).x;
+      g.fillStyle(this.mix(floorA, floorB, t0 * 0.75), 1);
+      g.beginPath();
+      g.moveTo(l0, y0);
+      g.lineTo(r0, y0);
+      g.lineTo(r1, y1);
+      g.lineTo(l1, y1);
+      g.closePath();
+      g.fillPath();
     }
-    g.lineStyle(1, 0x221708, 0.55);
-    for (let x = -40; x < GAME_WIDTH + 40; x += 64) {
-      g.lineBetween(x, FLOOR_TOP, x + 14, FLOOR_BOTTOM);
+    // 后墙与地板的交界(踢脚线)
+    g.fillStyle(0x24303f, 1);
+    g.fillRect(0, FLOOR_BACK_Y - 8, GAME_WIDTH, 8);
+    g.fillStyle(0x33445a, 0.9);
+    g.fillRect(0, FLOOR_BACK_Y - 8, GAME_WIDTH, 2);
+
+    // 地板纵缝:前后两排之间连线,天然形成透视
+    g.lineStyle(1, 0x1a1108, 0.5);
+    for (let i = 0; i <= 10; i++) {
+      const fx = i / 10;
+      const a = project(fx, 0);
+      const b = project(fx, 1);
+      g.lineBetween(a.x, a.y, b.x, b.y);
     }
-    g.lineStyle(1, 0x1c1208, 0.5);
-    for (let y = FLOOR_TOP + 30; y < FLOOR_BOTTOM; y += 22) g.lineBetween(0, y, GAME_WIDTH, y);
+    // 地板横缝:越靠前间距越大
+    for (let i = 1; i < 7; i++) {
+      const fz = i / 7;
+      const l = project(0, fz), r = project(1, fz);
+      g.lineStyle(1, 0x140d05, 0.42);
+      g.lineBetween(l.x, l.y, r.x, r.y);
+    }
+    // 打蜡反光(家产越高越亮)
+    g.fillStyle(0xffe0a3, 0.03 + tier * 0.012);
+    g.beginPath();
+    g.moveTo(backL.x + 90, backL.y + 10);
+    g.lineTo(backR.x - 90, backR.y + 10);
+    g.lineTo(frontR.x - 40, frontR.y);
+    g.lineTo(frontL.x + 40, frontL.y);
+    g.closePath();
+    g.fillPath();
+
+    // 地毯:跟着透视压成梯形
+    const rugBack = project(0.2, 0.5), rugFront = project(0.8, 0.84);
+    g.fillStyle(this.mix(0x5a2230, 0x7a1f24, tier / 4), 0.34 + tier * 0.03);
+    g.beginPath();
+    g.moveTo(project(0.25, 0.5).x, rugBack.y);
+    g.lineTo(project(0.75, 0.5).x, rugBack.y);
+    g.lineTo(rugFront.x, rugFront.y);
+    g.lineTo(project(0.2, 0.84).x, rugFront.y);
+    g.closePath();
+    g.fillPath();
+    if (tier >= 1) {
+      g.lineStyle(2, 0xffd43b, 0.16 + tier * 0.04);
+      g.beginPath();
+      g.moveTo(project(0.25, 0.5).x, rugBack.y);
+      g.lineTo(project(0.75, 0.5).x, rugBack.y);
+      g.lineTo(project(0.78, 0.84).x, rugFront.y);
+      g.lineTo(project(0.22, 0.84).x, rugFront.y);
+      g.closePath();
+      g.strokePath();
+    }
+
+    // 两侧压暗(伪 3D 的镜头氛围:中间亮、两边沉)
+    const vign = this.add.graphics().setDepth(-15);
+    for (let i = 0; i < 10; i++) {
+      const a = 0.03 * (10 - i);
+      vign.fillStyle(0x02060c, a);
+      vign.fillRect(i * 12, FLOOR_BACK_Y - 8, 12, GAME_HEIGHT - FLOOR_BACK_Y + 8);
+      vign.fillRect(GAME_WIDTH - (i + 1) * 12, FLOOR_BACK_Y - 8, 12, GAME_HEIGHT - FLOOR_BACK_Y + 8);
+    }
 
     // 窗户 + 夜景
     const wx = 604, wy = 100, ww = 236, wh = 132;
@@ -418,48 +529,56 @@ export default class AssetsScene extends Phaser.Scene {
 
   private buildFurniture() {
     ASSETS.forEach((a, i) => {
-      const x = FURNITURE_X[i];
+      const [fx, fz] = FURNITURE_SPOTS[i];
+      const pos = project(fx, fz);
+      const k = pos.scale;               // 景深缩放:越靠前越大
+      const x = pos.x;
+      const baseY = pos.y;               // 脚底(家具落地的位置)
       const level = this.holdings.assets[a.id] ?? 0;
-      const g = this.add.graphics().setDepth(5);
-      g.fillStyle(0x1a1208, 0.55);
-      g.fillEllipse(x, FURNITURE_BASE + 2, 88, 14);
+      const g = this.add.graphics().setDepth(depthFor(baseY) - 0.4);
+      g.fillStyle(0x120c05, 0.5);
+      g.fillEllipse(x, baseY, 78 * k, 13 * k);
       if (level <= 0) {
-        g.lineStyle(2, 0x7f93ab, 0.32);
-        for (let d = 0; d < 4; d++) g.lineBetween(x - 26 + d * 15, FURNITURE_BASE + 8, x - 14 + d * 15, FURNITURE_BASE + 8);
+        g.lineStyle(2, 0x7f93ab, 0.3);
+        for (let d = 0; d < 4; d++) {
+          g.lineBetween(x - 24 * k + d * 14 * k, baseY - 4 * k, x - 13 * k + d * 14 * k, baseY - 4 * k);
+        }
       } else {
         g.fillStyle(0xffd43b, 0.1);
-        g.fillEllipse(x, FURNITURE_BASE - 6, 82, 30);
+        g.fillEllipse(x, baseY - 8 * k, 74 * k, 26 * k);
       }
       // 产业落地成家具:底下垫一件柜子/台面,等级高一点的柜子带金边
       if (level > 0) {
-        const cab = this.add.graphics().setDepth(7);
-        const cw = 66;
-        const ch = 20;
+        const cab = this.add.graphics().setDepth(depthFor(baseY) - 0.2);
+        const cw = 66 * k;
+        const ch = 20 * k;
         const cx0 = x - cw / 2;
-        const cy0 = FURNITURE_BASE - ch + 2;
+        const cy0 = baseY - ch + 2 * k;
         cab.fillStyle(level >= 5 ? 0x4a3418 : 0x3a2a16, 1);
-        cab.fillRoundedRect(cx0, cy0, cw, ch, 4);
+        cab.fillRoundedRect(cx0, cy0, cw, ch, 4 * k);
         cab.fillStyle(level >= 5 ? 0x6b4a1c : 0x4e3a1e, 1);
-        cab.fillRoundedRect(cx0 + 2, cy0 + 2, cw - 4, ch - 8, 3);
+        cab.fillRoundedRect(cx0 + 2 * k, cy0 + 2 * k, cw - 4 * k, ch - 8 * k, 3 * k);
         cab.lineStyle(1.2, level >= 5 ? 0xffd43b : 0x22303f, level >= 5 ? 0.7 : 0.5);
-        cab.strokeRoundedRect(cx0, cy0, cw, ch, 4);
+        cab.strokeRoundedRect(cx0, cy0, cw, ch, 4 * k);
         cab.fillStyle(level >= 5 ? 0xffd43b : 0x22303f, 0.9);
-        cab.fillCircle(x, cy0 + ch / 2 - 1, 2.2);
+        cab.fillCircle(x, cy0 + ch / 2 - 1, 2.2 * k);
       }
-      const icon = this.add.image(x, FURNITURE_BASE - (level > 0 ? 6 : 0), ASSET_ICONS[a.id] ?? 'coin')
+      const iconSize = (level > 0 ? 52 : 30) * k;
+      const icon = this.add.image(x, baseY - (level > 0 ? 6 * k : 0), ASSET_ICONS[a.id] ?? 'coin')
         .setOrigin(0.5, 1)
-        .setDisplaySize(level > 0 ? 52 : 30, level > 0 ? 52 : 30)
-        .setDepth(6)
+        .setDisplaySize(iconSize, iconSize)
+        .setDepth(depthFor(baseY))
         .setAlpha(level > 0 ? 1 : 0.3);
-      const name = this.add.text(x, FURNITURE_BASE + 6, '', {
-        fontFamily: FONT, fontSize: '11px', color: level > 0 ? '#ffe066' : '#7f93ab', fontStyle: 'bold', resolution: 2
-      }).setOrigin(0.5, 0).setDepth(7);
-      const glow = this.add.image(x, FURNITURE_BASE - 24, 'spark')
-        .setDepth(6).setTint(0xffd43b).setAlpha(level > 0 ? 0.16 : 0)
-        .setDisplaySize(78 + level * 4, 60 + level * 3);
-      const highlight = this.add.graphics().setDepth(8);
+      const name = this.add.text(x, baseY + 6 * k, '', {
+        fontFamily: FONT, fontSize: `${Math.round(11 * k)}px`,
+        color: level > 0 ? '#ffe066' : '#7f93ab', fontStyle: 'bold', resolution: 2
+      }).setOrigin(0.5, 0).setDepth(depthFor(baseY) + 0.3);
+      const glow = this.add.image(x, baseY - 24 * k, 'spark')
+        .setDepth(depthFor(baseY) - 0.1).setTint(0xffd43b).setAlpha(level > 0 ? 0.16 : 0)
+        .setDisplaySize((78 + level * 4) * k, (60 + level * 3) * k);
+      const highlight = this.add.graphics().setDepth(depthFor(baseY) + 0.2);
       this.interactables.push({
-        kind: 'asset', id: a.id, x, y: FURNITURE_BASE,
+        kind: 'asset', id: a.id, x, y: baseY,
         prompt: '', action: () => this.buyAsset(a.id), label: name, highlight, icon,
         glow, maxLevel: a.maxLevel
       });
@@ -468,32 +587,39 @@ export default class AssetsScene extends Phaser.Scene {
 
   private buildNpcs() {
     NETWORK.forEach((n, i) => {
-      const x = NPC_X[i];
+      const [fx, fz] = NPC_SPOTS[i];
+      const pos = project(fx, fz);
+      const k = pos.scale;
+      const x = pos.x;
+      const baseY = pos.y;
       const level = this.holdings.network[n.id] ?? 0;
-      this.add.graphics().setDepth(4).fillStyle(0x1a2233, 0.5).fillEllipse(x, NPC_BASE, 38, 9);
+      const depth = depthFor(baseY);
+      this.add.graphics().setDepth(depth - 0.5).fillStyle(0x111a26, 0.45).fillEllipse(x, baseY, 34 * k, 9 * k);
       // 客人用主角贴图染色,看上去是屋里站着的人,而不是一个图标
       ensureSkinTextures(this, this.npcSkin);
       const guestKey = playerFrameKey(this, this.npcSkin, 'idle');
-      const icon = this.add.sprite(x, NPC_BASE, guestKey)
+      const hPx = (level > 0 ? 48 : 42) * k;
+      const icon = this.add.sprite(x, baseY, guestKey)
         .setOrigin(0.5, 1)
-        .setDisplaySize(28, level > 0 ? 48 : 42)
-        .setDepth(4)
+        .setDisplaySize(hPx * 0.58, hPx)
+        .setDepth(depth)
         .setTint(NETWORK_TINT[n.id] ?? 0xffffff)
         .setFlipX(i % 2 === 0)
         .setAlpha(level > 0 ? 1 : 0.3);
       this.tweens.add({
-        targets: icon, y: NPC_BASE - 2, duration: 1200 + i * 180,
+        targets: icon, y: baseY - 2, duration: 1200 + i * 180,
         yoyo: true, repeat: -1, ease: 'Sine.inOut'
       });
-      const name = this.add.text(x, NPC_BASE - 52, '', {
-        fontFamily: FONT, fontSize: '10px', color: level > 0 ? '#b197fc' : '#66788f', fontStyle: 'bold', resolution: 2
-      }).setOrigin(0.5, 1).setDepth(7);
-      const glow = this.add.image(x, NPC_BASE - 16, 'spark')
-        .setDepth(3).setTint(0xb197fc).setAlpha(level > 0 ? 0.14 : 0)
-        .setDisplaySize(44 + level * 3, 40 + level * 2);
-      const highlight = this.add.graphics().setDepth(8);
+      const name = this.add.text(x, baseY - 52 * k, '', {
+        fontFamily: FONT, fontSize: `${Math.max(9, Math.round(10 * k))}px`,
+        color: level > 0 ? '#b197fc' : '#66788f', fontStyle: 'bold', resolution: 2
+      }).setOrigin(0.5, 1).setDepth(depth + 0.3);
+      const glow = this.add.image(x, baseY - 16 * k, 'spark')
+        .setDepth(depth - 0.3).setTint(0xb197fc).setAlpha(level > 0 ? 0.14 : 0)
+        .setDisplaySize((44 + level * 3) * k, (40 + level * 2) * k);
+      const highlight = this.add.graphics().setDepth(depth + 0.2);
       this.interactables.push({
-        kind: 'network', id: n.id, x, y: NPC_BASE,
+        kind: 'network', id: n.id, x, y: baseY,
         prompt: '', action: () => this.buyNetwork(n.id), label: name, highlight, icon,
         glow, maxLevel: n.maxLevel
       });
@@ -510,8 +636,13 @@ export default class AssetsScene extends Phaser.Scene {
     const run1 = keyFor('run-1');
     const run2 = keyFor('run-2');
     this.idleKey = idle;
-    this.playerShadow = this.add.image(GAME_WIDTH / 2, PLAYER_BASE, 'shadow').setDepth(11).setScale(1.15, 0.55).setAlpha(0.5);
-    this.player = this.add.sprite(GAME_WIDTH / 2, PLAYER_BASE, idle).setOrigin(0.5, 1).setDepth(12).setScale(0.95);
+    this.playerFx = PLAYER_START[0];
+    this.playerFz = PLAYER_START[1];
+    const pos = project(this.playerFx, this.playerFz);
+    this.playerShadow = this.add.image(pos.x, pos.y, 'shadow')
+      .setDepth(depthFor(pos.y) - 0.6).setScale(1.15 * pos.scale, 0.55 * pos.scale).setAlpha(0.5);
+    this.player = this.add.sprite(pos.x, pos.y, idle)
+      .setOrigin(0.5, 1).setDepth(depthFor(pos.y)).setScale(0.95 * pos.scale);
     if (this.anims.exists('home-run')) this.anims.remove('home-run');
     this.anims.create({
       key: 'home-run',
@@ -527,6 +658,8 @@ export default class AssetsScene extends Phaser.Scene {
       this.cursors = kb.createCursorKeys();
       this.keyA = kb.addKey(Phaser.Input.Keyboard.KeyCodes.A);
       this.keyD = kb.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+      this.keyW = kb.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+      this.keyS = kb.addKey(Phaser.Input.Keyboard.KeyCodes.S);
       kb.on('keydown-E', () => this.interact());
       kb.on('keydown-SPACE', () => this.interact());
       kb.on('keydown-ESC', () => this.scene.start('Title'));
@@ -564,10 +697,14 @@ export default class AssetsScene extends Phaser.Scene {
         hit.on('pointerout', () => draw(false));
       }
     };
-    // 按键放大(半径 32~38),底部留出安全边距
+    // 左下:左右一对;左侧再放一对「里 / 外」控制纵深;右下 E
+    // 左下角做成十字键:上排 里/外(纵深),下排 ◀/▶(左右);右下 E
     const y = GAME_HEIGHT - 40;
+    const yUp = y - 72;
     mkBtn(68, y, 32, '◀', () => { this.moveLeft = true; this.moveRight = false; }, () => { this.moveLeft = false; });
     mkBtn(148, y, 32, '▶', () => { this.moveRight = true; this.moveLeft = false; }, () => { this.moveRight = false; });
+    mkBtn(68, yUp, 30, '里', () => { this.moveBack = true; this.moveFront = false; }, () => { this.moveBack = false; });
+    mkBtn(148, yUp, 30, '外', () => { this.moveFront = true; this.moveBack = false; }, () => { this.moveFront = false; });
     mkBtn(GAME_WIDTH - 62, y, 38, 'E', () => this.interact());
   }
 
@@ -670,18 +807,24 @@ export default class AssetsScene extends Phaser.Scene {
   private updateNearest() {
     let best = -1;
     let bestDist = 999;
+    const px = this.player.x;
+    const py = this.player.y;
     this.interactables.forEach((it, i) => {
-      // 人脉站在靠里一排,给一点距离惩罚,优先选中面前的家具
-      const d = Math.abs(it.x - this.player.x) + (it.kind === 'network' ? 30 : 0);
-      if (d < bestDist && d <= 110) { bestDist = d; best = i; }
+      // 伪 3D:用屏幕平面上的斜向距离,站在东西旁边才选得中
+      const dx = it.x - px;
+      const dy = (it.y - py) * 1.25;  // 纵深方向略微加权,前后走位有意义但不苛刻
+      const d = Math.sqrt(dx * dx + dy * dy) + (it.kind === 'network' ? 18 : 0);
+      if (d < bestDist && d <= 126) { bestDist = d; best = i; }
     });
     if (best !== this.activeIdx) {
       this.interactables.forEach(it => it.highlight.clear());
       this.activeIdx = best;
       if (best >= 0) {
         const t = this.interactables[best];
+        const kk = Phaser.Math.Clamp((t.y - FLOOR_BACK_Y) / (FLOOR_FRONT_Y - FLOOR_BACK_Y), 0, 1);
+        const hk = DEPTH_SCALE_BACK + (DEPTH_SCALE_FRONT - DEPTH_SCALE_BACK) * kk;
         t.highlight.lineStyle(2.4, 0xffd43b, 0.85);
-        t.highlight.strokeEllipse(t.x, t.y + 2, t.kind === 'asset' ? 84 : 44, t.kind === 'asset' ? 18 : 12);
+        t.highlight.strokeEllipse(t.x, t.y + 2, (t.kind === 'asset' ? 84 : 46) * hk, (t.kind === 'asset' ? 18 : 12) * hk);
       }
     }
     const t = this.interactables[this.activeIdx];
@@ -698,17 +841,38 @@ export default class AssetsScene extends Phaser.Scene {
     const dt = Math.min(delta, 50);
     const left = this.moveLeft || !!this.keyA?.isDown || !!this.cursors?.left.isDown;
     const right = this.moveRight || !!this.keyD?.isDown || !!this.cursors?.right.isDown;
+    const back = this.moveBack || !!this.keyW?.isDown || !!this.cursors?.up.isDown;
+    const front = this.moveFront || !!this.keyS?.isDown || !!this.cursors?.down.isDown;
+
+    // 走位在地板坐标系里做:fx 左右,fz 前后;越靠后越慢(透视),但手感更自然
     let moving = false;
+    const stepX = (0.42 * dt) / 1000 / (1.1 - this.playerFz * 0.35);
     if (left && !right) {
-      this.player.x = Math.max(48, this.player.x - (250 * dt) / 1000);
+      this.playerFx = Phaser.Math.Clamp(this.playerFx - stepX, 0.04, 0.96);
       this.player.setFlipX(true);
       moving = true;
     } else if (right && !left) {
-      this.player.x = Math.min(GAME_WIDTH - 48, this.player.x + (250 * dt) / 1000);
+      this.playerFx = Phaser.Math.Clamp(this.playerFx + stepX, 0.04, 0.96);
       this.player.setFlipX(false);
       moving = true;
     }
-    this.playerShadow.x = this.player.x;
+    const stepZ = (0.5 * dt) / 1000;
+    if (back && !front) {
+      this.playerFz = Phaser.Math.Clamp(this.playerFz - stepZ, 0.06, 0.94);
+      moving = true;
+    } else if (front && !back) {
+      this.playerFz = Phaser.Math.Clamp(this.playerFz + stepZ, 0.06, 0.94);
+      moving = true;
+    }
+
+    const pos = project(this.playerFx, this.playerFz);
+    this.player.setPosition(pos.x, pos.y);
+    this.player.setScale(0.95 * pos.scale);
+    this.player.setDepth(depthFor(pos.y));
+    this.playerShadow
+      .setPosition(pos.x, pos.y)
+      .setScale(1.15 * pos.scale, 0.55 * pos.scale)
+      .setDepth(depthFor(pos.y) - 0.6);
     this.collectDrops();
     this.updateDanger();
     if (moving && !this.runAnim) {
@@ -732,12 +896,13 @@ export default class AssetsScene extends Phaser.Scene {
   // ============================================================
 
   private toast(msg: string, color = '#ffe066', icon?: string) {
-    showToast(this, GAME_WIDTH / 2, 300, msg, color, icon);
+    showToast(this, GAME_WIDTH / 2, 262, msg, color, icon);
   }
 
   /** 在某个交互物头上冒一句话 */
   private sayAbove(it: Interactable, line: string) {
-    const bubble = this.add.text(it.x, it.y - (it.kind === 'asset' ? 76 : 66), line, {
+    const lift = it.kind === 'asset' ? 76 : 66;
+    const bubble = this.add.text(it.x, it.y - lift, line, {
       fontFamily: FONT, fontSize: '11px', color: '#0b1220', fontStyle: 'bold', resolution: 2,
       backgroundColor: '#ffe8a3', padding: { x: 7, y: 4 }
     }).setOrigin(0.5, 1).setDepth(50).setAlpha(0);
@@ -771,10 +936,10 @@ export default class AssetsScene extends Phaser.Scene {
     this.holdings.assets[id] = cur + 1;
     this.pendingBuilds += 1;
     playSfx(this, cur === 0 ? 'unlock' : 'coin', 0.45, cur === 0 ? 1 : 1.12);
-    const idx = ASSETS.indexOf(a);
-    const it = this.itemAt('asset', id);
+    const it0 = this.itemAt('asset', id);
+    const it = it0;
     if (cur === 0) {
-      confettiBurst(this, FURNITURE_X[idx], FURNITURE_BASE, 16);
+      confettiBurst(this, it0 ? it0.x : GAME_WIDTH / 2, it0 ? it0.y : 420, 16);
       this.toast(`置办了「${a.name}」· 开始产黑金`, '#ffe066', 'ui-shop');
       if (it) {
         // 家具从天上落地
@@ -784,7 +949,7 @@ export default class AssetsScene extends Phaser.Scene {
         this.sayAbove(it, a.desc);
       }
     } else {
-      confettiBurst(this, FURNITURE_X[idx], FURNITURE_BASE, 8);
+      confettiBurst(this, it0 ? it0.x : GAME_WIDTH / 2, it0 ? it0.y : 420, 8);
       this.toast(`「${a.name}」升到 Lv.${cur + 1} · 产出更高`, '#ffe066', ASSET_ICONS[id]);
       if (it) {
         this.tweens.add({ targets: it.icon, scale: it.icon.scale * 1.18, duration: 110, yoyo: true, ease: 'Quad.out' });
@@ -988,11 +1153,15 @@ export default class AssetsScene extends Phaser.Scene {
     if (this.overlayOpenCount() > 0) return;
     if (this.drops.length >= 5) return;
     if (incomePerMinWithWind(this.holdings, this.wind) <= 0) return;
-    const x = Phaser.Math.Between(70, GAME_WIDTH - 70);
-    const y = 508;
-    const glow = this.add.image(x, y, 'spark').setDepth(10).setTint(0xffd43b)
-      .setDisplaySize(34, 22).setAlpha(0.32);
-    const img = this.add.image(x, y, 'coin').setDisplaySize(18, 18).setDepth(11);
+    // 掉在地板上的随机位置(带景深)
+    const pos = project(Phaser.Math.FloatBetween(0.08, 0.92), Phaser.Math.FloatBetween(0.3, 0.95));
+    const x = pos.x;
+    const y = pos.y;
+    const k = pos.scale;
+    const depth = depthFor(y) + 0.5;
+    const glow = this.add.image(x, y, 'spark').setDepth(depth - 0.2).setTint(0xffd43b)
+      .setDisplaySize(34 * k, 22 * k).setAlpha(0.32);
+    const img = this.add.image(x, y, 'coin').setDisplaySize(18 * k, 18 * k).setDepth(depth);
     this.tweens.add({ targets: [img, glow], y: y - 4, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.drops.push({ img, glow, amount: this.moneyPerDrop() });
   }
@@ -1000,7 +1169,9 @@ export default class AssetsScene extends Phaser.Scene {
   private collectDrops() {
     for (let i = this.drops.length - 1; i >= 0; i--) {
       const d = this.drops[i];
-      if (Math.abs(d.img.x - this.player.x) > 24) continue;
+      const ddx = d.img.x - this.player.x;
+      const ddy = (d.img.y - this.player.y) * 1.4;
+      if (Math.sqrt(ddx * ddx + ddy * ddy) > 34) continue;
       this.corrupt += d.amount;
       this.drops.splice(i, 1);
       this.tweens.killTweensOf([d.img, d.glow]);
@@ -1037,24 +1208,29 @@ export default class AssetsScene extends Phaser.Scene {
     id: string; icon: string; tint: number; label: string; prompt: string;
     onInteract: () => void;
   }): Interactable {
-    // 站在两件家具之间的空档里,别把家具挡住
-    const slots = [177, 315, 453, 591, 729];
-    const x = slots[Phaser.Math.Between(0, slots.length - 1)];
-    const base = 452;
-    this.add.graphics().setDepth(9).fillStyle(0x1a2233, 0.5).fillEllipse(x, base, 42, 10);
-    const glow = this.add.image(x, base - 20, 'spark')
-      .setDepth(9).setTint(opts.tint).setAlpha(0.32).setDisplaySize(64, 56);
+    // 站在两排之间的空档里(带景深,不挡家具)
+    const slots: [number, number][] = [[0.17, 0.32], [0.33, 0.3], [0.5, 0.32], [0.67, 0.3], [0.83, 0.32]];
+    const [vfx, vfz] = slots[Phaser.Math.Between(0, slots.length - 1)];
+    const vpos = project(vfx, vfz);
+    const x = vpos.x;
+    const base = vpos.y;
+    const vk = vpos.scale;
+    const vdepth = depthFor(base);
+    this.add.graphics().setDepth(vdepth - 0.4).fillStyle(0x111a26, 0.45).fillEllipse(x, base, 40 * vk, 10 * vk);
+    const glow = this.add.image(x, base - 20 * vk, 'spark')
+      .setDepth(vdepth - 0.2).setTint(opts.tint).setAlpha(0.32).setDisplaySize(64 * vk, 56 * vk);
     this.tweens.add({ targets: glow, alpha: 0.14, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-    const icon = this.add.image(x, base, opts.icon).setOrigin(0.5, 1).setDepth(10).setDisplaySize(36, 36);
+    const icon = this.add.image(x, base, opts.icon).setOrigin(0.5, 1)
+      .setDepth(vdepth).setDisplaySize(36 * vk, 36 * vk);
     this.tweens.add({ targets: icon, y: base - 3, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-    const label = this.add.text(x, base - 44, opts.label, {
-      fontFamily: FONT, fontSize: '11px', color: '#ffd43b', fontStyle: 'bold', resolution: 2
-    }).setOrigin(0.5, 1).setDepth(10);
-    const bang = this.add.text(x + 22, base - 54, '!', {
-      fontFamily: FONT, fontSize: '18px', color: '#ff8787', fontStyle: 'bold', resolution: 2
-    }).setOrigin(0.5).setDepth(11);
+    const label = this.add.text(x, base - 44 * vk, opts.label, {
+      fontFamily: FONT, fontSize: `${Math.round(11 * vk)}px`, color: '#ffd43b', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0.5, 1).setDepth(vdepth + 0.3);
+    const bang = this.add.text(x + 22 * vk, base - 54 * vk, '!', {
+      fontFamily: FONT, fontSize: `${Math.round(18 * vk)}px`, color: '#ff8787', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0.5).setDepth(vdepth + 0.4);
     this.tweens.add({ targets: bang, scale: 1.3, duration: 520, yoyo: true, repeat: -1 });
-    const highlight = this.add.graphics().setDepth(11);
+    const highlight = this.add.graphics().setDepth(vdepth + 0.5);
     const it: Interactable = {
       kind: 'visitor', id: opts.id, x, y: base,
       prompt: opts.prompt,
@@ -1448,7 +1624,7 @@ export default class AssetsScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '26px', color: '#ffe066', fontStyle: 'bold', resolution: 2
     }).setOrigin(0.5));
     const steps: [string, string][] = [
-      ['① 走动、捡钱、谈事', 'A/D 走动,地上的黑金走过去自动捡;靠近家具或客人按 E 交互'],
+      ['① 走动、捡钱、谈事', 'A/D 左右、W/S 前后走(屋子里有纵深);地上的黑金走过去自动捡;靠近物件按 E'],
       ['② 两套钱', '银币(跑酷挣)置办新产业/结交人脉;黑金(产业产出)升级产业'],
       ['③ 别被查', '风险高了就洗白:花黑金降风险,还能洗出一笔明面银币']
     ];
