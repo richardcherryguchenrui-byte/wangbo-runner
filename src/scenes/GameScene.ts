@@ -869,6 +869,10 @@ export default class GameScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     hit.on('pointerdown', () => {
       playSfx(this, 'click', 0.3);
+      // 按下回弹:整组缩一下再复原
+      const group = [bg, text, ...(icon ? [icon] : [])];
+      this.tweens.add({ targets: group, scale: 0.93, duration: 70, yoyo: true, ease: 'Quad.out' });
+      try { wxVibrate('light'); } catch {}
       onClick();
     });
     return { bg, text, hit, icon };
@@ -911,18 +915,17 @@ export default class GameScene extends Phaser.Scene {
     this.padSlideBounds = { x: 0, y: 0, w: 0, h: 0 };
     if (!this.controls.virtualButtons) return;
 
-    const r = 44;
-    const y = GROUND_TOP - 30;
-    // 左撇子也能用:铲在左、跳在右,和大多数横版手游一致。
-    // 圆心贴到两角,标签画在圆内,底边不会压到地面线。
-    this.makePadButton(70, y, r, 0x74c0fc, 'down', '滑铲', false);
-    this.makePadButton(GAME_WIDTH - 70, y, r, 0xffd43b, 'up', '跳跃', true);
+    // 按键放大到 r=54:小屏手机按得准,手指挡住的画面也更少
+    const r = 54;
+    const y = GROUND_TOP - 34;
+    this.makePadButton(82, y, r, 0x74c0fc, 'down', '滑铲', false);
+    this.makePadButton(GAME_WIDTH - 82, y, r, 0xffd43b, 'up', '跳跃', true);
   }
 
   private makePadButton(
     x: number,
     y: number,
-    r: number,
+    r0: number,
     accent: number,
     dir: 'up' | 'down',
     label: string,
@@ -931,22 +934,34 @@ export default class GameScene extends Phaser.Scene {
     // 深度放在地面之上、角色之下:角色永远压在按钮上面,不会被挡住
     const base = this.add.graphics().setDepth(3);
     const glyph = this.add.graphics().setDepth(3);
+    const ring = this.add.graphics().setDepth(2);
     const text = this.add
-      .text(x, y + 17, label, {
-        fontFamily: FONT, fontSize: '12px', color: '#ffffff', fontStyle: 'bold',
+      .text(x, y + r0 * 0.36, label, {
+        fontFamily: FONT, fontSize: '14px', color: '#ffffff', fontStyle: 'bold',
         resolution: 2, stroke: '#08131f', strokeThickness: 4
       })
       .setOrigin(0.5)
       .setDepth(3);
+    // 按下时整体缩一点,松手弹回,手感更实
+    let pressTween: Phaser.Tweens.Tween | undefined;
+    const bump = (pressed: boolean) => {
+      pressTween?.stop();
+      const s0 = pressed ? 0.9 : 1;
+      text.setScale(s0);
+      pressTween = this.tweens.add({
+        targets: text, scale: pressed ? 0.9 : 1, duration: 110, ease: 'Quad.out'
+      });
+    };
+    const r = r0;
 
     const drawBase = (pressed: boolean) => {
       base.clear();
-      base.fillStyle(accent, pressed ? 0.32 : 0.16);
+      base.fillStyle(accent, pressed ? 0.34 : 0.16);
       base.fillCircle(x, y, r + 6);
       base.fillStyle(0x08131f, pressed ? 0.72 : 0.42);
-      base.fillCircle(x, y, r);
-      base.lineStyle(2.6, accent, pressed ? 1 : 0.75);
-      base.strokeCircle(x, y, r);
+      base.fillCircle(x, y, pressed ? r - 2 : r);
+      base.lineStyle(pressed ? 3.4 : 2.6, accent, pressed ? 1 : 0.75);
+      base.strokeCircle(x, y, pressed ? r - 2 : r);
     };
     const drawGlyph = (pressed: boolean) => {
       glyph.clear();
@@ -969,7 +984,23 @@ export default class GameScene extends Phaser.Scene {
       drawBase(true);
       drawGlyph(true);
       text.setColor('#ffe066');
-      playSfx(this, 'click', 0.22);
+      bump(true);
+      // 水波扩散:按下去的瞬间能立刻看到反馈
+      ring.clear();
+      ring.lineStyle(4, accent, 0.9);
+      ring.strokeCircle(x, y, r - 4);
+      this.tweens.add({
+        targets: ring, alpha: { from: 1, to: 0 }, duration: 320, ease: 'Quad.out',
+        onUpdate: (tw) => {
+          const k = tw.progress;
+          ring.clear();
+          ring.lineStyle(4 * (1 - k) + 1, accent, 0.9 * (1 - k));
+          ring.strokeCircle(x, y, r - 4 + 26 * k);
+        },
+        onComplete: () => ring.clear()
+      });
+      try { wxVibrate('light'); } catch {}
+      playSfx(this, 'click', 0.24);
       if (isJump) this.onJumpInput();
       else this.trySlide();
     };
@@ -977,6 +1008,7 @@ export default class GameScene extends Phaser.Scene {
       drawBase(false);
       drawGlyph(false);
       text.setColor('#ffffff');
+      bump(false);
       if (isJump) this.onJumpRelease();
     };
     hit.on('pointerdown', press);

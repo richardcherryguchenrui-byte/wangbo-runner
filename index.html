@@ -107,6 +107,18 @@
         font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
       }
       #rotate-hint.hidden { display: none !important; }
+      /* 竖屏硬转:把整个游戏画面逆时针转 90 度铺满屏幕(系统禁了自动旋转时的兜底) */
+      #app.force-landscape {
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        width: 100vh !important;
+        height: 100vw !important;
+        transform: translate(-50%, -50%) rotate(90deg);
+        transform-origin: center center;
+      }
+      #app.force-landscape canvas { width: 100% !important; height: 100% !important; }
+      body.force-landscape-body { overflow: hidden; }
       .rotate-card {
         display: flex;
         flex-direction: column;
@@ -161,7 +173,9 @@
       <div class="rotate-card">
         <div class="rotate-icon">↻</div>
         <strong>横屏体验更佳</strong>
-        <span>旋转手机,仕途更开阔</span>
+        <span id="rotate-sub">旋转手机,仕途更开阔</span>
+        <button id="rotate-lock" type="button">强制横屏(推荐)</button>
+        <button id="rotate-turn" type="button">手机转不过来?竖着横玩</button>
         <button id="rotate-dismiss" type="button">继续竖屏</button>
       </div>
     </div>

@@ -42,7 +42,7 @@ import {
   type Holdings
 } from '../systems/assets';
 import { buildAssetShareCard, downloadCanvas } from '../systems/sharecard';
-import { isWx, wxShare } from '../systems/wxapi';
+import { isWx, wxShare, wxVibrate } from '../systems/wxapi';
 import { collectOfflineIncome } from '../systems/offline';
 import { noteAssetBuild, noteAuditHandled, getDaily, dailyCompletedCount, DAILY_TASKS } from '../systems/daily';
 
@@ -534,21 +534,41 @@ export default class AssetsScene extends Phaser.Scene {
 
     const mkBtn = (x: number, y: number, r: number, label: string, onDown: () => void, onUp?: () => void) => {
       const g = this.add.graphics().setDepth(60);
-      g.fillStyle(0x060d16, 0.55);
-      g.fillCircle(x, y, r);
-      g.lineStyle(2.2, 0xffd43b, 0.6);
-      g.strokeCircle(x, y, r);
-      this.add.text(x, y, label, {
-        fontFamily: FONT, fontSize: r > 32 ? '18px' : '16px', color: '#ffe066', fontStyle: 'bold', resolution: 2
+      const draw = (pressed: boolean) => {
+        g.clear();
+        g.fillStyle(0xffd43b, pressed ? 0.26 : 0.1);
+        g.fillCircle(x, y, r + (pressed ? 3 : 6));
+        g.fillStyle(0x060d16, pressed ? 0.72 : 0.58);
+        g.fillCircle(x, y, pressed ? r - 2 : r);
+        g.lineStyle(pressed ? 3.2 : 2.6, 0xffd43b, pressed ? 1 : 0.68);
+        g.strokeCircle(x, y, pressed ? r - 2 : r);
+      };
+      draw(false);
+      const txt = this.add.text(x, y, label, {
+        fontFamily: FONT, fontSize: r >= 34 ? '21px' : '19px', color: '#ffe066', fontStyle: 'bold', resolution: 2
       }).setOrigin(0.5).setDepth(61);
-      const hit = this.add.circle(x, y, r + 10, 0xffffff, 0.001).setDepth(62).setInteractive({ useHandCursor: true });
-      hit.on('pointerdown', onDown);
-      if (onUp) { hit.on('pointerup', onUp); hit.on('pointerout', onUp); }
+      const hit = this.add.circle(x, y, r + 12, 0xffffff, 0.001).setDepth(62).setInteractive({ useHandCursor: true });
+      hit.on('pointerdown', () => {
+        draw(true);
+        this.tweens.add({ targets: txt, scale: 0.86, duration: 90, yoyo: true, ease: 'Quad.out' });
+        try { wxVibrate('light'); } catch {}
+        playSfx(this, 'click', 0.22);
+        onDown();
+      });
+      if (onUp) {
+        const up = () => { draw(false); onUp(); };
+        hit.on('pointerup', up);
+        hit.on('pointerout', up);
+      } else {
+        hit.on('pointerup', () => draw(false));
+        hit.on('pointerout', () => draw(false));
+      }
     };
-    const y = GAME_HEIGHT - 26;
-    mkBtn(52, y, 26, '◀', () => { this.moveLeft = true; this.moveRight = false; }, () => { this.moveLeft = false; });
-    mkBtn(118, y, 26, '▶', () => { this.moveRight = true; this.moveLeft = false; }, () => { this.moveRight = false; });
-    mkBtn(GAME_WIDTH - 46, y, 30, 'E', () => this.interact());
+    // 按键放大(半径 32~38),底部留出安全边距
+    const y = GAME_HEIGHT - 40;
+    mkBtn(68, y, 32, '◀', () => { this.moveLeft = true; this.moveRight = false; }, () => { this.moveLeft = false; });
+    mkBtn(148, y, 32, '▶', () => { this.moveRight = true; this.moveLeft = false; }, () => { this.moveRight = false; });
+    mkBtn(GAME_WIDTH - 62, y, 38, 'E', () => this.interact());
   }
 
   private washLabel!: Phaser.GameObjects.Text;

@@ -99,11 +99,43 @@ if ('serviceWorker' in navigator) {
 }
 
 // 竖屏提示:可跳过;本局会话内不再打扰
+// 三个出口:强制横屏(全屏 + 方向锁)、竖着横玩(CSS 把画面转 90 度)、继续竖屏
 try {
   const hint = document.getElementById('rotate-hint');
-  if (sessionStorage.getItem('rotateHintDismissed') === '1') hint?.classList.add('hidden');
+  const sub = document.getElementById('rotate-sub');
+  const appEl = document.getElementById('app');
+  const hideHint = () => hint?.classList.add('hidden');
+
+  if (sessionStorage.getItem('rotateHintDismissed') === '1') hideHint();
+
+  // 1) 强制横屏:浏览器只在全屏下允许锁方向,所以先全屏再锁
+  document.getElementById('rotate-lock')?.addEventListener('click', async () => {
+    try {
+      const el = document.documentElement as HTMLElement & {
+        webkitRequestFullscreen?: () => Promise<void>;
+      };
+      await (el.requestFullscreen?.() ?? el.webkitRequestFullscreen?.());
+    } catch {}
+    try {
+      const orientation = screen.orientation as ScreenOrientation & {
+        lock?: (o: string) => Promise<void>;
+      };
+      await orientation?.lock?.('landscape');
+    } catch {}
+    // 锁不上也没关系:全屏后大多数安卓机自己就能转
+    if (sub) sub.textContent = '已尝试锁定横屏 · 如果还是竖的,点下面「竖着横玩」';
+  });
+
+  // 2) 竖着横玩:整个画面转 90 度铺满屏幕
+  document.getElementById('rotate-turn')?.addEventListener('click', () => {
+    appEl?.classList.add('force-landscape');
+    document.body.classList.add('force-landscape-body');
+    hideHint();
+    (window as unknown as { __game?: Phaser.Game }).__game?.scale?.refresh?.();
+  });
+
   document.getElementById('rotate-dismiss')?.addEventListener('click', () => {
-    hint?.classList.add('hidden');
+    hideHint();
     sessionStorage.setItem('rotateHintDismissed', '1');
   });
 } catch {}
