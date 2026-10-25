@@ -13,6 +13,7 @@ import { checkIn } from '../systems/daily';
 import { hasCustomHead } from '../systems/customhead';
 import { RUN_RANKS } from '../systems/ranks';
 import { getDailyChallenge, dailyModifierIcon } from '../systems/dailyChallenge';
+import { DUNGEON_LEVELS, isDungeonUnlocked } from '../systems/dungeon';
 
 export default class TitleScene extends Phaser.Scene {
   private guSign?: Phaser.GameObjects.Container;
@@ -269,68 +270,76 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   // ---- 右侧菜单 ----
+  // 版式:严格按行分配高度,每块自带底板,行与行之间留 4~6px 空档,绝不重叠。
+  //   目标标题 96 · 继续闯关 118~176 · 仕途进度 182~210 · 今日挑战 216~268
+  //   六个入口 274~404 · 留置室 410~446 · 下一步提示 452~478
   private buildMenu(p: ReturnType<typeof loadProgress>) {
     const dc = getDailyChallenge();
-    const px = 620;
-    const pw = 312;
+    const px = 616;
+    const pw = 320;
+    const padX = 16;
+    const innerW = pw - padX * 2;
 
-    const panel = addPanel(this, px, 84, pw, 384, { fill: 0x0b1b31, fillAlpha: 0.72, stroke: 0xffffff, strokeAlpha: 0.14, radius: 22 });
+    const panel = addPanel(this, px, 84, pw, 400, { fill: 0x0b1b31, fillAlpha: 0.72, stroke: 0xffffff, strokeAlpha: 0.14, radius: 22 });
     panel.setDepth(9);
 
-    // ===== 右侧面板:纵向分区,每块各占一行,互不遮挡 =====
     // 1) 标题行
     this.add.text(px + 20, 100, '目标:一路高升', {
       fontFamily: FONT, fontSize: '13px', color: '#a9c7e8', fontStyle: 'bold'
     }).setOrigin(0, 0.5).setDepth(10);
 
-    // 2) 主按钮:闯关模式
-    makeHeroButton(this, px + pw / 2, 148, 268, 58, '继续闯关', () => {
+    // 2) 主按钮:闯关模式(118~176)
+    makeHeroButton(this, px + pw / 2, 147, 264, 56, '继续闯关', () => {
       playSfx(this, 'click', 0.45);
       this.scene.start('Campaign');
     }, { iconKey: 'ui-play', iconSize: 22, fontSize: 24 });
 
-    // 3) 仕途进度条(独立一行,带底板,不会再被按钮压住)
+    // 3) 仕途进度(182~210):独立一行带底板
     {
       const clearedCount = LEVELS.filter(l => (p.levelStars[l.id] ?? 0) > 0).length;
       const starSum = totalStars(p.levelStars);
-      const rowY = 188;
-      const rowH = 30;
+      const rowY = 182;
+      const rowH = 28;
       const g = this.add.graphics().setDepth(10);
       g.fillStyle(0x0a1728, 0.9);
-      g.fillRoundedRect(px + 16, rowY, pw - 32, rowH, 10);
+      g.fillRoundedRect(px + padX, rowY, innerW, rowH, 10);
       g.lineStyle(1, 0xffd43b, 0.28);
-      g.strokeRoundedRect(px + 16, rowY, pw - 32, rowH, 10);
-      // 进度条本体
-      const barW = 86;
+      g.strokeRoundedRect(px + padX, rowY, innerW, rowH, 10);
+      const barW = 80;
       const ratio = LEVELS.length > 0 ? clearedCount / LEVELS.length : 0;
       g.fillStyle(0x1d3350, 1);
-      g.fillRoundedRect(px + pw - 16 - barW, rowY + rowH / 2 - 3, barW, 6, 3);
+      g.fillRoundedRect(px + pw - padX - barW, rowY + rowH / 2 - 3, barW, 6, 3);
       g.fillStyle(0xffd43b, 0.95);
-      g.fillRoundedRect(px + pw - 16 - barW, rowY + rowH / 2 - 3, Math.max(4, barW * ratio), 6, 3);
-      this.add.image(px + 32, rowY + rowH / 2, 'pendant-star').setDisplaySize(15, 15).setDepth(11).setTint(0xffd43b);
-      this.add.text(px + 46, rowY + rowH / 2, `官场现形记 ${clearedCount}/${LEVELS.length} 关 · ★${starSum}`, {
+      g.fillRoundedRect(px + pw - padX - barW, rowY + rowH / 2 - 3, Math.max(4, barW * ratio), 6, 3);
+      this.add.image(px + padX + 16, rowY + rowH / 2, 'pendant-star').setDisplaySize(14, 14).setDepth(11).setTint(0xffd43b);
+      this.add.text(px + padX + 30, rowY + rowH / 2, `官场现形记 ${clearedCount}/${LEVELS.length} 关 · ★${starSum}`, {
         fontFamily: FONT, fontSize: '12px', color: '#ffe066', fontStyle: 'bold'
       }).setOrigin(0, 0.5).setDepth(11);
     }
 
-    // 4) 每日挑战卡
-    const dy = 228;
-    const dcBg = this.add.graphics().setDepth(10);
-    dcBg.fillStyle(0x2a1b4a, 0.9);
-    dcBg.fillRoundedRect(px + 16, dy, pw - 32, 62, 12);
-    dcBg.lineStyle(1.5, 0xc9a7ff, 0.5);
-    dcBg.strokeRoundedRect(px + 16, dy, pw - 32, 62, 12);
-    this.add.image(px + 38, dy + 30, dailyModifierIcon(dc.modifier.id)).setDisplaySize(20, 20).setDepth(11);
-    this.add.text(px + 54, dy + 10, `今日挑战 · ${dc.modifier.name}`, {
-      fontFamily: FONT, fontSize: '15px', color: '#ffe066', fontStyle: 'bold'
-    }).setDepth(11);
-    this.add.text(px + 54, dy + 34, `${dc.modifier.desc}`, {
-      fontFamily: FONT, fontSize: '11px', color: '#d8c7ff'
-    }).setDepth(11);
-    const dcHit = this.add.rectangle(px + pw / 2, dy + 31, pw - 32, 62, 0xffffff, 0.001).setDepth(12).setInteractive({ useHandCursor: true });
-    dcHit.on('pointerdown', () => { playSfx(this, 'click', 0.4); this.startGame(true); });
+    // 4) 今日挑战(216~268):卡面独立,高度锁死 52,标题与说明各占一行
+    {
+      const dy = 216;
+      const dh = 52;
+      const g = this.add.graphics().setDepth(10);
+      g.fillStyle(0x2a1b4a, 0.92);
+      g.fillRoundedRect(px + padX, dy, innerW, dh, 12);
+      g.lineStyle(1.5, 0xc9a7ff, 0.5);
+      g.strokeRoundedRect(px + padX, dy, innerW, dh, 12);
+      this.add.image(px + padX + 22, dy + dh / 2, dailyModifierIcon(dc.modifier.id)).setDisplaySize(20, 20).setDepth(11);
+      this.add.text(px + padX + 40, dy + 8, `今日挑战 · ${dc.modifier.name}`, {
+        fontFamily: FONT, fontSize: '14px', color: '#ffe066', fontStyle: 'bold'
+      }).setDepth(11);
+      this.add.text(px + padX + 40, dy + 30, dc.modifier.desc, {
+        fontFamily: FONT, fontSize: '11px', color: '#d8c7ff',
+        wordWrap: { width: innerW - 54, useAdvancedWrap: true }
+      }).setDepth(11);
+      const hit = this.add.rectangle(px + pw / 2, dy + dh / 2, innerW, dh, 0xffffff, 0.001)
+        .setDepth(12).setInteractive({ useHandCursor: true });
+      hit.on('pointerdown', () => { playSfx(this, 'click', 0.4); this.startGame(true); });
+    }
 
-    // 5) 次级入口:3 行 × 2 列
+    // 5) 六个入口(274~404):3 行 × 2 列,行高 40 + 间距 5
     const items: { icon: string; label: string; sub: string; onClick: () => void }[] = [
       { icon: 'ui-shop', label: '晋升商店', sub: '皮肤 · 手枪', onClick: () => this.scene.start('Shop') },
       {
@@ -350,48 +359,82 @@ export default class TitleScene extends Phaser.Scene {
       { icon: 'ui-clock', label: '无尽模式', sub: '能撑多久', onClick: () => this.startGame(false) },
       { icon: 'ui-gear', label: '设置', sub: '声音 · 存档', onClick: () => this.scene.start('Settings') }
     ];
+    const gap = 5;
+    const bh = 40;
+    const bw = (innerW - 5) / 2;
     items.forEach((it, i) => {
-      const gap = 7;
-      const bw = (pw - 32 - gap) / 2;
-      const bh = 44;
-      const bx = px + 16 + (i % 2) * (bw + gap);
-      const by = 288 + Math.floor(i / 2) * (bh + gap);
+      const bx = px + padX + (i % 2) * (bw + 5);
+      const by = 274 + Math.floor(i / 2) * (bh + gap);
       const bg = this.add.graphics().setDepth(10);
       bg.fillStyle(0x16324f, 0.85);
       bg.fillRoundedRect(bx, by, bw, bh, 10);
       bg.lineStyle(1.2, 0xffffff, 0.12);
       bg.strokeRoundedRect(bx, by, bw, bh, 10);
-      this.add.image(bx + 17, by + bh / 2, it.icon).setDisplaySize(15, 15).setDepth(11);
-      this.add.text(bx + 30, by + 6, it.label, { fontFamily: FONT, fontSize: '12px', color: '#ffffff', fontStyle: 'bold' }).setDepth(11);
-      this.add.text(bx + 30, by + 24, it.sub, { fontFamily: FONT, fontSize: '9px', color: '#93b5d6' }).setDepth(11);
-      const hit = this.add.rectangle(bx + bw / 2, by + bh / 2, bw, bh, 0xffffff, 0.001).setDepth(12).setInteractive({ useHandCursor: true });
-      hit.on('pointerover', () => bg.setAlpha(0.95));
-      hit.on('pointerout', () => bg.setAlpha(1));
+      this.add.image(bx + 18, by + bh / 2, it.icon).setDisplaySize(15, 15).setDepth(11);
+      this.add.text(bx + 32, by + 5, it.label, {
+        fontFamily: FONT, fontSize: '12px', color: '#ffffff', fontStyle: 'bold'
+      }).setDepth(11);
+      this.add.text(bx + 32, by + 21, it.sub, {
+        fontFamily: FONT, fontSize: '9px', color: '#93b5d6'
+      }).setDepth(11);
+      const hit = this.add.rectangle(bx + bw / 2, by + bh / 2, bw, bh, 0xffffff, 0.001)
+        .setDepth(12).setInteractive({ useHandCursor: true });
+      hit.on('pointerover', () => { bg.clear(); bg.fillStyle(0x1f4470, 0.95); bg.fillRoundedRect(bx, by, bw, bh, 10); bg.lineStyle(1.2, 0xffd43b, 0.35); bg.strokeRoundedRect(bx, by, bw, bh, 10); });
+      hit.on('pointerout', () => { bg.clear(); bg.fillStyle(0x16324f, 0.85); bg.fillRoundedRect(bx, by, bw, bh, 10); bg.lineStyle(1.2, 0xffffff, 0.12); bg.strokeRoundedRect(bx, by, bw, bh, 10); });
       hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); it.onClick(); });
     });
 
-    // 下一步提示:点一下直接去该去的地方
+    // 6) 留置室:横版闯关,独立模式(410~446)
+    {
+      const by = 410;
+      const bh2 = 36;
+      const cleared = Object.keys(p.dungeonCleared ?? {}).length;
+      const g = this.add.graphics().setDepth(10);
+      g.fillStyle(0x2a0f14, 0.95);
+      g.fillRoundedRect(px + padX, by, innerW, bh2, 12);
+      g.lineStyle(1.3, 0xff8787, 0.45);
+      g.strokeRoundedRect(px + padX, by, innerW, bh2, 12);
+      this.add.image(px + padX + 20, by + bh2 / 2, 'ui-siren').setDisplaySize(16, 16).setDepth(11);
+      this.add.text(px + padX + 36, by + bh2 / 2, '留置室 · 横版闯关', {
+        fontFamily: FONT, fontSize: '13px', color: '#ffd0d0', fontStyle: 'bold'
+      }).setOrigin(0, 0.5).setDepth(11);
+      this.add.text(px + pw - padX - 78, by + bh2 / 2, `${cleared}/${DUNGEON_LEVELS.length} 层`, {
+        fontFamily: FONT, fontSize: '11px', color: '#ff8787', fontStyle: 'bold'
+      }).setOrigin(0, 0.5).setDepth(11);
+      this.add.text(px + pw - padX - 10, by + bh2 / 2, '›', {
+        fontFamily: FONT, fontSize: '18px', color: '#ff8787', fontStyle: 'bold'
+      }).setOrigin(1, 0.5).setDepth(11);
+      const hit = this.add.rectangle(px + pw / 2, by + bh2 / 2, innerW, bh2, 0xffffff, 0.001)
+        .setDepth(12).setInteractive({ useHandCursor: true });
+      hit.on('pointerover', () => g.setAlpha(0.82));
+      hit.on('pointerout', () => g.setAlpha(1));
+      hit.on('pointerdown', () => { playSfx(this, 'click', 0.4); this.showDungeonPicker(p); });
+    }
+
+    // 7) 下一步提示(452~478)
     {
       const step = nextStep(p);
       if (step) {
-        const y = 450;
-        const w = pw - 32;
+        const y = 452;
+        const h = 26;
         const g = this.add.graphics().setDepth(10);
         g.fillStyle(step.tone === 'urgent' ? 0x3a1a20 : 0x122c40, 0.92);
-        g.fillRoundedRect(px + 16, y - 15, w, 30, 10);
+        g.fillRoundedRect(px + padX, y, innerW, h, 10);
         g.lineStyle(1.2, step.tone === 'urgent' ? 0xff8787 : 0x74c0fc, 0.4);
-        g.strokeRoundedRect(px + 16, y - 15, w, 30, 10);
-        this.add.image(px + 32, y, step.tone === 'urgent' ? 'ui-siren' : 'ui-tips')
+        g.strokeRoundedRect(px + padX, y, innerW, h, 10);
+        this.add.image(px + padX + 16, y + h / 2, step.tone === 'urgent' ? 'ui-siren' : 'ui-tips')
           .setDisplaySize(14, 14).setDepth(11);
+        const maxChars = 26;
+        const stepText = step.text.length > maxChars ? step.text.slice(0, maxChars - 1) + '…' : step.text;
         const t = this.add
-          .text(px + 46, y, step.text, {
+          .text(px + padX + 30, y + h / 2, stepText, {
             fontFamily: FONT, fontSize: '11px',
             color: step.tone === 'urgent' ? '#ff8787' : '#b7cfe8', resolution: 2
           })
           .setOrigin(0, 0.5)
           .setDepth(11);
         const hit = this.add
-          .rectangle(px + pw / 2, y, w, 30, 0xffffff, 0.001)
+          .rectangle(px + pw / 2, y + h / 2, innerW, h, 0xffffff, 0.001)
           .setDepth(12)
           .setInteractive({ useHandCursor: true });
         hit.on('pointerover', () => t.setColor('#ffe066'));
@@ -399,6 +442,83 @@ export default class TitleScene extends Phaser.Scene {
         hit.on('pointerdown', () => { playSfx(this, 'click', 0.35); this.scene.start(step.scene); });
       }
     }
+  }
+
+  /** 留置室选层:独立入口,和失败后的「去交代」共用同一套关卡 */
+  private showDungeonPicker(p: ReturnType<typeof loadProgress>) {
+    // 层级要压过签到/离线进账的 toast(depth 100),否则会被盖住
+    const layer = this.add.container(0, 0).setDepth(300);
+    const backdrop = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x02060c, 0.86)
+      .setInteractive();
+    backdrop.on('pointerdown', () => layer.destroy(true));
+    layer.add(backdrop);
+
+    const panelW = 600;
+    const panelH = 372;
+    const panelX = GAME_WIDTH / 2 - panelW / 2;
+    const panelY = 84;
+    const g = this.add.graphics();
+    g.fillStyle(0x140a12, 0.98);
+    g.fillRoundedRect(panelX, panelY, panelW, panelH, 22);
+    g.lineStyle(2, 0xff8787, 0.5);
+    g.strokeRoundedRect(panelX, panelY, panelW, panelH, 22);
+    layer.add(g);
+
+    layer.add(this.add.text(GAME_WIDTH / 2, panelY + 30, '留置室', {
+      fontFamily: FONT, fontSize: '28px', color: '#ff8787', fontStyle: 'bold',
+      resolution: 2, stroke: '#08131f', strokeThickness: 5
+    }).setOrigin(0.5));
+    layer.add(this.add.text(GAME_WIDTH / 2, panelY + 60, '横版闯关 · 独立入口,打输了也不影响主线;清完一层,回主线多一顶乌纱帽', {
+      fontFamily: FONT, fontSize: '11px', color: '#e2b6b6', resolution: 2
+    }).setOrigin(0.5));
+
+    DUNGEON_LEVELS.forEach((lvDef, i) => {
+      const unlocked = isDungeonUnlocked(lvDef.id, p.dungeonCleared ?? {});
+      const times = p.dungeonCleared?.[lvDef.id] ?? 0;
+      const by = panelY + 82 + i * 52;
+      const bw = panelW - 48;
+      const bx = panelX + 24;
+      const cardG = this.add.graphics();
+      cardG.fillStyle(unlocked ? (times > 0 ? 0x1d2b1c : 0x241018) : 0x131a22, 0.95);
+      cardG.fillRoundedRect(bx, by, bw, 46, 12);
+      cardG.lineStyle(1.3, unlocked ? 0xff8787 : 0x2b3646, unlocked ? 0.4 : 0.5);
+      cardG.strokeRoundedRect(bx, by, bw, 46, 12);
+      layer.add(cardG);
+      layer.add(this.add.text(bx + 16, by + 10, `${i + 1}. ${lvDef.name}`, {
+        fontFamily: FONT, fontSize: '15px', color: unlocked ? '#ffd0d0' : '#5b6a7d', fontStyle: 'bold', resolution: 2
+      }));
+      layer.add(this.add.text(bx + 16, by + 28, unlocked ? lvDef.subtitle : '上一层通关后解锁', {
+        fontFamily: FONT, fontSize: '10px', color: unlocked ? '#b9a0a0' : '#4b586a', resolution: 2
+      }));
+      if (times > 0) {
+        layer.add(this.add.text(bx + bw - 16, by + 23, `通关 ×${times}`, {
+          fontFamily: FONT, fontSize: '11px', color: '#8ce99a', fontStyle: 'bold', resolution: 2
+        }).setOrigin(1, 0.5));
+      }
+      if (!unlocked) return;
+      const hit = this.add.rectangle(bx + bw / 2, by + 23, bw, 46, 0xffffff, 0.001)
+        .setInteractive({ useHandCursor: true });
+      layer.add(hit);
+      hit.on('pointerdown', () => {
+        playSfx(this, 'click', 0.4);
+        layer.destroy(true);
+        this.scene.start('Dungeon', { levelId: lvDef.id });
+      });
+    });
+
+    const closeY = panelY + panelH - 26;
+    const closeG = this.add.graphics();
+    closeG.fillStyle(0x16324f, 0.95);
+    closeG.fillRoundedRect(GAME_WIDTH / 2 - 70, closeY - 15, 140, 30, 15);
+    layer.add(closeG);
+    layer.add(this.add.text(GAME_WIDTH / 2, closeY, '先不进去', {
+      fontFamily: FONT, fontSize: '13px', color: '#cfe3ff', fontStyle: 'bold', resolution: 2
+    }).setOrigin(0.5));
+    const closeHit = this.add.rectangle(GAME_WIDTH / 2, closeY, 140, 30, 0xffffff, 0.001)
+      .setInteractive({ useHandCursor: true });
+    layer.add(closeHit);
+    closeHit.on('pointerdown', () => { playSfx(this, 'click', 0.3); layer.destroy(true); });
+    playSfx(this, 'warn', 0.35);
   }
 
   // 回访钩子:一进游戏先把离线期间的家产收益结算掉并报喜
