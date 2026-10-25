@@ -58,6 +58,8 @@ export const LEVEL_OVERTIME_MS = 15000;
 
 // ---- 擦身而过:极限躲避奖励 + 气势 ----
 export const NEAR_MISS_DISTANCE = 26;
+// 擦身也要求「卡点」:跳/滑必须发生在接触前这么多毫秒内,提前躲开只算普通翻越
+export const NEAR_MISS_CLUTCH_ETA_MS = 170;
 export const NEAR_MISS_COINS = 2;
 export const NEAR_MISS_HYPE = 14;
 

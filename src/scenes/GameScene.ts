@@ -96,7 +96,7 @@ import {
   type MissionState
 } from '../systems/missions';
 import { generatePattern, FLYER_Y, type RunPattern } from '../systems/patterns';
-import { tightSlideIndex } from '../systems/slideJudge';
+import { tightSlideIndex, clutchIndex } from '../systems/slideJudge';
 import { loadControls, type ControlSettings } from '../systems/controls';
 import { assetPerks, EMPTY_PERKS, type AssetPerks } from '../systems/assets';
 import {
@@ -260,6 +260,7 @@ export default class GameScene extends Phaser.Scene {
   private slideCooldownUntil = 0;
   private slideQueued = false;
   private slideId = 0; // 本次滑铲编号:完美滑铲只认「起滑瞬间卡点」的那一次
+  private jumpId = 0;  // 本次起跳编号:擦身只认「贴脸那一瞬起跳/起滑」的那一次
   private overtimeMs = 0;      // 本局已拿到的加时
   private overtimeUsed = false;
 
@@ -1188,7 +1189,7 @@ export default class GameScene extends Phaser.Scene {
       {
         iconKey: 'mi-combo',
         title: '擦身 & 气势',
-        body: '贴着障碍躲过 = 擦身而过,额外银币 + 气势\n气势攒满自动进入「高光时刻」\n无敌冲刺,直接撞碎障碍!'
+        body: '贴脸那一瞬间才跳 / 才滑 = 擦身而过,额外银币 + 气势\n提前躲开不算,滑过去也不算\n气势攒满自动进入「高光时刻」'
       },
       {
         iconKey: 'ui-rank',
@@ -1792,6 +1793,10 @@ export default class GameScene extends Phaser.Scene {
   private doJump(speed: number, isDouble: boolean) {
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     body.setVelocityY(-speed);
+    if (!isDouble) {
+      this.jumpId += 1;
+      this.markTightJump();
+    }
     this.lastJumpPressedAt = -10000;
     this.bobTween?.stop();
     this.bobTween = undefined;
@@ -1859,6 +1864,24 @@ export default class GameScene extends Phaser.Scene {
     const idx = tightSlideIndex(candidates, this.runSpeed);
     if (idx === null) return;
     children[idx].setData('tightSlideId', this.slideId);
+  }
+
+  // 起跳瞬间给贴脸的那个障碍打上本次起跳的 id,之后贴着它过去才算擦身
+  private markTightJump() {
+    const pb = this.player.body as Phaser.Physics.Arcade.Body;
+    const children = this.obstacleGroup.getChildren() as Phaser.Physics.Arcade.Image[];
+    const candidates = children.map(o => {
+      const ob = o.body as Phaser.Physics.Arcade.Body;
+      return {
+        distanceToContact: ob.left - pb.right,
+        flyer: !!o.getData('flyer'),
+        counted: !!o.getData('counted'),
+        hit: !!o.getData('hit')
+      };
+    });
+    const idx = clutchIndex(candidates, this.runSpeed);
+    if (idx === null) return;
+    children[idx].setData('tightJumpId', this.jumpId);
   }
 
   private endSlide(cooldown = true) {
@@ -2230,10 +2253,15 @@ export default class GameScene extends Phaser.Scene {
       const horizontal = ob.right > pb.left + 2 && ob.left < pb.right - 2;
       if (!horizontal) return;
       const gap = Math.max(0, Math.max(pb.top - ob.bottom, ob.top - pb.bottom));
-      if (gap > 0 && gap <= NEAR_MISS_DISTANCE) {
-        o.setData('near', true);
-        this.onNearMiss(o);
-      }
+      if (!(gap > 0 && gap <= NEAR_MISS_DISTANCE)) return;
+      // 关键:只有「贴脸那一瞬间」做的动作才算擦身。
+      // 提前起跳 / 提前滑下去、一路等障碍过去,都只是普通翻越,不再白送擦身。
+      const clutch = this.sliding
+        ? o.getData('tightSlideId') === this.slideId
+        : o.getData('tightJumpId') === this.jumpId;
+      if (!clutch) return;
+      o.setData('near', true);
+      this.onNearMiss(o);
     });
   }
 

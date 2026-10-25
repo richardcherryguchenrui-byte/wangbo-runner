@@ -8,7 +8,8 @@
 
 import {
   PERFECT_SLIDE_ETA_MS,
-  PERFECT_SLIDE_OVERLAP_TOL_PX
+  PERFECT_SLIDE_OVERLAP_TOL_PX,
+  NEAR_MISS_CLUTCH_ETA_MS
 } from '../config/constants';
 
 export interface SlideCandidate {
@@ -57,6 +58,30 @@ export function tightSlideIndex(
   let bestEta = Number.POSITIVE_INFINITY;
   candidates.forEach((c, i) => {
     if (!c.flyer || c.counted || c.hit) return;
+    if (!isPerfectSlideTiming(c.distanceToContact, speed, windowMs, overlapTolPx)) return;
+    const eta = contactEtaMs(c.distanceToContact, speed);
+    if (eta < bestEta) {
+      bestEta = eta;
+      best = i;
+    }
+  });
+  return best;
+}
+
+/**
+ * 擦身而过也要「卡点」:不管跳还是滑,只有动作发生在贴脸那一瞬间才认。
+ * 从当前障碍里挑出这次动作(跳/滑)应该记功劳的那一个 —— 不限种类(跳过的可能是高障碍)。
+ */
+export function clutchIndex(
+  candidates: SlideCandidate[],
+  speed: number,
+  windowMs: number = NEAR_MISS_CLUTCH_ETA_MS,
+  overlapTolPx: number = PERFECT_SLIDE_OVERLAP_TOL_PX
+): number | null {
+  let best: number | null = null;
+  let bestEta = Number.POSITIVE_INFINITY;
+  candidates.forEach((c, i) => {
+    if (c.counted || c.hit) return;
     if (!isPerfectSlideTiming(c.distanceToContact, speed, windowMs, overlapTolPx)) return;
     const eta = contactEtaMs(c.distanceToContact, speed);
     if (eta < bestEta) {

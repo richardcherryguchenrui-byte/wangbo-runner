@@ -17,7 +17,7 @@ import {
   type MissionId, type MissionState
 } from '../src/systems/missions';
 import { generatePattern, stageFor, FLYER_Y } from '../src/systems/patterns';
-import { isPerfectSlideTiming, tightSlideIndex } from '../src/systems/slideJudge';
+import { isPerfectSlideTiming, tightSlideIndex, clutchIndex } from '../src/systems/slideJudge';
 import { formatDuration } from '../src/systems/offline';
 import { nextStep } from '../src/systems/hints';
 import {
@@ -1451,6 +1451,43 @@ describe('官场名人堂', () => {
 });
 
 // 双货币:银币(公开收入) vs 黑金(赃款)
+// 擦身卡点判定:只有贴脸那一瞬跳/滑才认
+describe('擦身卡点判定', () => {
+  const cand = (distanceToContact: number, extra: Partial<{ flyer: boolean; counted: boolean; hit: boolean }> = {}) => ({
+    distanceToContact, flyer: false, counted: false, hit: false, ...extra
+  });
+
+  it('贴脸距离内才算卡点', () => {
+    // 300px/s 跑速下,170ms 窗口 ≈ 51px
+    expect(clutchIndex([cand(30)], 300)).toBe(0);
+    expect(clutchIndex([cand(51)], 300)).toBe(0);
+    expect(clutchIndex([cand(120)], 300)).toBe(null);   // 提前很久,不算
+    expect(clutchIndex([cand(-8)], 300)).toBe(0);       // 已经贴上,仍在容差内
+    expect(clutchIndex([cand(-40)], 300)).toBe(null);   // 早跑到身后了,不算
+  });
+
+  it('挑最近的那个当次功劳,跳过已计数/已命中/已过去', () => {
+    expect(clutchIndex([cand(45), cand(20), cand(10)], 300)).toBe(2);
+    expect(clutchIndex([cand(10, { counted: true }), cand(40)], 300)).toBe(1);
+    expect(clutchIndex([cand(10, { hit: true })], 300)).toBe(null);
+    expect(clutchIndex([], 300)).toBe(null);
+  });
+
+  it('不限障碍种类:高障碍跳过也算卡点', () => {
+    expect(clutchIndex([cand(25, { flyer: false })], 300)).toBe(0);
+    expect(clutchIndex([cand(25, { flyer: true })], 300)).toBe(0);
+  });
+
+  it('跑速越快,同样毫秒窗口对应的像素越远', () => {
+    expect(clutchIndex([cand(80)], 300)).toBe(null);
+    expect(clutchIndex([cand(80)], 700)).toBe(0);   // 高速下 80px 也就 114ms
+  });
+
+  it('速度非法时不判定', () => {
+    expect(clutchIndex([cand(10)], 0)).toBe(null);
+  });
+});
+
 describe('双货币体系', () => {
   const purse = ASSETS[0];
 
