@@ -53,6 +53,9 @@ export const PERFECT_SLIDE_OVERLAP_TOL_PX = 16;
 export const PERFECT_SLIDE_COINS = 2;
 export const PERFECT_SLIDE_HYPE = 6;
 
+// ---- 关卡加时:到点时目标没做完,再给一段,别让玩家白跑 ----
+export const LEVEL_OVERTIME_MS = 15000;
+
 // ---- 擦身而过:极限躲避奖励 + 气势 ----
 export const NEAR_MISS_DISTANCE = 26;
 export const NEAR_MISS_COINS = 2;

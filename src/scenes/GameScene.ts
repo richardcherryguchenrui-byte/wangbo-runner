@@ -44,6 +44,7 @@ import {
   PERFECT_SLIDE_COINS,
   PERFECT_SLIDE_HYPE,
   NEAR_MISS_DISTANCE,
+  LEVEL_OVERTIME_MS,
   NEAR_MISS_COINS,
   NEAR_MISS_HYPE,
   HYPE_MAX,
@@ -259,6 +260,8 @@ export default class GameScene extends Phaser.Scene {
   private slideCooldownUntil = 0;
   private slideQueued = false;
   private slideId = 0; // 本次滑铲编号:完美滑铲只认「起滑瞬间卡点」的那一次
+  private overtimeMs = 0;      // 本局已拿到的加时
+  private overtimeUsed = false;
 
   // ---- 虚拟按键(触屏) ----
   private controls: ControlSettings = { virtualButtons: false };
@@ -1428,11 +1431,21 @@ export default class GameScene extends Phaser.Scene {
 
     this.elapsedMs += dt;
 
-    // 关卡模式:活到时长上限就算通关
-    if (this.level && this.elapsedMs >= this.level.durationMs) {
-      this.elapsedMs = this.level.durationMs;
-      this.finishLevel();
-      return;
+    // 关卡模式:到点先看目标做没做完 —— 没做完且还没加时过,就再给 15 秒,然后才结束
+    if (this.level) {
+      if (this.elapsedMs >= this.level.durationMs && !this.overtimeUsed && !this.goalsAllDone()) {
+        this.overtimeUsed = true;
+        this.overtimeMs = LEVEL_OVERTIME_MS;
+        this.showBanner('加时 15 秒', '#8ce99a', 30, 'ui-clock');
+        showToast(this, GAME_WIDTH / 2, GROUND_TOP - 250, '目标还没做完 · 再给 15 秒', '#8ce99a', 'ui-clock');
+        playSfx(this, 'wave_clear', 0.4);
+      }
+      const limit = this.level.durationMs + this.overtimeMs;
+      if (this.elapsedMs >= limit) {
+        this.elapsedMs = limit;
+        this.finishLevel();
+        return;
+      }
     }
     this.timeSinceHitMs += dt;
 
@@ -2196,6 +2209,17 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  /** 本关目标是不是都达标了(至少第一颗星的目标) */
+  private goalsAllDone(): boolean {
+    if (!this.level) return true;
+    const stats = {
+      cleared: false, timeMs: this.elapsedMs, dodged: this.dodged,
+      nearMisses: this.runNearMisses, perfectSlides: this.runPerfectSlides,
+      comboMax: this.comboMax, hits: this.hits, coins: this.runCoins
+    };
+    return this.level.goals.every(g => goalValue(g, stats) >= g.target);
+  }
+
   private checkNearMiss() {
     if (this.overdriveActive) return;
     const pb = this.player.body as Phaser.Physics.Arcade.Body;
@@ -2627,7 +2651,9 @@ export default class GameScene extends Phaser.Scene {
   private updateHud() {
     // 关卡模式显示倒计时,让「还剩几秒」成为持续压力
     const timeStr = this.level
-      ? `${(remainingMs(this.level, this.elapsedMs) / 1000).toFixed(1)}s`
+      ? (this.elapsedMs > this.level.durationMs
+        ? `加时 ${(Math.max(0, this.level.durationMs + this.overtimeMs - this.elapsedMs) / 1000).toFixed(1)}s`
+        : `${(remainingMs(this.level, this.elapsedMs) / 1000).toFixed(1)}s`)
       : `${(this.elapsedMs / 1000).toFixed(1)}s`;
     if (this.hud.time.text !== timeStr) this.hud.time.setText(timeStr);
 

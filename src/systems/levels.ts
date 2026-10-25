@@ -53,6 +53,15 @@ export const CHAPTERS: ChapterDef[] = [
   { index: 5, name: '落马时刻', tagline: '凌晨的门铃声', requireStars: 20 }
 ];
 
+// ---- 关卡时长:原来 22~48 秒太短,玩家常常任务没做完就被判结束 ----
+// 统一放大到 1.7 倍并封顶 60 秒(取 5 秒整数,方便 UI 显示)
+const LEVEL_TIME_SCALE = 1.7;
+const LEVEL_TIME_MAX_MS = 60000;
+
+export function scaleLevelDuration(ms: number): number {
+  return Math.min(LEVEL_TIME_MAX_MS, Math.round((ms * LEVEL_TIME_SCALE) / 5000) * 5000);
+}
+
 function lv(
   chapter: number,
   index: number,
@@ -69,13 +78,13 @@ function lv(
     index,
     name,
     flavor,
-    durationMs,
+    durationMs: scaleLevelDuration(durationMs),
     speedStart: speed[0],
     speedEnd: speed[1],
     rewardFirst: opts.rewardFirst ?? 40 + chapter * 25 + index * 10,
     rewardStar: 6 + chapter * 3,
     goals,
-    bossAtMs: opts.bossAtMs,
+    bossAtMs: opts.bossAtMs === undefined ? undefined : Math.round(opts.bossAtMs * LEVEL_TIME_SCALE),
     stageSpeed: opts.stageSpeed ?? 2.2 + chapter * 0.28
   };
 }
@@ -98,14 +107,14 @@ export const LEVELS: LevelDef[] = [
   // ---- 第二章 · 迎来送往 ----
   lv(1, 0, '红包往来', '收下还是退回,全看手速', 28000, [330, 450],
     [{ kind: 'dodge', target: 16, label: '翻越 16 个诱惑' },
-     { kind: 'nearmiss', target: 3, label: '擦身而过 3 次' }],
+     { kind: 'nearmiss', target: 2, label: '擦身而过 2 次' }],
     { stageSpeed: 2.4 }),
   lv(1, 1, '饭局排位', '主陪副陪,一步都不能错', 30000, [340, 470],
     [{ kind: 'combo', target: 10, label: '连击 ×10' },
      { kind: 'perfectSlide', target: 2, label: '完美滑铲 2 次' }],
     { stageSpeed: 3.0 }),
   lv(1, 2, '车改之后', '公车私用,躲开巡视', 32000, [350, 490],
-    [{ kind: 'nearmiss', target: 4, label: '擦身而过 4 次' },
+    [{ kind: 'nearmiss', target: 3, label: '擦身而过 3 次' },
      { kind: 'coins', target: 60, label: '单局 60 银币' }],
     { stageSpeed: 3.2, bossAtMs: 24000 }),
 
@@ -116,10 +125,10 @@ export const LEVELS: LevelDef[] = [
     { stageSpeed: 3.0 }),
   lv(2, 1, '拆迁现场', '钉子户与关系户', 34000, [380, 530],
     [{ kind: 'combo', target: 12, label: '连击 ×12' },
-     { kind: 'nearmiss', target: 5, label: '擦身而过 5 次' }],
+     { kind: 'nearmiss', target: 3, label: '擦身而过 3 次' }],
     { stageSpeed: 3.2, bossAtMs: 26000 }),
   lv(2, 2, '审计来访', '账本要经得起翻', 36000, [390, 550],
-    [{ kind: 'perfectSlide', target: 4, label: '完美滑铲 4 次' },
+    [{ kind: 'perfectSlide', target: 3, label: '完美滑铲 3 次' },
      { kind: 'noHit', target: 1, label: '全程不受伤' }],
     { stageSpeed: 3.4 }),
 
@@ -129,8 +138,8 @@ export const LEVELS: LevelDef[] = [
      { kind: 'combo', target: 14, label: '连击 ×14' }],
     { stageSpeed: 3.4 }),
   lv(3, 1, '组织谈话', '说真话说假话', 38000, [410, 590],
-    [{ kind: 'nearmiss', target: 6, label: '擦身而过 6 次' },
-     { kind: 'perfectSlide', target: 5, label: '完美滑铲 5 次' }],
+    [{ kind: 'nearmiss', target: 4, label: '擦身而过 4 次' },
+     { kind: 'perfectSlide', target: 3, label: '完美滑铲 3 次' }],
     { stageSpeed: 3.6, bossAtMs: 28000 }),
   lv(3, 2, '民主测评', '票数要凑齐,人心要稳住', 40000, [420, 610],
     [{ kind: 'coins', target: 90, label: '单局 90 银币' },
@@ -140,14 +149,14 @@ export const LEVELS: LevelDef[] = [
   // ---- 第五章 · 巡视风暴 ----
   lv(4, 0, '巡视组进驻', '会议室空气一下子冷了', 40000, [430, 630],
     [{ kind: 'dodge', target: 28, label: '翻越 28 个诱惑' },
-     { kind: 'perfectSlide', target: 6, label: '完美滑铲 6 次' }],
+     { kind: 'perfectSlide', target: 4, label: '完美滑铲 4 次' }],
     { stageSpeed: 3.8, bossAtMs: 30000 }),
   lv(4, 1, '谈话函询', '一句一句往回问', 42000, [440, 650],
-    [{ kind: 'nearmiss', target: 7, label: '擦身而过 7 次' },
+    [{ kind: 'nearmiss', target: 4, label: '擦身而过 4 次' },
      { kind: 'combo', target: 16, label: '连击 ×16' }],
     { stageSpeed: 4.0, bossAtMs: 26000 }),
   lv(4, 2, '线索移交', '举报信堆成了山', 44000, [450, 670],
-    [{ kind: 'perfectSlide', target: 8, label: '完美滑铲 8 次' },
+    [{ kind: 'perfectSlide', target: 5, label: '完美滑铲 5 次' },
      { kind: 'coins', target: 120, label: '单局 120 银币' }],
     { stageSpeed: 4.2, bossAtMs: 22000 }),
 
@@ -157,8 +166,8 @@ export const LEVELS: LevelDef[] = [
      { kind: 'noHit', target: 1, label: '全程不受伤' }],
     { stageSpeed: 4.2, bossAtMs: 20000 }),
   lv(5, 1, '留置期间', '时间过得很慢', 46000, [470, 710],
-    [{ kind: 'nearmiss', target: 8, label: '擦身而过 8 次' },
-     { kind: 'perfectSlide', target: 9, label: '完美滑铲 9 次' }],
+    [{ kind: 'nearmiss', target: 5, label: '擦身而过 5 次' },
+     { kind: 'perfectSlide', target: 5, label: '完美滑铲 5 次' }],
     { stageSpeed: 4.4, bossAtMs: 18000 }),
   lv(5, 2, '最后陈述', '这一路,值得吗', 48000, [480, 740],
     [{ kind: 'combo', target: 20, label: '连击 ×20' },
