@@ -102,7 +102,7 @@ const FURNITURE_SPOTS: [number, number][] = [
 ];
 /** 客人(人脉)在靠里一排站着 */
 const NPC_SPOTS: [number, number][] = [
-  [0.14, 0.16], [0.33, 0.12], [0.52, 0.16], [0.71, 0.12], [0.90, 0.16]
+  [0.14, 0.22], [0.33, 0.18], [0.52, 0.22], [0.71, 0.18], [0.90, 0.22]
 ];
 /** 交互提示气泡的纵向位置 */
 const PROMPT_Y = 366;
@@ -310,6 +310,44 @@ export default class AssetsScene extends Phaser.Scene {
       g.closePath();
       g.strokePath();
     }
+
+    // ---------- 左右侧墙(透视墙角):让房间像一个盒子,而不是一块地 ----------
+    const wallCol = this.mix(0x161e2b, 0x1d2634, tier / 4);
+    const sideWall = (dir: 1 | -1) => {
+      const backX = dir < 0 ? backL.x : backR.x;
+      const frontX = dir < 0 ? frontL.x : frontR.x;
+      const edgeX = dir < 0 ? 0 : GAME_WIDTH;
+      g.fillStyle(wallCol, 1);
+      g.beginPath();
+      g.moveTo(edgeX, FLOOR_BACK_Y - 8);
+      g.lineTo(backX, FLOOR_BACK_Y - 8);
+      g.lineTo(frontX, FLOOR_FRONT_Y);
+      g.lineTo(edgeX, FLOOR_FRONT_Y);
+      g.closePath();
+      g.fillPath();
+      // 墙角高光:一条亮边贴着地板
+      g.lineStyle(2, 0x40556e, 0.7);
+      g.lineBetween(backX, FLOOR_BACK_Y - 8, frontX, FLOOR_FRONT_Y);
+      // 墙裙
+      g.fillStyle(0x0d1420, 0.55);
+      g.beginPath();
+      g.moveTo(edgeX, FLOOR_FRONT_Y - 46);
+      g.lineTo(frontX, FLOOR_FRONT_Y - 46);
+      g.lineTo(frontX, FLOOR_FRONT_Y);
+      g.lineTo(edgeX, FLOOR_FRONT_Y);
+      g.closePath();
+      g.fillPath();
+    };
+    sideWall(-1);
+    sideWall(1);
+
+    // 吊灯在地上的光池(伪 3D 光源,让地板有明暗层次)
+    const pool = project(0.5, 0.42);
+    g.fillStyle(0xffe066, 0.06 + tier * 0.01);
+    g.fillEllipse(pool.x, pool.y, 470 * pool.scale, 120 * pool.scale);
+    const pool2 = project(0.5, 0.66);
+    g.fillStyle(0xffe066, 0.04 + tier * 0.008);
+    g.fillEllipse(pool2.x, pool2.y, 360 * pool2.scale, 90 * pool2.scale);
 
     // 两侧压暗(伪 3D 的镜头氛围:中间亮、两边沉)
     const vign = this.add.graphics().setDepth(-15);
@@ -613,7 +651,7 @@ export default class AssetsScene extends Phaser.Scene {
       const name = this.add.text(x, baseY - 52 * k, '', {
         fontFamily: FONT, fontSize: `${Math.max(9, Math.round(10 * k))}px`,
         color: level > 0 ? '#b197fc' : '#66788f', fontStyle: 'bold', resolution: 2
-      }).setOrigin(0.5, 1).setDepth(depth + 0.3);
+      }).setOrigin(0.5, 1).setDepth(depth + 0.3).setAlpha(0.86);
       const glow = this.add.image(x, baseY - 16 * k, 'spark')
         .setDepth(depth - 0.3).setTint(0xb197fc).setAlpha(level > 0 ? 0.14 : 0)
         .setDisplaySize((44 + level * 3) * k, (40 + level * 2) * k);
